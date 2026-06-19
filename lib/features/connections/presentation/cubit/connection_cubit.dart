@@ -27,10 +27,20 @@ class ConnectionCubit extends Cubit<ConnectionsState> {
     emit(state.copyWith(status: ConnectionStatus.loading));
     try {
       final connections = await _repository.getAll();
+      final persistedSelectedId = await _repository.getSelectedId();
+      final selectedId = connections.any((c) => c.id == persistedSelectedId)
+          ? persistedSelectedId
+          : null;
+
+      if (persistedSelectedId != null && selectedId == null) {
+        await _repository.setSelectedId(null);
+      }
+
       emit(
         state.copyWith(
           connections: connections,
           filteredConnections: _filter(connections, state.query),
+          selectedId: () => selectedId,
           status: ConnectionStatus.idle,
         ),
       );
@@ -43,6 +53,7 @@ class ConnectionCubit extends Cubit<ConnectionsState> {
     emit(state.copyWith(status: ConnectionStatus.saving));
     try {
       await _repository.save(connection);
+      await _repository.setSelectedId(connection.id);
       await load();
       emit(
         _feedback(
@@ -65,6 +76,7 @@ class ConnectionCubit extends Cubit<ConnectionsState> {
     try {
       await _repository.delete(id);
       if (state.selectedId == id) {
+        await _repository.setSelectedId(null);
         emit(state.copyWith(selectedId: () => null));
       }
       await load();
@@ -78,7 +90,8 @@ class ConnectionCubit extends Cubit<ConnectionsState> {
     emit(state.copyWith(query: query, filteredConnections: filtered));
   }
 
-  void select(String? id) {
+  Future<void> select(String? id) async {
+    await _repository.setSelectedId(id);
     emit(state.copyWith(selectedId: () => id));
   }
 

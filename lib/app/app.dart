@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:forui/forui.dart';
 
+import '../features/connections/presentation/cubit/connection_cubit.dart';
+import 'injection.dart';
 import 'router.dart';
 import 'theme.dart';
 import 'theme_cubit.dart';
@@ -11,8 +13,11 @@ class App extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      create: (_) => ThemeCubit(),
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider(create: (_) => ThemeCubit()),
+        BlocProvider(create: (_) => getIt<ConnectionCubit>()..load()),
+      ],
       child: BlocBuilder<ThemeCubit, ThemeMode>(
         builder: (context, mode) {
           final foruiTheme = mode == ThemeMode.dark ? darkTheme : lightTheme;

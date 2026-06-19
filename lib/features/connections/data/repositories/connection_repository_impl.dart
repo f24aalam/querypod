@@ -10,6 +10,7 @@ import '../models/connection_model.dart';
 class ConnectionRepositoryImpl implements ConnectionRepository {
   static const _connectionsKey = 'querypod_connections';
   static const _passwordPrefix = 'querypod_connection_';
+  static const _selectedConnectionKey = 'querypod_selected_connection_id';
 
   final FlutterSecureStorage _secureStorage;
   final SharedPreferences _prefs;
@@ -30,9 +31,7 @@ class ConnectionRepositoryImpl implements ConnectionRepository {
     for (final json in jsonList) {
       final connMap = json as Map<String, dynamic>;
       final id = connMap['id'] as String;
-      final password = await _secureStorage.read(
-        key: _passwordPrefix + id,
-      );
+      final password = await _secureStorage.read(key: _passwordPrefix + id);
       connections.add(
         ConnectionModel.fromJson(connMap, password: password ?? ''),
       );
@@ -61,10 +60,7 @@ class ConnectionRepositoryImpl implements ConnectionRepository {
         .map((c) => ConnectionModel.fromEntity(c).toJsonMap())
         .toList();
 
-    await _prefs.setString(
-      _connectionsKey,
-      jsonEncode(modelsJson),
-    );
+    await _prefs.setString(_connectionsKey, jsonEncode(modelsJson));
 
     return connection;
   }
@@ -80,9 +76,20 @@ class ConnectionRepositoryImpl implements ConnectionRepository {
         .map((c) => ConnectionModel.fromEntity(c).toJsonMap())
         .toList();
 
-    await _prefs.setString(
-      _connectionsKey,
-      jsonEncode(modelsJson),
-    );
+    await _prefs.setString(_connectionsKey, jsonEncode(modelsJson));
+  }
+
+  @override
+  Future<String?> getSelectedId() async =>
+      _prefs.getString(_selectedConnectionKey);
+
+  @override
+  Future<void> setSelectedId(String? id) async {
+    if (id == null) {
+      await _prefs.remove(_selectedConnectionKey);
+      return;
+    }
+
+    await _prefs.setString(_selectedConnectionKey, id);
   }
 }

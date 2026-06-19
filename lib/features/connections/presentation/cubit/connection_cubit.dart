@@ -8,7 +8,20 @@ class ConnectionCubit extends Cubit<ConnectionsState> {
   final ConnectionRepository _repository;
 
   ConnectionCubit({required this._repository})
-      : super(const ConnectionsState());
+    : super(const ConnectionsState());
+
+  ConnectionsState _feedback(
+    String message, {
+    required bool isError,
+    ConnectionStatus status = ConnectionStatus.idle,
+  }) {
+    return state.copyWith(
+      status: status,
+      feedbackMessage: () => message,
+      feedbackIsError: isError,
+      feedbackNonce: state.feedbackNonce + 1,
+    );
+  }
 
   Future<void> load() async {
     emit(state.copyWith(status: ConnectionStatus.loading));
@@ -32,13 +45,19 @@ class ConnectionCubit extends Cubit<ConnectionsState> {
       await _repository.save(connection);
       await load();
       emit(
-        state.copyWith(
-          selectedId: () => connection.id,
-          status: ConnectionStatus.idle,
-        ),
+        _feedback(
+          'Connection saved',
+          isError: false,
+        ).copyWith(selectedId: () => connection.id),
       );
     } catch (e) {
-      emit(state.copyWith(status: ConnectionStatus.error));
+      emit(
+        _feedback(
+          'Failed to save connection',
+          isError: true,
+          status: ConnectionStatus.error,
+        ),
+      );
     }
   }
 
@@ -60,51 +79,26 @@ class ConnectionCubit extends Cubit<ConnectionsState> {
   }
 
   void select(String? id) {
-    emit(state.copyWith(selectedId: () => id, testResult: () => null));
+    emit(state.copyWith(selectedId: () => id));
   }
 
   void test(Connection connection) {
-    emit(
-      state.copyWith(
-        status: ConnectionStatus.testing,
-        testResult: () => null,
-      ),
-    );
+    emit(state.copyWith(status: ConnectionStatus.testing));
 
     if (connection.name.isEmpty) {
-      emit(
-        state.copyWith(
-          status: ConnectionStatus.idle,
-          testResult: () => 'Name is required',
-        ),
-      );
+      emit(_feedback('Name is required', isError: true));
       return;
     }
     if (connection.host.isEmpty) {
-      emit(
-        state.copyWith(
-          status: ConnectionStatus.idle,
-          testResult: () => 'Host is required',
-        ),
-      );
+      emit(_feedback('Host is required', isError: true));
       return;
     }
     if (connection.port <= 0) {
-      emit(
-        state.copyWith(
-          status: ConnectionStatus.idle,
-          testResult: () => 'Port is required',
-        ),
-      );
+      emit(_feedback('Port is required', isError: true));
       return;
     }
 
-    emit(
-      state.copyWith(
-        status: ConnectionStatus.idle,
-        testResult: () => 'Validation passed',
-      ),
-    );
+    emit(_feedback('Connection looks valid', isError: false));
   }
 
   List<Connection> _filter(List<Connection> connections, String query) {

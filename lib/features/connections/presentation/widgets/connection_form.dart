@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:forui/forui.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../domain/entities/connection.dart';
 import '../cubit/connection_cubit.dart';
@@ -62,11 +61,29 @@ class _ConnectionFormState extends State<ConnectionForm> {
   Widget build(BuildContext context) {
     final theme = context.theme;
 
-    return BlocListener<ConnectionCubit, ConnectionsState>(
-      listenWhen: (prev, curr) => prev.selectedId != curr.selectedId,
-      listener: (context, state) {
-        _fillForm(state.selectedConnection);
-      },
+    return MultiBlocListener(
+      listeners: [
+        BlocListener<ConnectionCubit, ConnectionsState>(
+          listenWhen: (prev, curr) => prev.selectedId != curr.selectedId,
+          listener: (context, state) {
+            _fillForm(state.selectedConnection);
+          },
+        ),
+        BlocListener<ConnectionCubit, ConnectionsState>(
+          listenWhen: (prev, curr) =>
+              prev.feedbackNonce != curr.feedbackNonce &&
+              curr.feedbackMessage != null,
+          listener: (context, state) {
+            showFToast(
+              context: context,
+              variant: state.feedbackIsError
+                  ? FToastVariant.destructive
+                  : FToastVariant.primary,
+              title: Text(state.feedbackMessage!),
+            );
+          },
+        ),
+      ],
       child: BlocBuilder<ConnectionCubit, ConnectionsState>(
         builder: (context, state) {
           return Container(
@@ -127,54 +144,35 @@ class _ConnectionFormState extends State<ConnectionForm> {
                                 _FormField(
                                   label: 'Name',
                                   controller: _nameController,
-                                  theme: theme,
                                 ),
-                                const SizedBox(height: 4),
+                                const SizedBox(height: 12),
                                 _FormField(
                                   label: 'Host',
                                   controller: _hostController,
-                                  theme: theme,
                                 ),
-                                const SizedBox(height: 4),
+                                const SizedBox(height: 12),
                                 _FormField(
                                   label: 'Port',
                                   controller: _portController,
-                                  theme: theme,
+                                  keyboardType: TextInputType.number,
                                 ),
-                                const SizedBox(height: 4),
+                                const SizedBox(height: 12),
                                 _FormField(
                                   label: 'User',
                                   controller: _userController,
-                                  theme: theme,
                                 ),
-                                const SizedBox(height: 4),
+                                const SizedBox(height: 12),
                                 _FormField(
                                   label: 'Password',
                                   controller: _passwordController,
-                                  theme: theme,
                                   obscure: true,
                                 ),
-                                const SizedBox(height: 4),
+                                const SizedBox(height: 12),
                                 _FormField(
                                   label: 'Database',
                                   controller: _databaseController,
-                                  theme: theme,
                                 ),
                                 const SizedBox(height: 20),
-                                if (state.testResult != null)
-                                  Padding(
-                                    padding: const EdgeInsets.only(bottom: 12),
-                                    child: Text(
-                                      state.testResult!,
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color:
-                                            state.testResult!.contains('passed')
-                                            ? theme.colors.primary
-                                            : theme.colors.destructive,
-                                      ),
-                                    ),
-                                  ),
                                 Row(
                                   children: [
                                     FButton(
@@ -189,7 +187,7 @@ class _ConnectionFormState extends State<ConnectionForm> {
                                       child: Text(
                                         state.status == ConnectionStatus.testing
                                             ? 'Testing...'
-                                            : 'Test Connection',
+                                            : 'Test',
                                       ),
                                     ),
                                     const SizedBox(width: 8),
@@ -207,14 +205,6 @@ class _ConnectionFormState extends State<ConnectionForm> {
                                             : 'Save',
                                       ),
                                     ),
-                                    if (state.selectedId != null) ...[
-                                      const SizedBox(width: 8),
-                                      FButton(
-                                        variant: FButtonVariant.outline,
-                                        onPress: () => context.go('/workspace'),
-                                        child: const Text('Open Connection'),
-                                      ),
-                                    ],
                                   ],
                                 ),
                               ],
@@ -237,61 +227,30 @@ class _ConnectionFormState extends State<ConnectionForm> {
 class _FormField extends StatelessWidget {
   final String label;
   final TextEditingController controller;
-  final FThemeData theme;
   final bool obscure;
+  final TextInputType? keyboardType;
 
   const _FormField({
     required this.label,
     required this.controller,
-    required this.theme,
     this.obscure = false,
+    this.keyboardType,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: theme.colors.foreground,
-          ),
-        ),
-        const SizedBox(height: 4),
-        SizedBox(
-          height: 34,
-          child: TextField(
-            controller: controller,
-            obscureText: obscure,
-            style: TextStyle(fontSize: 13, color: theme.colors.foreground),
-            cursorColor: theme.colors.primary,
-            decoration: InputDecoration(
-              isDense: true,
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 10,
-                vertical: 4,
-              ),
-              filled: true,
-              fillColor: theme.colors.secondary,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(4),
-                borderSide: BorderSide(color: theme.colors.border, width: 1),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(4),
-                borderSide: BorderSide(color: theme.colors.border, width: 1),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(4),
-                borderSide: BorderSide(color: theme.colors.primary, width: 1),
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
+    if (obscure) {
+      return FTextField.password(
+        control: FTextFieldControl.managed(controller: controller),
+        label: Text(label),
+        keyboardType: keyboardType,
+      );
+    } else {
+      return FTextField(
+        control: FTextFieldControl.managed(controller: controller),
+        label: Text(label),
+        keyboardType: keyboardType,
+      );
+    }
   }
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:forui/forui.dart';
+import 'package:go_router/go_router.dart';
 
 import '../cubit/connection_cubit.dart';
 import '../cubit/connection_state.dart';
@@ -32,17 +33,28 @@ class ConnectionListPanel extends StatelessWidget {
                     bottom: BorderSide(color: theme.colors.border, width: 1),
                   ),
                 ),
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    'CONNECTIONS',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 0.8,
-                      color: theme.colors.mutedForeground,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'CONNECTIONS',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.8,
+                          color: theme.colors.mutedForeground,
+                        ),
+                      ),
                     ),
-                  ),
+                    FButton(
+                      variant: FButtonVariant.outline,
+                      size: FButtonSizeVariant.xs,
+                      mainAxisSize: MainAxisSize.min,
+                      onPress: () =>
+                          context.read<ConnectionCubit>().select(null),
+                      child: const Text('New'),
+                    ),
+                  ],
                 ),
               ),
               Padding(
@@ -159,6 +171,10 @@ class _ConnectionItem extends StatelessWidget {
       ],
       child: GestureDetector(
         onTap: () => context.read<ConnectionCubit>().select(id),
+        onDoubleTap: () {
+          context.read<ConnectionCubit>().select(id);
+          context.go('/workspace');
+        },
         child: Container(
           color: isSelected ? theme.colors.secondary : Colors.transparent,
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),

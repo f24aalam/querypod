@@ -1,3 +1,4 @@
 import 'package:forui/forui.dart';
 
-final theme = FThemes.zinc.dark.desktop;
+final lightTheme = FThemes.zinc.light.desktop;
+final darkTheme = FThemes.zinc.dark.desktop;

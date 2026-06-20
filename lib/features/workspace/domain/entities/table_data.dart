@@ -58,46 +58,63 @@ class TableDataRow {
   TableDataRow(List<TableCellValue> cells) : cells = List.unmodifiable(cells);
 }
 
+class TableCellCoordinate {
+  final int rowIndex;
+  final int columnIndex;
+
+  const TableCellCoordinate({
+    required this.rowIndex,
+    required this.columnIndex,
+  });
+
+  @override
+  bool operator ==(Object other) =>
+      other is TableCellCoordinate &&
+      rowIndex == other.rowIndex &&
+      columnIndex == other.columnIndex;
+
+  @override
+  int get hashCode => Object.hash(rowIndex, columnIndex);
+}
+
 class TableCellEdit {
   final int rowIndex;
   final int columnIndex;
   final String originalText;
   final String draftText;
-  final bool isSaving;
 
   const TableCellEdit({
     required this.rowIndex,
     required this.columnIndex,
     required this.originalText,
     required this.draftText,
-    this.isSaving = false,
   });
 
   bool get isDirty => draftText != originalText;
 
-  TableCellEdit copyWith({String? draftText, bool? isSaving}) {
+  TableCellCoordinate get coordinate =>
+      TableCellCoordinate(rowIndex: rowIndex, columnIndex: columnIndex);
+
+  TableCellEdit copyWith({String? draftText}) {
     return TableCellEdit(
       rowIndex: rowIndex,
       columnIndex: columnIndex,
       originalText: originalText,
       draftText: draftText ?? this.draftText,
-      isSaving: isSaving ?? this.isSaving,
     );
   }
 }
 
-class TableRowDelete {
-  final int rowIndex;
-  final bool isSaving;
+class TableCellChange {
+  final TableDataRow row;
+  final int columnIndex;
+  final String value;
 
-  const TableRowDelete({required this.rowIndex, this.isSaving = false});
-
-  TableRowDelete copyWith({bool? isSaving}) {
-    return TableRowDelete(
-      rowIndex: rowIndex,
-      isSaving: isSaving ?? this.isSaving,
-    );
-  }
+  const TableCellChange({
+    required this.row,
+    required this.columnIndex,
+    required this.value,
+  });
 }
 
 class TableStructure {

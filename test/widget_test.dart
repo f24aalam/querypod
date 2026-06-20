@@ -352,26 +352,17 @@ class _WidgetTableRepository implements TableDataRepository {
   );
 
   @override
-  Future<void> updateCell(
+  Future<void> commitChanges(
     Connection connection,
     String database,
     String table, {
     required TableStructure structure,
-    required TableDataRow row,
-    required int columnIndex,
-    required String value,
+    required List<TableCellChange> cellChanges,
+    required List<TableDataRow> deletedRows,
   }) async {
-    updatedValue = value;
-  }
-
-  @override
-  Future<void> deleteRow(
-    Connection connection,
-    String database,
-    String table, {
-    required TableStructure structure,
-    required TableDataRow row,
-  }) async {
-    deleted = true;
+    if (cellChanges.isNotEmpty) {
+      updatedValue = cellChanges.first.value;
+    }
+    deleted = deletedRows.isNotEmpty;
   }
 }

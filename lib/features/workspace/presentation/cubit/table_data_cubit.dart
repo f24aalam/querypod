@@ -39,12 +39,9 @@ class TableDataCubit extends Cubit<TableDataState> {
     final session = state.session(key);
     if (session == null || session.pageSize == pageSize) return;
     _setSession(
-      session.copyWith(
-        pageSize: pageSize,
-        pageIndex: 0,
-        selectedRowIndex: () => null,
-        cellEdit: () => null,
-        rowDelete: () => null,
+      _clearTransientState(
+        session.copyWith(pageSize: pageSize, pageIndex: 0),
+        clearError: false,
       ),
     );
     await _loadPage(key, 0);
@@ -55,45 +52,30 @@ class TableDataCubit extends Cubit<TableDataState> {
     await _loadInitial(key, refreshing: true);
   }
 
-  void selectRow(TableTabKey key, int index) {
+  void activateCell(
+    TableTabKey key,
+    int rowIndex,
+    int columnIndex, {
+    bool toggleSelection = false,
+    bool extendSelection = false,
+  }) {
     final session = state.session(key);
-    if (session == null || index < 0 || index >= session.rows.length) return;
-    if (session.selectedRowIndex == index) return;
-    _setSession(session.copyWith(selectedRowIndex: () => index));
-  }
-
-  void clearRowSelection(TableTabKey key) {
-    final session = state.session(key);
-    if (session == null || session.selectedRowIndex == null) return;
-    _setSession(session.copyWith(selectedRowIndex: () => null));
-  }
-
-  void beginCellEdit(TableTabKey key, int rowIndex, int columnIndex) {
-    final session = state.session(key);
-    if (session == null ||
-        !session.isEditable ||
-        session.rowDelete != null ||
-        rowIndex < 0 ||
-        rowIndex >= session.rows.length ||
-        columnIndex < 0 ||
-        columnIndex >= session.rows[rowIndex].cells.length) {
+    if (session == null || rowIndex < 0 || rowIndex >= session.rows.length) {
       return;
     }
-    final value = session.rows[rowIndex].cells[columnIndex];
-    _setSession(
-      session.copyWith(
-        selectedRowIndex: () => rowIndex,
-        cellEdit: () => TableCellEdit(
-          rowIndex: rowIndex,
-          columnIndex: columnIndex,
-          originalText: value.editText,
-          draftText: value.editText,
-        ),
-      ),
-    );
-  }
 
-  void activateCell(TableTabKey key, int rowIndex, int columnIndex) {
+    if (toggleSelection) {
+      _lastCellClicks.remove(key);
+      toggleRowSelection(key, rowIndex);
+      return;
+    }
+
+    if (extendSelection) {
+      _lastCellClicks.remove(key);
+      selectRowRange(key, rowIndex);
+      return;
+    }
+
     final now = DateTime.now();
     final lastClick = _lastCellClicks[key];
     final isDoubleClick =
@@ -114,130 +96,227 @@ class TableDataCubit extends Cubit<TableDataState> {
       columnIndex: columnIndex,
       timestamp: now,
     );
-    selectRow(key, rowIndex);
+    selectSingleRow(key, rowIndex);
   }
 
-  void updateCellDraft(TableTabKey key, String value) {
+  void selectSingleRow(TableTabKey key, int rowIndex) {
     final session = state.session(key);
-    final edit = session?.cellEdit;
-    if (session == null || edit == null || edit.isSaving) return;
+    if (!_isValidRow(session, rowIndex)) return;
     _setSession(
-      session.copyWith(cellEdit: () => edit.copyWith(draftText: value)),
-    );
-  }
-
-  void cancelCellEdit(TableTabKey key) {
-    final session = state.session(key);
-    if (session == null || session.cellEdit == null) return;
-    _setSession(session.copyWith(cellEdit: () => null));
-  }
-
-  void stageRowDelete(TableTabKey key, int rowIndex) {
-    final session = state.session(key);
-    if (session == null ||
-        !session.isEditable ||
-        session.rowDelete != null ||
-        rowIndex < 0 ||
-        rowIndex >= session.rows.length ||
-        (session.cellEdit?.isDirty ?? false)) {
-      return;
-    }
-    _setSession(
-      session.copyWith(
-        selectedRowIndex: () => rowIndex,
-        cellEdit: () => null,
-        rowDelete: () => TableRowDelete(rowIndex: rowIndex),
+      session!.copyWith(
+        selectedRowIndexes: {rowIndex},
+        selectionAnchorRowIndex: () => rowIndex,
+        activeCellEdit: () => null,
       ),
     );
   }
 
-  void cancelRowDelete(TableTabKey key) {
+  void toggleRowSelection(TableTabKey key, int rowIndex) {
     final session = state.session(key);
-    if (session == null || session.rowDelete == null) return;
-    _setSession(session.copyWith(rowDelete: () => null));
+    if (!_isValidRow(session, rowIndex)) return;
+    final selected = Set<int>.from(session!.selectedRowIndexes);
+    if (!selected.remove(rowIndex)) {
+      selected.add(rowIndex);
+    }
+    _setSession(
+      session.copyWith(
+        selectedRowIndexes: selected,
+        selectionAnchorRowIndex: () => rowIndex,
+        activeCellEdit: () => null,
+      ),
+    );
   }
 
-  Future<void> commitRowDelete(TableTabKey key) async {
-    final connection = _connections[key];
+  void selectRowRange(TableTabKey key, int rowIndex) {
     final session = state.session(key);
-    final deletion = session?.rowDelete;
-    final structure = session?.structure;
-    if (connection == null ||
-        session == null ||
-        deletion == null ||
-        structure == null ||
-        deletion.isSaving) {
+    if (!_isValidRow(session, rowIndex)) return;
+    final anchor = session!.selectionAnchorRowIndex ?? rowIndex;
+    final start = anchor < rowIndex ? anchor : rowIndex;
+    final end = anchor > rowIndex ? anchor : rowIndex;
+    _setSession(
+      session.copyWith(
+        selectedRowIndexes: {
+          for (var index = start; index <= end; index++) index,
+        },
+        selectionAnchorRowIndex: () => anchor,
+        activeCellEdit: () => null,
+      ),
+    );
+  }
+
+  void clearSelection(TableTabKey key) {
+    final session = state.session(key);
+    if (session == null || !session.hasSelection) return;
+    _setSession(
+      session.copyWith(
+        selectedRowIndexes: <int>{},
+        selectionAnchorRowIndex: () => null,
+        activeCellEdit: () => null,
+      ),
+    );
+  }
+
+  void beginCellEdit(TableTabKey key, int rowIndex, int columnIndex) {
+    final session = state.session(key);
+    if (session == null ||
+        !session.isEditable ||
+        !_isValidRow(session, rowIndex) ||
+        columnIndex < 0 ||
+        columnIndex >= session.rows[rowIndex].cells.length ||
+        session.stagedDeletedRowIndexes.contains(rowIndex)) {
       return;
     }
 
-    _setSession(
-      session.copyWith(rowDelete: () => deletion.copyWith(isSaving: true)),
+    final coordinate = TableCellCoordinate(
+      rowIndex: rowIndex,
+      columnIndex: columnIndex,
     );
+    final value = session.rows[rowIndex].cells[columnIndex];
+    final activeEdit =
+        session.stagedCellEdits[coordinate] ??
+        TableCellEdit(
+          rowIndex: rowIndex,
+          columnIndex: columnIndex,
+          originalText: value.editText,
+          draftText: value.editText,
+        );
+
+    final selectedRows = session.selectedRowIndexes.contains(rowIndex)
+        ? session.selectedRowIndexes
+        : {rowIndex};
+
+    _setSession(
+      session.copyWith(
+        selectedRowIndexes: selectedRows,
+        selectionAnchorRowIndex: () => rowIndex,
+        activeCellEdit: () => activeEdit,
+      ),
+    );
+  }
+
+  void updateCellDraft(TableTabKey key, String value) {
+    final session = state.session(key);
+    final edit = session?.activeCellEdit;
+    if (session == null || edit == null) return;
+
+    final updatedEdit = edit.copyWith(draftText: value);
+    final staged = Map<TableCellCoordinate, TableCellEdit>.from(
+      session.stagedCellEdits,
+    );
+    if (updatedEdit.isDirty) {
+      staged[updatedEdit.coordinate] = updatedEdit;
+    } else {
+      staged.remove(updatedEdit.coordinate);
+    }
+
+    _setSession(
+      session.copyWith(
+        activeCellEdit: () => updatedEdit,
+        stagedCellEdits: staged,
+      ),
+    );
+  }
+
+  void cancelActiveCellEdit(TableTabKey key) {
+    final session = state.session(key);
+    if (session == null || session.activeCellEdit == null) return;
+    _setSession(session.copyWith(activeCellEdit: () => null));
+  }
+
+  void stageDeleteForRow(TableTabKey key, int rowIndex) {
+    final session = state.session(key);
+    if (session == null ||
+        !session.isEditable ||
+        !_isValidRow(session, rowIndex)) {
+      return;
+    }
+
+    final targetSelection = session.selectedRowIndexes.contains(rowIndex)
+        ? session.selectedRowIndexes
+        : {rowIndex};
+    final stagedDeletes = Set<int>.from(session.stagedDeletedRowIndexes)
+      ..addAll(targetSelection);
+
+    _setSession(
+      session.copyWith(
+        selectedRowIndexes: targetSelection,
+        selectionAnchorRowIndex: () => rowIndex,
+        stagedDeletedRowIndexes: stagedDeletes,
+        activeCellEdit: () => null,
+      ),
+    );
+  }
+
+  void clearPendingChanges(TableTabKey key) {
+    final session = state.session(key);
+    if (session == null || !session.hasPendingChanges) return;
+    _setSession(
+      session.copyWith(
+        activeCellEdit: () => null,
+        stagedCellEdits: const {},
+        stagedDeletedRowIndexes: const {},
+      ),
+    );
+  }
+
+  Future<void> commitPendingChanges(TableTabKey key) async {
+    final connection = _connections[key];
+    final session = state.session(key);
+    final structure = session?.structure;
+    if (connection == null ||
+        session == null ||
+        structure == null ||
+        !session.hasPendingChanges ||
+        session.isCommittingChanges) {
+      return;
+    }
+
+    final deletedIndexes = session.stagedDeletedRowIndexes.toList()..sort();
+    final deletedRows = [
+      for (final rowIndex in deletedIndexes) session.rows[rowIndex],
+    ];
+
+    final cellChanges =
+        session.stagedCellEdits.values
+            .where(
+              (edit) =>
+                  !session.stagedDeletedRowIndexes.contains(edit.rowIndex),
+            )
+            .toList()
+          ..sort((a, b) {
+            final rowCompare = a.rowIndex.compareTo(b.rowIndex);
+            if (rowCompare != 0) return rowCompare;
+            return a.columnIndex.compareTo(b.columnIndex);
+          });
+
+    _setSession(session.copyWith(isCommittingChanges: true));
     try {
-      await repository.deleteRow(
+      await repository.commitChanges(
         connection,
         key.database,
         key.tableName,
         structure: structure,
-        row: session.rows[deletion.rowIndex],
+        cellChanges: [
+          for (final edit in cellChanges)
+            TableCellChange(
+              row: session.rows[edit.rowIndex],
+              columnIndex: edit.columnIndex,
+              value: edit.draftText,
+            ),
+        ],
+        deletedRows: deletedRows,
       );
       final latest = state.session(key);
       if (latest == null) return;
-      _setSession(
-        latest.copyWith(rowDelete: () => null, selectedRowIndex: () => null),
-      );
+      _setSession(_clearTransientState(latest, clearError: false));
       await _loadInitial(key, refreshing: true);
     } catch (error) {
       final latest = state.session(key);
       if (latest == null) return;
       _setSession(
         latest.copyWith(
-          rowDelete: () => deletion,
-          errorMessage: () => _deleteErrorMessage(error),
-          feedbackNonce: latest.feedbackNonce + 1,
-        ),
-      );
-    }
-  }
-
-  Future<void> commitCellEdit(TableTabKey key) async {
-    final connection = _connections[key];
-    final session = state.session(key);
-    final edit = session?.cellEdit;
-    final structure = session?.structure;
-    if (connection == null ||
-        session == null ||
-        edit == null ||
-        structure == null ||
-        !edit.isDirty ||
-        edit.isSaving) {
-      return;
-    }
-
-    _setSession(
-      session.copyWith(cellEdit: () => edit.copyWith(isSaving: true)),
-    );
-    try {
-      await repository.updateCell(
-        connection,
-        key.database,
-        key.tableName,
-        structure: structure,
-        row: session.rows[edit.rowIndex],
-        columnIndex: edit.columnIndex,
-        value: edit.draftText,
-      );
-      final latest = state.session(key);
-      if (latest == null) return;
-      _setSession(latest.copyWith(cellEdit: () => null));
-      await _loadPage(key, latest.pageIndex, preserveSelection: true);
-    } catch (error) {
-      final latest = state.session(key);
-      if (latest == null) return;
-      _setSession(
-        latest.copyWith(
-          cellEdit: () => edit,
-          errorMessage: () => _saveErrorMessage(error),
+          isCommittingChanges: false,
+          errorMessage: () => _commitErrorMessage(error),
           feedbackNonce: latest.feedbackNonce + 1,
         ),
       );
@@ -270,13 +349,12 @@ class TableDataCubit extends Cubit<TableDataState> {
     final generation = _nextGeneration(key);
 
     _setSession(
-      current.copyWith(
-        status: refreshing && current.hasRows
-            ? TableDataStatus.refreshing
-            : TableDataStatus.initialLoading,
-        errorMessage: () => null,
-        cellEdit: () => null,
-        rowDelete: () => null,
+      _clearTransientState(
+        current.copyWith(
+          status: refreshing && current.hasRows
+              ? TableDataStatus.refreshing
+              : TableDataStatus.initialLoading,
+        ),
       ),
     );
 
@@ -309,17 +387,15 @@ class TableDataCubit extends Cubit<TableDataState> {
       if (!_isCurrent(key, generation)) return;
 
       _setSession(
-        latest.copyWith(
-          structure: () => structure,
-          rows: page.rows,
-          totalCount: total,
-          pageIndex: pageIndex,
-          selectedRowIndex: () => null,
-          cellEdit: () => null,
-          rowDelete: () => null,
-          queryDuration: page.queryDuration,
-          status: TableDataStatus.ready,
-          errorMessage: () => null,
+        _clearTransientState(
+          latest.copyWith(
+            structure: () => structure,
+            rows: page.rows,
+            totalCount: total,
+            pageIndex: pageIndex,
+            queryDuration: page.queryDuration,
+            status: TableDataStatus.ready,
+          ),
         ),
       );
     } catch (error) {
@@ -327,11 +403,7 @@ class TableDataCubit extends Cubit<TableDataState> {
     }
   }
 
-  Future<void> _loadPage(
-    TableTabKey key,
-    int pageIndex, {
-    bool preserveSelection = false,
-  }) async {
+  Future<void> _loadPage(TableTabKey key, int pageIndex) async {
     final connection = _connections[key];
     final current = state.session(key);
     final structure = current?.structure;
@@ -339,11 +411,8 @@ class TableDataCubit extends Cubit<TableDataState> {
     final generation = _nextGeneration(key);
 
     _setSession(
-      current.copyWith(
-        status: TableDataStatus.pageLoading,
-        errorMessage: () => null,
-        cellEdit: () => null,
-        rowDelete: () => null,
+      _clearTransientState(
+        current.copyWith(status: TableDataStatus.pageLoading),
       ),
     );
 
@@ -359,16 +428,13 @@ class TableDataCubit extends Cubit<TableDataState> {
       if (!_isCurrent(key, generation)) return;
 
       _setSession(
-        current.copyWith(
-          rows: page.rows,
-          pageIndex: pageIndex,
-          selectedRowIndex: () =>
-              preserveSelection ? current.selectedRowIndex : null,
-          cellEdit: () => null,
-          rowDelete: () => null,
-          queryDuration: page.queryDuration,
-          status: TableDataStatus.ready,
-          errorMessage: () => null,
+        _clearTransientState(
+          current.copyWith(
+            rows: page.rows,
+            pageIndex: pageIndex,
+            queryDuration: page.queryDuration,
+            status: TableDataStatus.ready,
+          ),
         ),
       );
     } catch (error) {
@@ -390,6 +456,25 @@ class TableDataCubit extends Cubit<TableDataState> {
     );
   }
 
+  TableDataSession _clearTransientState(
+    TableDataSession session, {
+    bool clearError = true,
+  }) {
+    return session.copyWith(
+      selectedRowIndexes: const {},
+      selectionAnchorRowIndex: () => null,
+      activeCellEdit: () => null,
+      stagedCellEdits: const {},
+      stagedDeletedRowIndexes: const {},
+      isCommittingChanges: false,
+      errorMessage: clearError ? () => null : null,
+    );
+  }
+
+  bool _isValidRow(TableDataSession? session, int rowIndex) {
+    return session != null && rowIndex >= 0 && rowIndex < session.rows.length;
+  }
+
   String _errorMessage(Object error) {
     if (error is MySQLException && error.message.isNotEmpty) {
       return 'Failed to load table: ${error.message}';
@@ -397,19 +482,12 @@ class TableDataCubit extends Cubit<TableDataState> {
     return 'Failed to load table: $error';
   }
 
-  String _saveErrorMessage(Object error) {
+  String _commitErrorMessage(Object error) {
     if (error is MySQLException && error.message.isNotEmpty) {
-      return 'Failed to save cell: ${error.message}';
+      return 'Failed to commit changes: ${error.message}';
     }
     if (error is FormatException) return error.message;
-    return 'Failed to save cell: $error';
-  }
-
-  String _deleteErrorMessage(Object error) {
-    if (error is MySQLException && error.message.isNotEmpty) {
-      return 'Failed to delete row: ${error.message}';
-    }
-    return 'Failed to delete row: $error';
+    return 'Failed to commit changes: $error';
   }
 
   int _nextGeneration(TableTabKey key) {
@@ -418,12 +496,13 @@ class TableDataCubit extends Cubit<TableDataState> {
     return generation;
   }
 
-  bool _isCurrent(TableTabKey key, int generation) =>
-      _generations[key] == generation && state.sessions.containsKey(key);
+  bool _isCurrent(TableTabKey key, int generation) {
+    return (_generations[key] ?? 0) == generation;
+  }
 
   void _setSession(TableDataSession session) {
-    final sessions = Map<TableTabKey, TableDataSession>.from(state.sessions);
-    sessions[session.key] = session;
+    final sessions = Map<TableTabKey, TableDataSession>.from(state.sessions)
+      ..[session.key] = session;
     emit(TableDataState(sessions: sessions));
   }
 }

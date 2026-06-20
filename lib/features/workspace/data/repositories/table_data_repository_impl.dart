@@ -130,14 +130,13 @@ class TableDataRepositoryImpl implements TableDataRepository {
   }
 
   @override
-  Future<void> updateCell(
+  Future<void> commitChanges(
     Connection connection,
     String database,
     String table, {
     required TableStructure structure,
-    required TableDataRow row,
-    required int columnIndex,
-    required String value,
+    required List<TableCellChange> cellChanges,
+    required List<TableDataRow> deletedRows,
   }) async {
     final primaryKeyIndexes = <int>[
       for (var index = 0; index < structure.columns.length; index++)
@@ -149,69 +148,92 @@ class TableDataRepositoryImpl implements TableDataRepository {
 
     final conn = await _connect(connection, database);
     try {
-      final column = structure.columns[columnIndex];
-      final where = primaryKeyIndexes
-          .map(
-            (index) => '${_quoteIdentifier(structure.columns[index].name)} = ?',
-          )
-          .join(' AND ');
-      final statement = await conn.prepare(
-        'UPDATE ${_quoteIdentifier(database)}.${_quoteIdentifier(table)} '
-        'SET ${_quoteIdentifier(column.name)} = ? WHERE $where LIMIT 1',
-      );
-      try {
-        final updatedValue = row.cells[columnIndex].kind == TableCellKind.binary
-            ? _decodeHex(value)
-            : value;
-        await statement.execute([
-          updatedValue,
-          for (final index in primaryKeyIndexes) row.cells[index].rawValue,
-        ]);
-      } finally {
-        await statement.deallocate();
-      }
+      await conn.transactional((txn) async {
+        for (final change in cellChanges) {
+          await _executeUpdate(
+            txn,
+            database,
+            table,
+            structure,
+            primaryKeyIndexes,
+            change,
+          );
+        }
+        for (final row in deletedRows) {
+          await _executeDelete(
+            txn,
+            database,
+            table,
+            structure,
+            primaryKeyIndexes,
+            row,
+          );
+        }
+      });
     } finally {
       await conn.close();
     }
   }
 
-  @override
-  Future<void> deleteRow(
-    Connection connection,
+  Future<void> _executeUpdate(
+    MySQLConnection conn,
     String database,
-    String table, {
-    required TableStructure structure,
-    required TableDataRow row,
-  }) async {
-    final primaryKeyIndexes = <int>[
-      for (var index = 0; index < structure.columns.length; index++)
-        if (structure.columns[index].isPrimaryKey) index,
-    ];
-    if (primaryKeyIndexes.isEmpty) {
-      throw StateError('This table has no primary key and is read-only');
-    }
-
-    final conn = await _connect(connection, database);
+    String table,
+    TableStructure structure,
+    List<int> primaryKeyIndexes,
+    TableCellChange change,
+  ) async {
+    final column = structure.columns[change.columnIndex];
+    final where = _primaryKeyWhere(structure, primaryKeyIndexes);
+    final statement = await conn.prepare(
+      'UPDATE ${_quoteIdentifier(database)}.${_quoteIdentifier(table)} '
+      'SET ${_quoteIdentifier(column.name)} = ? WHERE $where LIMIT 1',
+    );
     try {
-      final where = primaryKeyIndexes
-          .map(
-            (index) => '${_quoteIdentifier(structure.columns[index].name)} = ?',
-          )
-          .join(' AND ');
-      final statement = await conn.prepare(
-        'DELETE FROM ${_quoteIdentifier(database)}.'
-        '${_quoteIdentifier(table)} WHERE $where LIMIT 1',
-      );
-      try {
-        await statement.execute([
-          for (final index in primaryKeyIndexes) row.cells[index].rawValue,
-        ]);
-      } finally {
-        await statement.deallocate();
-      }
+      final updatedValue =
+          change.row.cells[change.columnIndex].kind == TableCellKind.binary
+          ? _decodeHex(change.value)
+          : change.value;
+      await statement.execute([
+        updatedValue,
+        for (final index in primaryKeyIndexes) change.row.cells[index].rawValue,
+      ]);
     } finally {
-      await conn.close();
+      await statement.deallocate();
     }
+  }
+
+  Future<void> _executeDelete(
+    MySQLConnection conn,
+    String database,
+    String table,
+    TableStructure structure,
+    List<int> primaryKeyIndexes,
+    TableDataRow row,
+  ) async {
+    final where = _primaryKeyWhere(structure, primaryKeyIndexes);
+    final statement = await conn.prepare(
+      'DELETE FROM ${_quoteIdentifier(database)}.${_quoteIdentifier(table)} '
+      'WHERE $where LIMIT 1',
+    );
+    try {
+      await statement.execute([
+        for (final index in primaryKeyIndexes) row.cells[index].rawValue,
+      ]);
+    } finally {
+      await statement.deallocate();
+    }
+  }
+
+  String _primaryKeyWhere(
+    TableStructure structure,
+    List<int> primaryKeyIndexes,
+  ) {
+    return primaryKeyIndexes
+        .map(
+          (index) => '${_quoteIdentifier(structure.columns[index].name)} = ?',
+        )
+        .join(' AND ');
   }
 
   String _quoteIdentifier(String value) => '`${value.replaceAll('`', '``')}`';

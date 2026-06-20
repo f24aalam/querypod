@@ -1,5 +1,6 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:forui/forui.dart';
 
@@ -92,19 +93,20 @@ class _TableContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final selectedIndex = session.selectedRowIndex;
-    final hasSelection =
-        selectedIndex != null &&
-        selectedIndex >= 0 &&
-        selectedIndex < session.rows.length &&
-        session.structure != null;
-
     final grid = _GridWithLoading(
       tableKey: tableKey,
       session: session,
       isLoading: isLoading,
     );
-    if (!hasSelection) return grid;
+    final selectedIndex = session.singleSelectedRowIndex;
+    final showRowDetail =
+        selectedIndex != null &&
+        selectedIndex >= 0 &&
+        selectedIndex < session.rows.length &&
+        session.structure != null;
+    final showBatchInspector = session.selectionCount > 1;
+
+    if (!showRowDetail && !showBatchInspector) return grid;
 
     return FResizable(
       axis: Axis.horizontal,
@@ -117,14 +119,16 @@ class _TableContent extends StatelessWidget {
         ),
         FResizableRegion.fixed(
           extent: 320,
-          minExtent: 220,
+          minExtent: 240,
           builder: (context, data, child) => child!,
-          child: _RowDetailPanel(
-            tableKey: tableKey,
-            columns: session.structure!.columns,
-            row: session.rows[selectedIndex],
-            rowNumber: session.rangeStart + selectedIndex,
-          ),
+          child: showBatchInspector
+              ? _BatchInspector(tableKey: tableKey, session: session)
+              : _RowDetailPanel(
+                  tableKey: tableKey,
+                  columns: session.structure!.columns,
+                  row: session.rows[selectedIndex!],
+                  rowNumber: session.rangeStart + selectedIndex,
+                ),
         ),
       ],
     );
@@ -224,9 +228,8 @@ class _RowDetailPanel extends StatelessWidget {
                   tooltip: 'Close row details',
                   padding: EdgeInsets.zero,
                   splashRadius: 12,
-                  onPressed: () => context
-                      .read<TableDataCubit>()
-                      .clearRowSelection(tableKey),
+                  onPressed: () =>
+                      context.read<TableDataCubit>().clearSelection(tableKey),
                   icon: Icon(
                     Icons.close,
                     size: 14,
@@ -248,6 +251,130 @@ class _RowDetailPanel extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _BatchInspector extends StatelessWidget {
+  final TableTabKey tableKey;
+  final TableDataSession session;
+
+  const _BatchInspector({required this.tableKey, required this.session});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = context.theme;
+    return Container(
+      decoration: BoxDecoration(
+        color: theme.colors.background,
+        border: Border(left: BorderSide(color: theme.colors.border, width: 1)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            height: 34,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              border: Border(
+                bottom: BorderSide(color: theme.colors.border, width: 1),
+              ),
+            ),
+            alignment: Alignment.centerLeft,
+            child: Text(
+              'Batch selection',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: theme.colors.foreground,
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${session.selectionCount} rows selected',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: theme.colors.foreground,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  _summary(session),
+                  style: TextStyle(
+                    fontSize: 12,
+                    height: 1.4,
+                    color: theme.colors.mutedForeground,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                _InspectorMetric(
+                  label: 'Staged cell edits',
+                  value: session.stagedCellEdits.length.toString(),
+                ),
+                const SizedBox(height: 8),
+                _InspectorMetric(
+                  label: 'Rows marked for delete',
+                  value: session.stagedDeletedRowIndexes.length.toString(),
+                ),
+                const SizedBox(height: 16),
+                FButton(
+                  size: FButtonSizeVariant.xs,
+                  variant: FButtonVariant.outline,
+                  onPress: () =>
+                      context.read<TableDataCubit>().clearSelection(tableKey),
+                  child: const Text('Clear selection'),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _summary(TableDataSession session) {
+    final edits = session.stagedCellEdits.length;
+    final deletes = session.stagedDeletedRowIndexes.length;
+    if (edits == 0 && deletes == 0) {
+      return 'Use Ctrl/Cmd-click to toggle rows and Shift-click to select a range on this page.';
+    }
+    return '${session.selectionCount} rows selected, '
+        '$edits staged cell edits, $deletes rows marked for delete.';
+  }
+}
+
+class _InspectorMetric extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _InspectorMetric({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = context.theme;
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            label,
+            style: TextStyle(fontSize: 12, color: theme.colors.mutedForeground),
+          ),
+        ),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: theme.colors.foreground,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -377,13 +504,13 @@ class _DataGridState extends State<_DataGrid> {
                             rowIndex: index,
                             row: widget.session.rows[index],
                             widths: widths,
-                            selected: widget.session.selectedRowIndex == index,
-                            edit: widget.session.cellEdit,
-                            deletion: widget.session.rowDelete,
+                            selected: widget.session.selectedRowIndexes
+                                .contains(index),
+                            activeEdit: widget.session.activeCellEdit,
+                            stagedEdits: widget.session.stagedCellEdits,
+                            stagedDelete: widget.session.stagedDeletedRowIndexes
+                                .contains(index),
                             editable: widget.session.isEditable,
-                            onTap: () => context
-                                .read<TableDataCubit>()
-                                .selectRow(widget.tableKey, index),
                           ),
                         ),
                 ),
@@ -463,10 +590,10 @@ class _GridRow extends StatelessWidget {
   final TableDataRow row;
   final List<double> widths;
   final bool selected;
-  final TableCellEdit? edit;
-  final TableRowDelete? deletion;
+  final TableCellEdit? activeEdit;
+  final Map<TableCellCoordinate, TableCellEdit> stagedEdits;
+  final bool stagedDelete;
   final bool editable;
-  final VoidCallback onTap;
 
   const _GridRow({
     required this.tableKey,
@@ -474,28 +601,26 @@ class _GridRow extends StatelessWidget {
     required this.row,
     required this.widths,
     required this.selected,
-    required this.edit,
-    required this.deletion,
+    required this.activeEdit,
+    required this.stagedEdits,
+    required this.stagedDelete,
     required this.editable,
-    required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = context.theme;
-    final pendingDelete = deletion?.rowIndex == rowIndex;
-    final canDelete = editable && deletion == null && !(edit?.isDirty ?? false);
     return FContextMenu(
       menu: [
         FItemGroup(
           children: [
             FItem(
               variant: FItemVariant.destructive,
-              enabled: canDelete,
+              enabled: editable,
               prefix: const Icon(Icons.delete_outline, size: 14),
-              title: const Text('Delete row'),
-              onPress: canDelete
-                  ? () => context.read<TableDataCubit>().stageRowDelete(
+              title: const Text('Delete selection'),
+              onPress: editable
+                  ? () => context.read<TableDataCubit>().stageDeleteForRow(
                       tableKey,
                       rowIndex,
                     )
@@ -505,7 +630,7 @@ class _GridRow extends StatelessWidget {
         ),
       ],
       child: Material(
-        color: pendingDelete
+        color: stagedDelete
             ? theme.colors.destructive.withValues(alpha: 0.18)
             : selected
             ? theme.colors.secondary
@@ -514,24 +639,32 @@ class _GridRow extends StatelessWidget {
           children: [
             for (var index = 0; index < row.cells.length; index++)
               _GridCell(
+                rowIndex: rowIndex,
+                columnIndex: index,
                 value: row.cells[index],
                 width: widths[index],
-                edit: edit?.rowIndex == rowIndex && edit?.columnIndex == index
-                    ? edit
+                activeEdit:
+                    activeEdit?.rowIndex == rowIndex &&
+                        activeEdit?.columnIndex == index
+                    ? activeEdit
                     : null,
-                deleted: pendingDelete,
+                stagedEdit:
+                    stagedEdits[TableCellCoordinate(
+                      rowIndex: rowIndex,
+                      columnIndex: index,
+                    )],
+                deleted: stagedDelete,
                 onActivate: (event) {
                   if ((event.buttons & kPrimaryMouseButton) == 0) return;
-                  if (pendingDelete) return;
-                  if (editable) {
-                    context.read<TableDataCubit>().activateCell(
-                      tableKey,
-                      rowIndex,
-                      index,
-                    );
-                  } else {
-                    onTap();
-                  }
+                  final keyboard = HardwareKeyboard.instance;
+                  context.read<TableDataCubit>().activateCell(
+                    tableKey,
+                    rowIndex,
+                    index,
+                    toggleSelection:
+                        keyboard.isControlPressed || keyboard.isMetaPressed,
+                    extendSelection: keyboard.isShiftPressed,
+                  );
                 },
                 onChanged: (value) => context
                     .read<TableDataCubit>()
@@ -545,17 +678,23 @@ class _GridRow extends StatelessWidget {
 }
 
 class _GridCell extends StatelessWidget {
+  final int rowIndex;
+  final int columnIndex;
   final TableCellValue value;
   final double width;
-  final TableCellEdit? edit;
+  final TableCellEdit? activeEdit;
+  final TableCellEdit? stagedEdit;
   final bool deleted;
   final ValueChanged<PointerDownEvent> onActivate;
   final ValueChanged<String> onChanged;
 
   const _GridCell({
+    required this.rowIndex,
+    required this.columnIndex,
     required this.value,
     required this.width,
-    required this.edit,
+    required this.activeEdit,
+    required this.stagedEdit,
     required this.deleted,
     required this.onActivate,
     required this.onChanged,
@@ -564,16 +703,19 @@ class _GridCell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = context.theme;
+    final pendingEdit = stagedEdit?.isDirty ?? false;
+    final displayText = stagedEdit?.draftText ?? value.display;
+    final fullText = stagedEdit?.draftText ?? value.fullText;
     final text = Text(
-      value.display,
+      displayText,
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
       style: TextStyle(
         fontSize: 12,
-        fontStyle: value.kind == TableCellKind.nullValue
+        fontStyle: value.kind == TableCellKind.nullValue && stagedEdit == null
             ? FontStyle.italic
             : FontStyle.normal,
-        color: value.kind == TableCellKind.nullValue
+        color: value.kind == TableCellKind.nullValue && stagedEdit == null
             ? theme.colors.mutedForeground
             : deleted
             ? theme.colors.destructive
@@ -584,27 +726,30 @@ class _GridCell extends StatelessWidget {
 
     return Listener(
       behavior: HitTestBehavior.opaque,
-      onPointerDown: edit == null ? onActivate : null,
+      onPointerDown: activeEdit == null ? onActivate : null,
       child: Container(
         width: width,
         height: 34,
-        padding: edit == null
+        padding: activeEdit == null
             ? const EdgeInsets.symmetric(horizontal: 10)
             : EdgeInsets.zero,
         alignment: Alignment.centerLeft,
         decoration: BoxDecoration(
+          color: pendingEdit && !deleted
+              ? Colors.amber.withValues(alpha: 0.16)
+              : null,
           border: Border(
             right: BorderSide(color: theme.colors.border, width: 1),
             bottom: BorderSide(color: theme.colors.border, width: 0.5),
           ),
         ),
-        child: edit != null
-            ? _CellTextField(edit: edit!, onChanged: onChanged)
-            : value.fullText != null && value.fullText!.length > 24
+        child: activeEdit != null
+            ? _CellTextField(edit: activeEdit!, onChanged: onChanged)
+            : fullText != null && fullText.length > 24
             ? FTooltip(
                 tipBuilder: (context, controller) => ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 420),
-                  child: Text(value.fullText!),
+                  child: Text(fullText),
                 ),
                 child: text,
               )
@@ -664,11 +809,7 @@ class _CellTextFieldState extends State<_CellTextField> {
   @override
   Widget build(BuildContext context) {
     final theme = context.theme;
-    final isDirty = widget.edit.isDirty;
-    final borderColor = isDirty ? Colors.amber.shade700 : theme.colors.primary;
-    final fillColor = isDirty
-        ? Colors.amber.withValues(alpha: 0.16)
-        : theme.colors.background;
+    final borderColor = Colors.amber.shade700;
     return TextField(
       key: ValueKey<(String, int, int)>((
         'table-cell-editor',
@@ -677,7 +818,6 @@ class _CellTextFieldState extends State<_CellTextField> {
       )),
       controller: _controller,
       focusNode: _focusNode,
-      enabled: !widget.edit.isSaving,
       onChanged: widget.onChanged,
       expands: true,
       minLines: null,
@@ -687,7 +827,7 @@ class _CellTextFieldState extends State<_CellTextField> {
       decoration: InputDecoration(
         isDense: true,
         filled: true,
-        fillColor: fillColor,
+        fillColor: Colors.amber.withValues(alpha: 0.16),
         contentPadding: const EdgeInsets.symmetric(horizontal: 10),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.zero,
@@ -700,10 +840,6 @@ class _CellTextFieldState extends State<_CellTextField> {
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.zero,
           borderSide: BorderSide(color: borderColor, width: 1.5),
-        ),
-        disabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.zero,
-          borderSide: BorderSide(color: borderColor),
         ),
       ),
     );
@@ -721,7 +857,8 @@ class _PaginationBar extends StatelessWidget {
     final theme = context.theme;
     final disabled =
         session.status == TableDataStatus.pageLoading ||
-        session.status == TableDataStatus.refreshing;
+        session.status == TableDataStatus.refreshing ||
+        session.isCommittingChanges;
 
     return Container(
       height: 50,
@@ -734,50 +871,28 @@ class _PaginationBar extends StatelessWidget {
         scrollDirection: Axis.horizontal,
         child: Row(
           children: [
-            if (session.rowDelete != null) ...[
+            if (session.hasPendingChanges) ...[
               FButton(
                 size: FButtonSizeVariant.xs,
-                variant: FButtonVariant.destructive,
-                onPress: session.rowDelete!.isSaving
+                variant: session.hasPendingDeletes
+                    ? FButtonVariant.destructive
+                    : FButtonVariant.primary,
+                onPress: session.isCommittingChanges
                     ? null
-                    : () => context.read<TableDataCubit>().commitRowDelete(
+                    : () => context.read<TableDataCubit>().commitPendingChanges(
                         tableKey,
                       ),
                 child: Text(
-                  session.rowDelete!.isSaving ? 'Deleting…' : 'Commit',
+                  session.isCommittingChanges ? 'Committing…' : 'Commit',
                 ),
               ),
               const SizedBox(width: 6),
               FButton(
                 size: FButtonSizeVariant.xs,
                 variant: FButtonVariant.outline,
-                onPress: session.rowDelete!.isSaving
+                onPress: session.isCommittingChanges
                     ? null
-                    : () => context.read<TableDataCubit>().cancelRowDelete(
-                        tableKey,
-                      ),
-                child: const Text('Cancel'),
-              ),
-              const SizedBox(width: 16),
-            ] else if (session.cellEdit?.isDirty ?? false) ...[
-              FButton(
-                size: FButtonSizeVariant.xs,
-                onPress: session.cellEdit!.isSaving
-                    ? null
-                    : () => context.read<TableDataCubit>().commitCellEdit(
-                        tableKey,
-                      ),
-                child: Text(
-                  session.cellEdit!.isSaving ? 'Committing…' : 'Commit',
-                ),
-              ),
-              const SizedBox(width: 6),
-              FButton(
-                size: FButtonSizeVariant.xs,
-                variant: FButtonVariant.outline,
-                onPress: session.cellEdit!.isSaving
-                    ? null
-                    : () => context.read<TableDataCubit>().cancelCellEdit(
+                    : () => context.read<TableDataCubit>().clearPendingChanges(
                         tableKey,
                       ),
                 child: const Text('Cancel'),
@@ -806,6 +921,15 @@ class _PaginationBar extends StatelessWidget {
                 color: theme.colors.mutedForeground,
               ),
             ),
+            const SizedBox(width: 16),
+            if (session.hasSelection)
+              Text(
+                '${session.selectionCount} selected',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: theme.colors.mutedForeground,
+                ),
+              ),
             const SizedBox(width: 24),
             Text(
               'Rows per page',

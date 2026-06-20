@@ -19,21 +19,12 @@ abstract class TableDataRepository {
     required int limit,
   });
 
-  Future<void> updateCell(
+  Future<void> commitChanges(
     Connection connection,
     String database,
     String table, {
     required TableStructure structure,
-    required TableDataRow row,
-    required int columnIndex,
-    required String value,
-  });
-
-  Future<void> deleteRow(
-    Connection connection,
-    String database,
-    String table, {
-    required TableStructure structure,
-    required TableDataRow row,
+    required List<TableCellChange> cellChanges,
+    required List<TableDataRow> deletedRows,
   });
 }

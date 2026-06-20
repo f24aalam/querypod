@@ -10,9 +10,12 @@ class TableDataSession {
   final int totalCount;
   final int pageIndex;
   final int pageSize;
-  final int? selectedRowIndex;
-  final TableCellEdit? cellEdit;
-  final TableRowDelete? rowDelete;
+  final Set<int> selectedRowIndexes;
+  final int? selectionAnchorRowIndex;
+  final TableCellEdit? activeCellEdit;
+  final Map<TableCellCoordinate, TableCellEdit> stagedCellEdits;
+  final Set<int> stagedDeletedRowIndexes;
+  final bool isCommittingChanges;
   final Duration queryDuration;
   final TableDataStatus status;
   final String? errorMessage;
@@ -25,14 +28,20 @@ class TableDataSession {
     this.totalCount = 0,
     this.pageIndex = 0,
     this.pageSize = 50,
-    this.selectedRowIndex,
-    this.cellEdit,
-    this.rowDelete,
+    Set<int> selectedRowIndexes = const {},
+    this.selectionAnchorRowIndex,
+    this.activeCellEdit,
+    Map<TableCellCoordinate, TableCellEdit> stagedCellEdits = const {},
+    Set<int> stagedDeletedRowIndexes = const {},
+    this.isCommittingChanges = false,
     this.queryDuration = Duration.zero,
     this.status = TableDataStatus.initialLoading,
     this.errorMessage,
     this.feedbackNonce = 0,
-  }) : rows = List.unmodifiable(rows);
+  }) : rows = List.unmodifiable(rows),
+       selectedRowIndexes = Set.unmodifiable(selectedRowIndexes),
+       stagedCellEdits = Map.unmodifiable(stagedCellEdits),
+       stagedDeletedRowIndexes = Set.unmodifiable(stagedDeletedRowIndexes);
 
   int get pageCount => totalCount == 0 ? 0 : (totalCount / pageSize).ceil();
   int get rangeStart => rows.isEmpty ? 0 : pageIndex * pageSize + 1;
@@ -44,6 +53,13 @@ class TableDataSession {
   bool get hasRows => rows.isNotEmpty;
   bool get isEditable =>
       structure?.columns.any((column) => column.isPrimaryKey) ?? false;
+  bool get hasSelection => selectedRowIndexes.isNotEmpty;
+  int get selectionCount => selectedRowIndexes.length;
+  int? get singleSelectedRowIndex =>
+      selectionCount == 1 ? selectedRowIndexes.first : null;
+  bool get hasPendingEdits => stagedCellEdits.isNotEmpty;
+  bool get hasPendingDeletes => stagedDeletedRowIndexes.isNotEmpty;
+  bool get hasPendingChanges => hasPendingEdits || hasPendingDeletes;
 
   TableDataSession copyWith({
     TableStructure? Function()? structure,
@@ -51,9 +67,12 @@ class TableDataSession {
     int? totalCount,
     int? pageIndex,
     int? pageSize,
-    int? Function()? selectedRowIndex,
-    TableCellEdit? Function()? cellEdit,
-    TableRowDelete? Function()? rowDelete,
+    Set<int>? selectedRowIndexes,
+    int? Function()? selectionAnchorRowIndex,
+    TableCellEdit? Function()? activeCellEdit,
+    Map<TableCellCoordinate, TableCellEdit>? stagedCellEdits,
+    Set<int>? stagedDeletedRowIndexes,
+    bool? isCommittingChanges,
     Duration? queryDuration,
     TableDataStatus? status,
     String? Function()? errorMessage,
@@ -66,11 +85,17 @@ class TableDataSession {
       totalCount: totalCount ?? this.totalCount,
       pageIndex: pageIndex ?? this.pageIndex,
       pageSize: pageSize ?? this.pageSize,
-      selectedRowIndex: selectedRowIndex != null
-          ? selectedRowIndex()
-          : this.selectedRowIndex,
-      cellEdit: cellEdit != null ? cellEdit() : this.cellEdit,
-      rowDelete: rowDelete != null ? rowDelete() : this.rowDelete,
+      selectedRowIndexes: selectedRowIndexes ?? this.selectedRowIndexes,
+      selectionAnchorRowIndex: selectionAnchorRowIndex != null
+          ? selectionAnchorRowIndex()
+          : this.selectionAnchorRowIndex,
+      activeCellEdit: activeCellEdit != null
+          ? activeCellEdit()
+          : this.activeCellEdit,
+      stagedCellEdits: stagedCellEdits ?? this.stagedCellEdits,
+      stagedDeletedRowIndexes:
+          stagedDeletedRowIndexes ?? this.stagedDeletedRowIndexes,
+      isCommittingChanges: isCommittingChanges ?? this.isCommittingChanges,
       queryDuration: queryDuration ?? this.queryDuration,
       status: status ?? this.status,
       errorMessage: errorMessage != null ? errorMessage() : this.errorMessage,

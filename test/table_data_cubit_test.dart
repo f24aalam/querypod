@@ -141,83 +141,160 @@ void main() {
     expect(session.rows, hasLength(25));
   });
 
-  test('cell changes remain local until commit is requested', () async {
-    final repository = _FakeTableDataRepository(total: 1);
+  test('ctrl toggle and shift range selection stay on current page', () async {
+    final repository = _FakeTableDataRepository(total: 10);
     final cubit = TableDataCubit(repository: repository);
     await cubit.openTable(connection, key);
 
-    cubit.beginCellEdit(key, 0, 0);
-    cubit.updateCellDraft(key, '42');
-
-    expect(cubit.state.session(key)!.cellEdit!.isDirty, isTrue);
-    expect(repository.updates, isEmpty);
-
-    await cubit.commitCellEdit(key);
-
-    expect(
-      repository.updates.single,
-      isA<_UpdateRequest>()
-          .having((request) => request.columnIndex, 'columnIndex', 0)
-          .having((request) => request.value, 'value', '42'),
-    );
-    expect(cubit.state.session(key)!.cellEdit, isNull);
-  });
-
-  test('tables without a primary key cannot enter edit mode', () async {
-    final repository = _FakeTableDataRepository(
-      total: 1,
-      structure: TableStructure(
-        columns: const [
-          TableDataColumn(
-            name: 'name',
-            databaseType: 'varchar(255)',
-            length: 255,
-            isPrimaryKey: false,
-          ),
-        ],
-        orderColumn: 'name',
-      ),
-    );
-    final cubit = TableDataCubit(repository: repository);
-    await cubit.openTable(connection, key);
-
-    cubit.beginCellEdit(key, 0, 0);
-
-    expect(cubit.state.session(key)!.isEditable, isFalse);
-    expect(cubit.state.session(key)!.cellEdit, isNull);
-  });
-
-  test('row deletion remains staged until commit', () async {
-    final repository = _FakeTableDataRepository(total: 2);
-    final cubit = TableDataCubit(repository: repository);
-    await cubit.openTable(connection, key);
-
-    cubit.stageRowDelete(key, 0);
-
-    expect(cubit.state.session(key)!.rowDelete?.rowIndex, 0);
-    expect(repository.deletes, isEmpty);
-
-    await cubit.commitRowDelete(key);
-
-    expect(repository.deletes, hasLength(1));
-    expect(cubit.state.session(key)!.rowDelete, isNull);
-    expect(cubit.state.session(key)!.totalCount, 1);
-  });
-
-  test('failed row deletion stays staged and exposes feedback', () async {
-    final repository = _FakeTableDataRepository(total: 1)
-      ..deleteError = Exception('foreign key constraint');
-    final cubit = TableDataCubit(repository: repository);
-    await cubit.openTable(connection, key);
-    cubit.stageRowDelete(key, 0);
-
-    await cubit.commitRowDelete(key);
+    cubit.activateCell(key, 1, 0);
+    cubit.activateCell(key, 3, 0, toggleSelection: true);
+    cubit.activateCell(key, 5, 0, extendSelection: true);
 
     final session = cubit.state.session(key)!;
-    expect(session.rowDelete?.rowIndex, 0);
-    expect(session.rowDelete?.isSaving, isFalse);
-    expect(session.errorMessage, contains('foreign key constraint'));
-    expect(session.feedbackNonce, 1);
+    expect(session.selectedRowIndexes, {3, 4, 5});
+    expect(session.selectionAnchorRowIndex, 3);
+  });
+
+  test(
+    'multiple cell changes remain local until commit is requested',
+    () async {
+      final repository = _FakeTableDataRepository(
+        total: 3,
+        structure: _multiColumn,
+      );
+      final cubit = TableDataCubit(repository: repository);
+      await cubit.openTable(connection, key);
+
+      cubit.beginCellEdit(key, 0, 1);
+      cubit.updateCellDraft(key, 'Alicia');
+      cubit.beginCellEdit(key, 1, 1);
+      cubit.updateCellDraft(key, 'Bobby');
+
+      final session = cubit.state.session(key)!;
+      expect(session.stagedCellEdits, hasLength(2));
+      expect(repository.commitRequests, isEmpty);
+
+      await cubit.commitPendingChanges(key);
+
+      expect(repository.commitRequests, hasLength(1));
+      expect(
+        repository.commitRequests.single.cellChanges
+            .map((change) => change.value)
+            .toList(),
+        ['Alicia', 'Bobby'],
+      );
+      expect(cubit.state.session(key)!.hasPendingChanges, isFalse);
+    },
+  );
+
+  test(
+    'tables without a primary key cannot enter edit or delete mode',
+    () async {
+      final repository = _FakeTableDataRepository(
+        total: 1,
+        structure: TableStructure(
+          columns: const [
+            TableDataColumn(
+              name: 'name',
+              databaseType: 'varchar(255)',
+              length: 255,
+              isPrimaryKey: false,
+            ),
+          ],
+          orderColumn: 'name',
+        ),
+      );
+      final cubit = TableDataCubit(repository: repository);
+      await cubit.openTable(connection, key);
+
+      cubit.beginCellEdit(key, 0, 0);
+      cubit.stageDeleteForRow(key, 0);
+
+      expect(cubit.state.session(key)!.isEditable, isFalse);
+      expect(cubit.state.session(key)!.activeCellEdit, isNull);
+      expect(cubit.state.session(key)!.stagedDeletedRowIndexes, isEmpty);
+    },
+  );
+
+  test('right click delete stages the whole current selection', () async {
+    final repository = _FakeTableDataRepository(total: 3);
+    final cubit = TableDataCubit(repository: repository);
+    await cubit.openTable(connection, key);
+
+    cubit.selectSingleRow(key, 0);
+    cubit.toggleRowSelection(key, 1);
+    cubit.stageDeleteForRow(key, 1);
+
+    final session = cubit.state.session(key)!;
+    expect(session.selectedRowIndexes, {0, 1});
+    expect(session.stagedDeletedRowIndexes, {0, 1});
+    expect(repository.commitRequests, isEmpty);
+  });
+
+  test('mixed edits and deletes commit in one batch transaction', () async {
+    final repository = _FakeTableDataRepository(
+      total: 3,
+      structure: _multiColumn,
+    );
+    final cubit = TableDataCubit(repository: repository);
+    await cubit.openTable(connection, key);
+
+    cubit.beginCellEdit(key, 0, 1);
+    cubit.updateCellDraft(key, 'Alicia');
+    cubit.selectSingleRow(key, 1);
+    cubit.toggleRowSelection(key, 2);
+    cubit.stageDeleteForRow(key, 2);
+
+    await cubit.commitPendingChanges(key);
+
+    final request = repository.commitRequests.single;
+    expect(request.cellChanges, hasLength(1));
+    expect(request.deletedRows, hasLength(2));
+  });
+
+  test(
+    'failed batch commit keeps all staged changes and exposes feedback',
+    () async {
+      final repository = _FakeTableDataRepository(
+        total: 2,
+        structure: _multiColumn,
+      )..commitError = Exception('foreign key constraint');
+      final cubit = TableDataCubit(repository: repository);
+      await cubit.openTable(connection, key);
+
+      cubit.beginCellEdit(key, 0, 1);
+      cubit.updateCellDraft(key, 'Alicia');
+      cubit.stageDeleteForRow(key, 1);
+
+      await cubit.commitPendingChanges(key);
+
+      final session = cubit.state.session(key)!;
+      expect(session.hasPendingChanges, isTrue);
+      expect(session.isCommittingChanges, isFalse);
+      expect(session.errorMessage, contains('foreign key constraint'));
+      expect(session.feedbackNonce, 1);
+    },
+  );
+
+  test('page change clears selection and staged changes', () async {
+    final repository = _FakeTableDataRepository(
+      total: 100,
+      structure: _multiColumn,
+    );
+    final cubit = TableDataCubit(repository: repository);
+    await cubit.openTable(connection, key);
+
+    cubit.beginCellEdit(key, 0, 1);
+    cubit.updateCellDraft(key, 'Alicia');
+    cubit.selectSingleRow(key, 0);
+    cubit.toggleRowSelection(key, 1);
+
+    await cubit.nextPage(key);
+
+    final session = cubit.state.session(key)!;
+    expect(session.selectedRowIndexes, isEmpty);
+    expect(session.stagedCellEdits, isEmpty);
+    expect(session.stagedDeletedRowIndexes, isEmpty);
   });
 }
 
@@ -227,9 +304,8 @@ class _FakeTableDataRepository implements TableDataRepository {
   int countCalls = 0;
   bool failNextPage = false;
   final List<_PageRequest> requests = [];
-  final List<_UpdateRequest> updates = [];
-  final List<TableDataRow> deletes = [];
-  Object? deleteError;
+  final List<_CommitRequest> commitRequests = [];
+  Object? commitError;
 
   _FakeTableDataRepository({required this.total, TableStructure? structure})
     : structure = structure ?? _structure;
@@ -267,35 +343,25 @@ class _FakeTableDataRepository implements TableDataRepository {
     }
     final count = (total - offset).clamp(0, limit);
     return TableRowsPage(
-      rows: List.generate(count, _row),
+      rows: List.generate(count, (index) => _row(offset + index, structure)),
       queryDuration: const Duration(milliseconds: 4),
     );
   }
 
   @override
-  Future<void> updateCell(
+  Future<void> commitChanges(
     Connection connection,
     String database,
     String table, {
     required TableStructure structure,
-    required TableDataRow row,
-    required int columnIndex,
-    required String value,
+    required List<TableCellChange> cellChanges,
+    required List<TableDataRow> deletedRows,
   }) async {
-    updates.add(_UpdateRequest(columnIndex: columnIndex, value: value));
-  }
-
-  @override
-  Future<void> deleteRow(
-    Connection connection,
-    String database,
-    String table, {
-    required TableStructure structure,
-    required TableDataRow row,
-  }) async {
-    if (deleteError case final error?) throw error;
-    deletes.add(row);
-    total--;
+    if (commitError case final error?) throw error;
+    commitRequests.add(
+      _CommitRequest(cellChanges: cellChanges, deletedRows: deletedRows),
+    );
+    total -= deletedRows.length;
   }
 }
 
@@ -332,30 +398,20 @@ class _ControlledPageRepository implements TableDataRepository {
   void completeRequest(int offset, int limit) {
     requests[_PageRequest(offset: offset, limit: limit)]!.complete(
       TableRowsPage(
-        rows: List.generate(limit, _row),
+        rows: List.generate(limit, (index) => _row(offset + index, _structure)),
         queryDuration: const Duration(milliseconds: 3),
       ),
     );
   }
 
   @override
-  Future<void> updateCell(
+  Future<void> commitChanges(
     Connection connection,
     String database,
     String table, {
     required TableStructure structure,
-    required TableDataRow row,
-    required int columnIndex,
-    required String value,
-  }) async {}
-
-  @override
-  Future<void> deleteRow(
-    Connection connection,
-    String database,
-    String table, {
-    required TableStructure structure,
-    required TableDataRow row,
+    required List<TableCellChange> cellChanges,
+    required List<TableDataRow> deletedRows,
   }) async {}
 }
 
@@ -371,8 +427,29 @@ final _structure = TableStructure(
   orderColumn: 'id',
 );
 
-TableDataRow _row(int index) =>
-    TableDataRow([TableCellValue.text(index.toString())]);
+final _multiColumn = TableStructure(
+  columns: [
+    TableDataColumn(
+      name: 'id',
+      databaseType: 'int',
+      length: 11,
+      isPrimaryKey: true,
+    ),
+    TableDataColumn(
+      name: 'name',
+      databaseType: 'varchar(255)',
+      length: 255,
+      isPrimaryKey: false,
+    ),
+  ],
+  orderColumn: 'id',
+);
+
+TableDataRow _row(int index, TableStructure structure) => TableDataRow([
+  TableCellValue.text(index.toString()),
+  for (final column in structure.columns.skip(1))
+    TableCellValue.text('${column.name} $index'),
+]);
 
 class _PageRequest {
   final int offset;
@@ -388,9 +465,9 @@ class _PageRequest {
   int get hashCode => Object.hash(offset, limit);
 }
 
-class _UpdateRequest {
-  final int columnIndex;
-  final String value;
+class _CommitRequest {
+  final List<TableCellChange> cellChanges;
+  final List<TableDataRow> deletedRows;
 
-  const _UpdateRequest({required this.columnIndex, required this.value});
+  const _CommitRequest({required this.cellChanges, required this.deletedRows});
 }

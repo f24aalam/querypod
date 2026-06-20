@@ -128,6 +128,22 @@ class ConnectionCubit extends Cubit<ConnectionsState> {
       state.copyWith(
         selectedId: () => id,
         activeConnection: () => selectedConnection ?? state.activeConnection,
+        selectionNonce: state.selectionNonce + 1,
+      ),
+    );
+  }
+
+  Future<void> openSavedConnection(String id) async {
+    await _repository.setSelectedId(id);
+    final selectedConnection = state.connections
+        .where((c) => c.id == id)
+        .firstOrNull;
+    emit(
+      state.copyWith(
+        selectedId: () => id,
+        activeConnection: () => selectedConnection ?? state.activeConnection,
+        selectionNonce: state.selectionNonce + 1,
+        openWorkspaceNonce: state.openWorkspaceNonce + 1,
       ),
     );
   }

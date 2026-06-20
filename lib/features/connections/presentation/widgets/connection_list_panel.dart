@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:forui/forui.dart';
-import 'package:go_router/go_router.dart';
 
 import '../cubit/connection_cubit.dart';
 import '../cubit/connection_state.dart';
@@ -171,10 +170,8 @@ class _ConnectionItem extends StatelessWidget {
       ],
       child: GestureDetector(
         onTap: () => context.read<ConnectionCubit>().select(id),
-        onDoubleTap: () {
-          context.read<ConnectionCubit>().select(id);
-          context.go('/workspace');
-        },
+        onDoubleTap: () =>
+            context.read<ConnectionCubit>().openSavedConnection(id),
         child: Container(
           color: isSelected ? theme.colors.secondary : Colors.transparent,
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),

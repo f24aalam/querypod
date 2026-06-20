@@ -65,7 +65,8 @@ class _ConnectionFormState extends State<ConnectionForm> {
     return MultiBlocListener(
       listeners: [
         BlocListener<ConnectionCubit, ConnectionsState>(
-          listenWhen: (prev, curr) => prev.selectedId != curr.selectedId,
+          listenWhen: (prev, curr) =>
+              prev.selectionNonce != curr.selectionNonce,
           listener: (context, state) {
             _fillForm(state.selectedConnection);
           },

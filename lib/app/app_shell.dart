@@ -34,10 +34,11 @@ class AppShell extends StatelessWidget {
             child: Row(
               children: [
                 BlocBuilder<ConnectionCubit, ConnectionsState>(
-                  buildWhen: (prev, curr) => prev.selectedId != curr.selectedId,
+                  buildWhen: (prev, curr) =>
+                      prev.activeConnection?.id != curr.activeConnection?.id,
                   builder: (context, connectionState) => ActivityBar(
                     activeSection: _activeSection(),
-                    canOpenWorkspace: connectionState.selectedId != null,
+                    canOpenWorkspace: connectionState.activeConnection != null,
                   ),
                 ),
                 Expanded(child: child),

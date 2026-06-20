@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:forui/forui.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../domain/entities/connection.dart';
 import '../cubit/connection_cubit.dart';
@@ -81,6 +82,13 @@ class _ConnectionFormState extends State<ConnectionForm> {
                   : FToastVariant.primary,
               title: Text(state.feedbackMessage!),
             );
+          },
+        ),
+        BlocListener<ConnectionCubit, ConnectionsState>(
+          listenWhen: (prev, curr) =>
+              prev.openWorkspaceNonce != curr.openWorkspaceNonce,
+          listener: (context, state) {
+            context.go('/workspace');
           },
         ),
       ],
@@ -166,11 +174,13 @@ class _ConnectionFormState extends State<ConnectionForm> {
                                   label: 'Password',
                                   controller: _passwordController,
                                   obscure: true,
+                                  optional: true,
                                 ),
                                 const SizedBox(height: 12),
                                 _FormField(
                                   label: 'Database',
                                   controller: _databaseController,
+                                  optional: true,
                                 ),
                                 const SizedBox(height: 20),
                                 Row(
@@ -229,12 +239,14 @@ class _FormField extends StatelessWidget {
   final TextEditingController controller;
   final bool obscure;
   final TextInputType? keyboardType;
+  final bool optional;
 
   const _FormField({
     required this.label,
     required this.controller,
     this.obscure = false,
     this.keyboardType,
+    this.optional = false,
   });
 
   @override
@@ -242,13 +254,13 @@ class _FormField extends StatelessWidget {
     if (obscure) {
       return FTextField.password(
         control: FTextFieldControl.managed(controller: controller),
-        label: Text(label),
+        label: Text(optional ? '$label (optional)' : label),
         keyboardType: keyboardType,
       );
     } else {
       return FTextField(
         control: FTextFieldControl.managed(controller: controller),
-        label: Text(label),
+        label: Text(optional ? '$label (optional)' : label),
         keyboardType: keyboardType,
       );
     }

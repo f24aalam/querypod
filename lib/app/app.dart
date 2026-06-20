@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:forui/forui.dart';
 
 import '../features/connections/presentation/cubit/connection_cubit.dart';
+import '../features/workspace/presentation/cubit/workspace_metadata_cubit.dart';
 import 'injection.dart';
 import 'router.dart';
 import 'theme.dart';
@@ -17,6 +18,7 @@ class App extends StatelessWidget {
       providers: [
         BlocProvider(create: (_) => ThemeCubit()),
         BlocProvider(create: (_) => getIt<ConnectionCubit>()..load()),
+        BlocProvider(create: (_) => getIt<WorkspaceMetadataCubit>()),
       ],
       child: BlocBuilder<ThemeCubit, ThemeMode>(
         builder: (context, mode) {

@@ -1,4 +1,6 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:mysql_client_plus/exception.dart';
+import 'package:mysql_client_plus/mysql_client_plus.dart';
 
 import '../../domain/entities/connection.dart';
 import '../../domain/repositories/connection_repository.dart';
@@ -23,6 +25,28 @@ class ConnectionCubit extends Cubit<ConnectionsState> {
     );
   }
 
+  String _connectionErrorMessage(Object error, Connection connection) {
+    if (error is MySQLException) {
+      final base = error.message.isNotEmpty
+          ? error.message
+          : 'MySQL client returned an error';
+      return 'Failed to connect: $base';
+    }
+
+    final message = error.toString();
+    final localhostHint =
+        (connection.host == '127.0.0.1' || connection.host == 'localhost') &&
+        (message.contains('Connection refused') ||
+            message.contains('No route to host') ||
+            message.contains('OS Error'));
+
+    if (localhostHint) {
+      return 'Failed to connect: $message. If this app is running on a simulator/device, 127.0.0.1 points to the device, not your computer.';
+    }
+
+    return 'Failed to connect: $message';
+  }
+
   Future<void> load() async {
     emit(state.copyWith(status: ConnectionStatus.loading));
     try {
@@ -41,6 +65,9 @@ class ConnectionCubit extends Cubit<ConnectionsState> {
           connections: connections,
           filteredConnections: _filter(connections, state.query),
           selectedId: () => selectedId,
+          activeConnection: () => selectedId != null
+              ? connections.where((c) => c.id == selectedId).firstOrNull
+              : state.activeConnection,
           status: ConnectionStatus.idle,
         ),
       );
@@ -56,10 +83,10 @@ class ConnectionCubit extends Cubit<ConnectionsState> {
       await _repository.setSelectedId(connection.id);
       await load();
       emit(
-        _feedback(
-          'Connection saved',
-          isError: false,
-        ).copyWith(selectedId: () => connection.id),
+        _feedback('Connection saved', isError: false).copyWith(
+          selectedId: () => connection.id,
+          activeConnection: () => connection,
+        ),
       );
     } catch (e) {
       emit(
@@ -77,7 +104,9 @@ class ConnectionCubit extends Cubit<ConnectionsState> {
       await _repository.delete(id);
       if (state.selectedId == id) {
         await _repository.setSelectedId(null);
-        emit(state.copyWith(selectedId: () => null));
+        emit(
+          state.copyWith(selectedId: () => null, activeConnection: () => null),
+        );
       }
       await load();
     } catch (e) {
@@ -92,10 +121,18 @@ class ConnectionCubit extends Cubit<ConnectionsState> {
 
   Future<void> select(String? id) async {
     await _repository.setSelectedId(id);
-    emit(state.copyWith(selectedId: () => id));
+    final selectedConnection = id == null
+        ? null
+        : state.connections.where((c) => c.id == id).firstOrNull;
+    emit(
+      state.copyWith(
+        selectedId: () => id,
+        activeConnection: () => selectedConnection ?? state.activeConnection,
+      ),
+    );
   }
 
-  void test(Connection connection) {
+  Future<void> test(Connection connection) async {
     emit(state.copyWith(status: ConnectionStatus.testing));
 
     if (connection.name.isEmpty) {
@@ -111,7 +148,34 @@ class ConnectionCubit extends Cubit<ConnectionsState> {
       return;
     }
 
-    emit(_feedback('Connection looks valid', isError: false));
+    try {
+      final conn = await MySQLConnection.createConnection(
+        host: connection.host,
+        port: connection.port,
+        userName: connection.user,
+        password: connection.password,
+        databaseName: connection.database.isEmpty ? null : connection.database,
+        secure: false,
+      );
+      await conn.connect();
+      await conn.execute('SELECT 1');
+      await conn.close();
+
+      emit(
+        _feedback('Connection successful', isError: false).copyWith(
+          activeConnection: () => connection,
+          openWorkspaceNonce: state.openWorkspaceNonce + 1,
+        ),
+      );
+    } catch (e) {
+      emit(
+        _feedback(
+          _connectionErrorMessage(e, connection),
+          isError: true,
+          status: ConnectionStatus.error,
+        ),
+      );
+    }
   }
 
   List<Connection> _filter(List<Connection> connections, String query) {

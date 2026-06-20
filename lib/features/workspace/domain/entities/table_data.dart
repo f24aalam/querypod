@@ -4,21 +4,38 @@ class TableCellValue {
   final TableCellKind kind;
   final String display;
   final String? fullText;
+  final Object? rawValue;
+  final String editText;
 
   const TableCellValue._({
     required this.kind,
     required this.display,
+    required this.editText,
     this.fullText,
+    this.rawValue,
   });
 
   const TableCellValue.nullValue()
-    : this._(kind: TableCellKind.nullValue, display: 'NULL');
+    : this._(kind: TableCellKind.nullValue, display: 'NULL', editText: '');
 
   const TableCellValue.text(String value)
-    : this._(kind: TableCellKind.text, display: value, fullText: value);
+    : this._(
+        kind: TableCellKind.text,
+        display: value,
+        editText: value,
+        fullText: value,
+        rawValue: value,
+      );
 
-  const TableCellValue.binary(int bytes)
-    : this._(kind: TableCellKind.binary, display: '<binary: $bytes bytes>');
+  TableCellValue.binary(List<int> value)
+    : this._(
+        kind: TableCellKind.binary,
+        display: '<binary: ${value.length} bytes>',
+        editText: value
+            .map((byte) => byte.toRadixString(16).padLeft(2, '0'))
+            .join(),
+        rawValue: List<int>.unmodifiable(value),
+      );
 }
 
 class TableDataColumn {
@@ -39,6 +56,48 @@ class TableDataRow {
   final List<TableCellValue> cells;
 
   TableDataRow(List<TableCellValue> cells) : cells = List.unmodifiable(cells);
+}
+
+class TableCellEdit {
+  final int rowIndex;
+  final int columnIndex;
+  final String originalText;
+  final String draftText;
+  final bool isSaving;
+
+  const TableCellEdit({
+    required this.rowIndex,
+    required this.columnIndex,
+    required this.originalText,
+    required this.draftText,
+    this.isSaving = false,
+  });
+
+  bool get isDirty => draftText != originalText;
+
+  TableCellEdit copyWith({String? draftText, bool? isSaving}) {
+    return TableCellEdit(
+      rowIndex: rowIndex,
+      columnIndex: columnIndex,
+      originalText: originalText,
+      draftText: draftText ?? this.draftText,
+      isSaving: isSaving ?? this.isSaving,
+    );
+  }
+}
+
+class TableRowDelete {
+  final int rowIndex;
+  final bool isSaving;
+
+  const TableRowDelete({required this.rowIndex, this.isSaving = false});
+
+  TableRowDelete copyWith({bool? isSaving}) {
+    return TableRowDelete(
+      rowIndex: rowIndex,
+      isSaving: isSaving ?? this.isSaving,
+    );
+  }
 }
 
 class TableStructure {

@@ -18,4 +18,22 @@ abstract class TableDataRepository {
     required int offset,
     required int limit,
   });
+
+  Future<void> updateCell(
+    Connection connection,
+    String database,
+    String table, {
+    required TableStructure structure,
+    required TableDataRow row,
+    required int columnIndex,
+    required String value,
+  });
+
+  Future<void> deleteRow(
+    Connection connection,
+    String database,
+    String table, {
+    required TableStructure structure,
+    required TableDataRow row,
+  });
 }

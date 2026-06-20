@@ -197,9 +197,8 @@ void main() {
   ) async {
     await getIt.unregister<TableDataCubit>();
     await getIt.unregister<TableDataRepository>();
-    getIt.registerLazySingleton<TableDataRepository>(
-      () => _WidgetTableRepository(),
-    );
+    final repository = _WidgetTableRepository();
+    getIt.registerLazySingleton<TableDataRepository>(() => repository);
     getIt.registerFactory(
       () => TableDataCubit(repository: getIt<TableDataRepository>()),
     );
@@ -252,6 +251,31 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Row 1'), findsNothing);
 
+    final aliceCell = find.text('Alice');
+    final alicePosition = tester.getCenter(aliceCell);
+    await tester.tapAt(alicePosition);
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.tapAt(alicePosition);
+    await tester.pumpAndSettle();
+    expect(find.text('Commit'), findsNothing);
+    expect(find.text('Cancel'), findsNothing);
+
+    await tester.enterText(
+      find.byKey(
+        const ValueKey<(String, int, int)>(('table-cell-editor', 0, 1)),
+      ),
+      'Alicia',
+    );
+    await tester.pump();
+    expect(find.text('Commit'), findsOneWidget);
+    expect(find.text('Cancel'), findsOneWidget);
+    expect(repository.updatedValue, isNull);
+
+    await tester.tap(find.text('Commit'));
+    await tester.pumpAndSettle();
+    expect(repository.updatedValue, 'Alicia');
+    expect(find.text('Commit'), findsNothing);
+
     final tableTab = find.byKey(
       const ValueKey<(String, EditorTabKey)>(('tab-strip', key)),
     );
@@ -264,6 +288,9 @@ void main() {
 }
 
 class _WidgetTableRepository implements TableDataRepository {
+  String? updatedValue;
+  bool deleted = false;
+
   @override
   Future<TableStructure> inspectTable(
     Connection connection,
@@ -323,4 +350,28 @@ class _WidgetTableRepository implements TableDataRepository {
     ],
     queryDuration: const Duration(milliseconds: 5),
   );
+
+  @override
+  Future<void> updateCell(
+    Connection connection,
+    String database,
+    String table, {
+    required TableStructure structure,
+    required TableDataRow row,
+    required int columnIndex,
+    required String value,
+  }) async {
+    updatedValue = value;
+  }
+
+  @override
+  Future<void> deleteRow(
+    Connection connection,
+    String database,
+    String table, {
+    required TableStructure structure,
+    required TableDataRow row,
+  }) async {
+    deleted = true;
+  }
 }

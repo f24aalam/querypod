@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:forui/forui.dart';
@@ -372,9 +373,14 @@ class _DataGridState extends State<_DataGrid> {
                           itemExtent: 34,
                           itemCount: widget.session.rows.length,
                           itemBuilder: (context, index) => _GridRow(
+                            tableKey: widget.tableKey,
+                            rowIndex: index,
                             row: widget.session.rows[index],
                             widths: widths,
                             selected: widget.session.selectedRowIndex == index,
+                            edit: widget.session.cellEdit,
+                            deletion: widget.session.rowDelete,
+                            editable: widget.session.isEditable,
                             onTap: () => context
                                 .read<TableDataCubit>()
                                 .selectRow(widget.tableKey, index),
@@ -452,29 +458,85 @@ class _HeaderRow extends StatelessWidget {
 }
 
 class _GridRow extends StatelessWidget {
+  final TableTabKey tableKey;
+  final int rowIndex;
   final TableDataRow row;
   final List<double> widths;
   final bool selected;
+  final TableCellEdit? edit;
+  final TableRowDelete? deletion;
+  final bool editable;
   final VoidCallback onTap;
 
   const _GridRow({
+    required this.tableKey,
+    required this.rowIndex,
     required this.row,
     required this.widths,
     required this.selected,
+    required this.edit,
+    required this.deletion,
+    required this.editable,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = context.theme;
-    return Material(
-      color: selected ? theme.colors.secondary : Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
+    final pendingDelete = deletion?.rowIndex == rowIndex;
+    final canDelete = editable && deletion == null && !(edit?.isDirty ?? false);
+    return FContextMenu(
+      menu: [
+        FItemGroup(
+          children: [
+            FItem(
+              variant: FItemVariant.destructive,
+              enabled: canDelete,
+              prefix: const Icon(Icons.delete_outline, size: 14),
+              title: const Text('Delete row'),
+              onPress: canDelete
+                  ? () => context.read<TableDataCubit>().stageRowDelete(
+                      tableKey,
+                      rowIndex,
+                    )
+                  : null,
+            ),
+          ],
+        ),
+      ],
+      child: Material(
+        color: pendingDelete
+            ? theme.colors.destructive.withValues(alpha: 0.18)
+            : selected
+            ? theme.colors.secondary
+            : Colors.transparent,
         child: Row(
           children: [
             for (var index = 0; index < row.cells.length; index++)
-              _GridCell(value: row.cells[index], width: widths[index]),
+              _GridCell(
+                value: row.cells[index],
+                width: widths[index],
+                edit: edit?.rowIndex == rowIndex && edit?.columnIndex == index
+                    ? edit
+                    : null,
+                deleted: pendingDelete,
+                onActivate: (event) {
+                  if ((event.buttons & kPrimaryMouseButton) == 0) return;
+                  if (pendingDelete) return;
+                  if (editable) {
+                    context.read<TableDataCubit>().activateCell(
+                      tableKey,
+                      rowIndex,
+                      index,
+                    );
+                  } else {
+                    onTap();
+                  }
+                },
+                onChanged: (value) => context
+                    .read<TableDataCubit>()
+                    .updateCellDraft(tableKey, value),
+              ),
           ],
         ),
       ),
@@ -485,8 +547,19 @@ class _GridRow extends StatelessWidget {
 class _GridCell extends StatelessWidget {
   final TableCellValue value;
   final double width;
+  final TableCellEdit? edit;
+  final bool deleted;
+  final ValueChanged<PointerDownEvent> onActivate;
+  final ValueChanged<String> onChanged;
 
-  const _GridCell({required this.value, required this.width});
+  const _GridCell({
+    required this.value,
+    required this.width,
+    required this.edit,
+    required this.deleted,
+    required this.onActivate,
+    required this.onChanged,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -502,30 +575,137 @@ class _GridCell extends StatelessWidget {
             : FontStyle.normal,
         color: value.kind == TableCellKind.nullValue
             ? theme.colors.mutedForeground
+            : deleted
+            ? theme.colors.destructive
             : theme.colors.foreground,
+        decoration: deleted ? TextDecoration.lineThrough : null,
       ),
     );
 
-    return Container(
-      width: width,
-      height: 34,
-      padding: const EdgeInsets.symmetric(horizontal: 10),
-      alignment: Alignment.centerLeft,
-      decoration: BoxDecoration(
-        border: Border(
-          right: BorderSide(color: theme.colors.border, width: 1),
-          bottom: BorderSide(color: theme.colors.border, width: 0.5),
+    return Listener(
+      behavior: HitTestBehavior.opaque,
+      onPointerDown: edit == null ? onActivate : null,
+      child: Container(
+        width: width,
+        height: 34,
+        padding: edit == null
+            ? const EdgeInsets.symmetric(horizontal: 10)
+            : EdgeInsets.zero,
+        alignment: Alignment.centerLeft,
+        decoration: BoxDecoration(
+          border: Border(
+            right: BorderSide(color: theme.colors.border, width: 1),
+            bottom: BorderSide(color: theme.colors.border, width: 0.5),
+          ),
+        ),
+        child: edit != null
+            ? _CellTextField(edit: edit!, onChanged: onChanged)
+            : value.fullText != null && value.fullText!.length > 24
+            ? FTooltip(
+                tipBuilder: (context, controller) => ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 420),
+                  child: Text(value.fullText!),
+                ),
+                child: text,
+              )
+            : text,
+      ),
+    );
+  }
+}
+
+class _CellTextField extends StatefulWidget {
+  final TableCellEdit edit;
+  final ValueChanged<String> onChanged;
+
+  const _CellTextField({required this.edit, required this.onChanged});
+
+  @override
+  State<_CellTextField> createState() => _CellTextFieldState();
+}
+
+class _CellTextFieldState extends State<_CellTextField> {
+  late final TextEditingController _controller;
+  late final FocusNode _focusNode;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.edit.draftText);
+    _controller.selection = TextSelection.collapsed(
+      offset: _controller.text.length,
+    );
+    _focusNode = FocusNode();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _focusNode.requestFocus();
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant _CellTextField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_controller.text != widget.edit.draftText) {
+      _controller.value = TextEditingValue(
+        text: widget.edit.draftText,
+        selection: TextSelection.collapsed(
+          offset: widget.edit.draftText.length,
+        ),
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = context.theme;
+    final isDirty = widget.edit.isDirty;
+    final borderColor = isDirty ? Colors.amber.shade700 : theme.colors.primary;
+    final fillColor = isDirty
+        ? Colors.amber.withValues(alpha: 0.16)
+        : theme.colors.background;
+    return TextField(
+      key: ValueKey<(String, int, int)>((
+        'table-cell-editor',
+        widget.edit.rowIndex,
+        widget.edit.columnIndex,
+      )),
+      controller: _controller,
+      focusNode: _focusNode,
+      enabled: !widget.edit.isSaving,
+      onChanged: widget.onChanged,
+      expands: true,
+      minLines: null,
+      maxLines: null,
+      textAlignVertical: TextAlignVertical.center,
+      style: TextStyle(fontSize: 12, color: theme.colors.foreground),
+      decoration: InputDecoration(
+        isDense: true,
+        filled: true,
+        fillColor: fillColor,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 10),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.zero,
+          borderSide: BorderSide(color: borderColor),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.zero,
+          borderSide: BorderSide(color: borderColor),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.zero,
+          borderSide: BorderSide(color: borderColor, width: 1.5),
+        ),
+        disabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.zero,
+          borderSide: BorderSide(color: borderColor),
         ),
       ),
-      child: value.fullText != null && value.fullText!.length > 24
-          ? FTooltip(
-              tipBuilder: (context, controller) => ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 420),
-                child: Text(value.fullText!),
-              ),
-              child: text,
-            )
-          : text,
     );
   }
 }
@@ -554,6 +734,71 @@ class _PaginationBar extends StatelessWidget {
         scrollDirection: Axis.horizontal,
         child: Row(
           children: [
+            if (session.rowDelete != null) ...[
+              FButton(
+                size: FButtonSizeVariant.xs,
+                variant: FButtonVariant.destructive,
+                onPress: session.rowDelete!.isSaving
+                    ? null
+                    : () => context.read<TableDataCubit>().commitRowDelete(
+                        tableKey,
+                      ),
+                child: Text(
+                  session.rowDelete!.isSaving ? 'Deleting…' : 'Commit',
+                ),
+              ),
+              const SizedBox(width: 6),
+              FButton(
+                size: FButtonSizeVariant.xs,
+                variant: FButtonVariant.outline,
+                onPress: session.rowDelete!.isSaving
+                    ? null
+                    : () => context.read<TableDataCubit>().cancelRowDelete(
+                        tableKey,
+                      ),
+                child: const Text('Cancel'),
+              ),
+              const SizedBox(width: 16),
+            ] else if (session.cellEdit?.isDirty ?? false) ...[
+              FButton(
+                size: FButtonSizeVariant.xs,
+                onPress: session.cellEdit!.isSaving
+                    ? null
+                    : () => context.read<TableDataCubit>().commitCellEdit(
+                        tableKey,
+                      ),
+                child: Text(
+                  session.cellEdit!.isSaving ? 'Committing…' : 'Commit',
+                ),
+              ),
+              const SizedBox(width: 6),
+              FButton(
+                size: FButtonSizeVariant.xs,
+                variant: FButtonVariant.outline,
+                onPress: session.cellEdit!.isSaving
+                    ? null
+                    : () => context.read<TableDataCubit>().cancelCellEdit(
+                        tableKey,
+                      ),
+                child: const Text('Cancel'),
+              ),
+              const SizedBox(width: 16),
+            ] else if (!session.isEditable) ...[
+              Icon(
+                Icons.lock_outline,
+                size: 13,
+                color: theme.colors.mutedForeground,
+              ),
+              const SizedBox(width: 5),
+              Text(
+                'Read-only: no primary key',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: theme.colors.mutedForeground,
+                ),
+              ),
+              const SizedBox(width: 16),
+            ],
             Text(
               _rangeLabel(session),
               style: TextStyle(

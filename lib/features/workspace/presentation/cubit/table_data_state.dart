@@ -11,6 +11,8 @@ class TableDataSession {
   final int pageIndex;
   final int pageSize;
   final int? selectedRowIndex;
+  final TableCellEdit? cellEdit;
+  final TableRowDelete? rowDelete;
   final Duration queryDuration;
   final TableDataStatus status;
   final String? errorMessage;
@@ -24,6 +26,8 @@ class TableDataSession {
     this.pageIndex = 0,
     this.pageSize = 50,
     this.selectedRowIndex,
+    this.cellEdit,
+    this.rowDelete,
     this.queryDuration = Duration.zero,
     this.status = TableDataStatus.initialLoading,
     this.errorMessage,
@@ -38,6 +42,8 @@ class TableDataSession {
   bool get canGoNext =>
       status != TableDataStatus.pageLoading && rangeEnd < totalCount;
   bool get hasRows => rows.isNotEmpty;
+  bool get isEditable =>
+      structure?.columns.any((column) => column.isPrimaryKey) ?? false;
 
   TableDataSession copyWith({
     TableStructure? Function()? structure,
@@ -46,6 +52,8 @@ class TableDataSession {
     int? pageIndex,
     int? pageSize,
     int? Function()? selectedRowIndex,
+    TableCellEdit? Function()? cellEdit,
+    TableRowDelete? Function()? rowDelete,
     Duration? queryDuration,
     TableDataStatus? status,
     String? Function()? errorMessage,
@@ -61,6 +69,8 @@ class TableDataSession {
       selectedRowIndex: selectedRowIndex != null
           ? selectedRowIndex()
           : this.selectedRowIndex,
+      cellEdit: cellEdit != null ? cellEdit() : this.cellEdit,
+      rowDelete: rowDelete != null ? rowDelete() : this.rowDelete,
       queryDuration: queryDuration ?? this.queryDuration,
       status: status ?? this.status,
       errorMessage: errorMessage != null ? errorMessage() : this.errorMessage,

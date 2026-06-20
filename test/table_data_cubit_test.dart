@@ -140,22 +140,106 @@ void main() {
     expect(session.pageIndex, 0);
     expect(session.rows, hasLength(25));
   });
+
+  test('cell changes remain local until commit is requested', () async {
+    final repository = _FakeTableDataRepository(total: 1);
+    final cubit = TableDataCubit(repository: repository);
+    await cubit.openTable(connection, key);
+
+    cubit.beginCellEdit(key, 0, 0);
+    cubit.updateCellDraft(key, '42');
+
+    expect(cubit.state.session(key)!.cellEdit!.isDirty, isTrue);
+    expect(repository.updates, isEmpty);
+
+    await cubit.commitCellEdit(key);
+
+    expect(
+      repository.updates.single,
+      isA<_UpdateRequest>()
+          .having((request) => request.columnIndex, 'columnIndex', 0)
+          .having((request) => request.value, 'value', '42'),
+    );
+    expect(cubit.state.session(key)!.cellEdit, isNull);
+  });
+
+  test('tables without a primary key cannot enter edit mode', () async {
+    final repository = _FakeTableDataRepository(
+      total: 1,
+      structure: TableStructure(
+        columns: const [
+          TableDataColumn(
+            name: 'name',
+            databaseType: 'varchar(255)',
+            length: 255,
+            isPrimaryKey: false,
+          ),
+        ],
+        orderColumn: 'name',
+      ),
+    );
+    final cubit = TableDataCubit(repository: repository);
+    await cubit.openTable(connection, key);
+
+    cubit.beginCellEdit(key, 0, 0);
+
+    expect(cubit.state.session(key)!.isEditable, isFalse);
+    expect(cubit.state.session(key)!.cellEdit, isNull);
+  });
+
+  test('row deletion remains staged until commit', () async {
+    final repository = _FakeTableDataRepository(total: 2);
+    final cubit = TableDataCubit(repository: repository);
+    await cubit.openTable(connection, key);
+
+    cubit.stageRowDelete(key, 0);
+
+    expect(cubit.state.session(key)!.rowDelete?.rowIndex, 0);
+    expect(repository.deletes, isEmpty);
+
+    await cubit.commitRowDelete(key);
+
+    expect(repository.deletes, hasLength(1));
+    expect(cubit.state.session(key)!.rowDelete, isNull);
+    expect(cubit.state.session(key)!.totalCount, 1);
+  });
+
+  test('failed row deletion stays staged and exposes feedback', () async {
+    final repository = _FakeTableDataRepository(total: 1)
+      ..deleteError = Exception('foreign key constraint');
+    final cubit = TableDataCubit(repository: repository);
+    await cubit.openTable(connection, key);
+    cubit.stageRowDelete(key, 0);
+
+    await cubit.commitRowDelete(key);
+
+    final session = cubit.state.session(key)!;
+    expect(session.rowDelete?.rowIndex, 0);
+    expect(session.rowDelete?.isSaving, isFalse);
+    expect(session.errorMessage, contains('foreign key constraint'));
+    expect(session.feedbackNonce, 1);
+  });
 }
 
 class _FakeTableDataRepository implements TableDataRepository {
   int total;
+  final TableStructure structure;
   int countCalls = 0;
   bool failNextPage = false;
   final List<_PageRequest> requests = [];
+  final List<_UpdateRequest> updates = [];
+  final List<TableDataRow> deletes = [];
+  Object? deleteError;
 
-  _FakeTableDataRepository({required this.total});
+  _FakeTableDataRepository({required this.total, TableStructure? structure})
+    : structure = structure ?? _structure;
 
   @override
   Future<TableStructure> inspectTable(
     Connection connection,
     String database,
     String table,
-  ) async => _structure;
+  ) async => structure;
 
   @override
   Future<int> countRows(
@@ -186,6 +270,32 @@ class _FakeTableDataRepository implements TableDataRepository {
       rows: List.generate(count, _row),
       queryDuration: const Duration(milliseconds: 4),
     );
+  }
+
+  @override
+  Future<void> updateCell(
+    Connection connection,
+    String database,
+    String table, {
+    required TableStructure structure,
+    required TableDataRow row,
+    required int columnIndex,
+    required String value,
+  }) async {
+    updates.add(_UpdateRequest(columnIndex: columnIndex, value: value));
+  }
+
+  @override
+  Future<void> deleteRow(
+    Connection connection,
+    String database,
+    String table, {
+    required TableStructure structure,
+    required TableDataRow row,
+  }) async {
+    if (deleteError case final error?) throw error;
+    deletes.add(row);
+    total--;
   }
 }
 
@@ -227,6 +337,26 @@ class _ControlledPageRepository implements TableDataRepository {
       ),
     );
   }
+
+  @override
+  Future<void> updateCell(
+    Connection connection,
+    String database,
+    String table, {
+    required TableStructure structure,
+    required TableDataRow row,
+    required int columnIndex,
+    required String value,
+  }) async {}
+
+  @override
+  Future<void> deleteRow(
+    Connection connection,
+    String database,
+    String table, {
+    required TableStructure structure,
+    required TableDataRow row,
+  }) async {}
 }
 
 final _structure = TableStructure(
@@ -256,4 +386,11 @@ class _PageRequest {
 
   @override
   int get hashCode => Object.hash(offset, limit);
+}
+
+class _UpdateRequest {
+  final int columnIndex;
+  final String value;
+
+  const _UpdateRequest({required this.columnIndex, required this.value});
 }

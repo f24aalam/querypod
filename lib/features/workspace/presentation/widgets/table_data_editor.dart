@@ -861,135 +861,169 @@ class _PaginationBar extends StatelessWidget {
         session.isCommittingChanges;
 
     return Container(
+      width: double.infinity,
       height: 50,
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         color: theme.colors.background,
         border: Border(top: BorderSide(color: theme.colors.border, width: 1)),
       ),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: [
-            if (session.hasPendingChanges) ...[
-              FButton(
-                size: FButtonSizeVariant.xs,
-                variant: session.hasPendingDeletes
-                    ? FButtonVariant.destructive
-                    : FButtonVariant.primary,
-                onPress: session.isCommittingChanges
-                    ? null
-                    : () => context.read<TableDataCubit>().commitPendingChanges(
-                        tableKey,
+      child: Stack(
+        children: [
+          Align(
+            alignment: Alignment.centerLeft,
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (!session.isEditable) ...[
+                    Icon(
+                      Icons.lock_outline,
+                      size: 13,
+                      color: theme.colors.mutedForeground,
+                    ),
+                    const SizedBox(width: 5),
+                    Text(
+                      'Read-only: no primary key',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: theme.colors.mutedForeground,
                       ),
-                child: Text(
-                  session.isCommittingChanges ? 'Committing…' : 'Commit',
-                ),
-              ),
-              const SizedBox(width: 6),
-              FButton(
-                size: FButtonSizeVariant.xs,
-                variant: FButtonVariant.outline,
-                onPress: session.isCommittingChanges
-                    ? null
-                    : () => context.read<TableDataCubit>().clearPendingChanges(
-                        tableKey,
+                    ),
+                    const SizedBox(width: 12),
+                  ],
+                  const SizedBox(width: 16),
+                  Text(
+                    'Rows per page',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: theme.colors.mutedForeground,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  SizedBox(
+                    width: 76,
+                    child: FSelect<int>(
+                      items: const {'25': 25, '50': 50, '100': 100},
+                      size: FTextFieldSizeVariant.sm,
+                      enabled: !disabled,
+                      control: FSelectControl.lifted(
+                        value: session.pageSize,
+                        onChange: (value) {
+                          if (value != null) {
+                            context.read<TableDataCubit>().setPageSize(
+                              tableKey,
+                              value,
+                            );
+                          }
+                        },
                       ),
-                child: const Text('Cancel'),
-              ),
-              const SizedBox(width: 16),
-            ] else if (!session.isEditable) ...[
-              Icon(
-                Icons.lock_outline,
-                size: 13,
-                color: theme.colors.mutedForeground,
-              ),
-              const SizedBox(width: 5),
-              Text(
-                'Read-only: no primary key',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: theme.colors.mutedForeground,
-                ),
-              ),
-              const SizedBox(width: 16),
-            ],
-            Text(
-              _rangeLabel(session),
-              style: TextStyle(
-                fontSize: 12,
-                color: theme.colors.mutedForeground,
+                    ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(width: 16),
-            if (session.hasSelection)
-              Text(
-                '${session.selectionCount} selected',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: theme.colors.mutedForeground,
-                ),
-              ),
-            const SizedBox(width: 24),
-            Text(
-              'Rows per page',
-              style: TextStyle(
-                fontSize: 12,
-                color: theme.colors.mutedForeground,
-              ),
-            ),
-            const SizedBox(width: 8),
-            SizedBox(
-              width: 76,
-              child: FSelect<int>(
-                items: const {'25': 25, '50': 50, '100': 100},
-                size: FTextFieldSizeVariant.sm,
-                enabled: !disabled,
-                control: FSelectControl.lifted(
-                  value: session.pageSize,
-                  onChange: (value) {
-                    if (value != null) {
-                      context.read<TableDataCubit>().setPageSize(
-                        tableKey,
-                        value,
-                      );
-                    }
-                  },
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            FButton(
-              size: FButtonSizeVariant.xs,
-              variant: FButtonVariant.outline,
-              onPress: session.canGoPrevious
-                  ? () => context.read<TableDataCubit>().previousPage(tableKey)
-                  : null,
-              child: const Text('Previous'),
-            ),
-            const SizedBox(width: 6),
-            FButton(
-              size: FButtonSizeVariant.xs,
-              variant: FButtonVariant.outline,
-              onPress: session.canGoNext
-                  ? () => context.read<TableDataCubit>().nextPage(tableKey)
-                  : null,
-              child: const Text('Next'),
-            ),
-            const SizedBox(width: 6),
-            FTooltip(
-              tipBuilder: (context, controller) => const Text('Refresh'),
-              child: FButton.icon(
-                size: FButtonSizeVariant.xs,
-                variant: FButtonVariant.outline,
-                onPress: disabled
-                    ? null
-                    : () => context.read<TableDataCubit>().refresh(tableKey),
-                child: const Icon(Icons.refresh, size: 14),
+          ),
+          if (session.hasPendingChanges || session.hasSelection)
+            Center(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (session.hasSelection) ...[
+                    Text(
+                      '${session.selectionCount} selected',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: theme.colors.mutedForeground,
+                      ),
+                    ),
+                    if (session.hasPendingChanges) const SizedBox(width: 12),
+                  ],
+                  if (session.hasPendingChanges) ...[
+                  FButton(
+                    size: FButtonSizeVariant.xs,
+                    variant: session.hasPendingDeletes
+                        ? FButtonVariant.destructive
+                        : FButtonVariant.primary,
+                    onPress: session.isCommittingChanges
+                        ? null
+                        : () => context
+                              .read<TableDataCubit>()
+                              .commitPendingChanges(tableKey),
+                    child: Text(
+                      session.isCommittingChanges ? 'Committing…' : 'Commit',
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  FButton(
+                    size: FButtonSizeVariant.xs,
+                    variant: FButtonVariant.outline,
+                    onPress: session.isCommittingChanges
+                        ? null
+                        : () => context
+                              .read<TableDataCubit>()
+                              .clearPendingChanges(tableKey),
+                    child: const Text('Cancel'),
+                  ),
+                  ],
+                ],
               ),
             ),
-          ],
-        ),
+          Align(
+            alignment: Alignment.centerRight,
+            child: SingleChildScrollView(
+              reverse: true,
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    _rangeLabel(session),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: theme.colors.mutedForeground,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  FButton(
+                    size: FButtonSizeVariant.xs,
+                    variant: FButtonVariant.outline,
+                    onPress: session.canGoPrevious
+                        ? () => context.read<TableDataCubit>().previousPage(
+                            tableKey,
+                          )
+                        : null,
+                    child: const Text('Previous'),
+                  ),
+                  const SizedBox(width: 6),
+                  FButton(
+                    size: FButtonSizeVariant.xs,
+                    variant: FButtonVariant.outline,
+                    onPress: session.canGoNext
+                        ? () =>
+                              context.read<TableDataCubit>().nextPage(tableKey)
+                        : null,
+                    child: const Text('Next'),
+                  ),
+                  const SizedBox(width: 6),
+                  FTooltip(
+                    tipBuilder: (context, controller) => const Text('Refresh'),
+                    child: FButton.icon(
+                      size: FButtonSizeVariant.xs,
+                      variant: FButtonVariant.outline,
+                      onPress: disabled
+                          ? null
+                          : () =>
+                                context.read<TableDataCubit>().refresh(tableKey),
+                      child: const Icon(Icons.refresh, size: 14),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

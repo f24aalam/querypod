@@ -7,6 +7,8 @@ import '../../../connections/presentation/cubit/connection_cubit.dart';
 import '../../../connections/presentation/cubit/connection_state.dart';
 import '../cubit/activity_cubit.dart';
 import '../cubit/editor_tabs_cubit.dart';
+import '../cubit/editor_tabs_state.dart';
+import '../cubit/table_data_cubit.dart';
 import '../cubit/workspace_metadata_cubit.dart';
 import '../cubit/workspace_metadata_state.dart';
 import '../widgets/activity_bar.dart';
@@ -23,10 +25,18 @@ class WorkspacePage extends StatefulWidget {
 
 class _WorkspacePageState extends State<WorkspacePage> {
   ConnectionSessionIdentity? _loadedConnectionSession;
+  Set<TableTabKey> _knownTableKeys = {};
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    _knownTableKeys = context
+        .read<EditorTabsCubit>()
+        .state
+        .tabs
+        .map((tab) => tab.key)
+        .whereType<TableTabKey>()
+        .toSet();
     _syncWorkspaceConnection(
       context.read<ConnectionCubit>().state.activeConnection,
     );
@@ -61,7 +71,23 @@ class _WorkspacePageState extends State<WorkspacePage> {
               curr.activeConnection?.sessionIdentity,
           listener: (context, state) {
             context.read<EditorTabsCubit>().closeTableTabs();
+            context.read<TableDataCubit>().clear();
             _syncWorkspaceConnection(state.activeConnection);
+          },
+        ),
+        BlocListener<EditorTabsCubit, EditorTabsState>(
+          listenWhen: (previous, current) => previous.tabs != current.tabs,
+          listener: (context, state) {
+            final currentKeys = state.tabs
+                .map((tab) => tab.key)
+                .whereType<TableTabKey>()
+                .toSet();
+            for (final key in _knownTableKeys) {
+              if (!currentKeys.contains(key)) {
+                context.read<TableDataCubit>().closeSession(key);
+              }
+            }
+            _knownTableKeys = currentKeys;
           },
         ),
         BlocListener<ConnectionCubit, ConnectionsState>(

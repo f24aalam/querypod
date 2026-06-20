@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:forui/forui.dart';
@@ -5,6 +7,8 @@ import 'package:forui/forui.dart';
 import '../../../connections/presentation/cubit/connection_cubit.dart';
 import '../../domain/entities/workspace_table.dart';
 import '../cubit/editor_tabs_cubit.dart';
+import '../cubit/editor_tabs_state.dart';
+import '../cubit/table_data_cubit.dart';
 import '../cubit/workspace_metadata_cubit.dart';
 import '../cubit/workspace_metadata_state.dart';
 
@@ -360,6 +364,13 @@ class _TableItem extends StatelessWidget {
         table: table,
       );
     }
+
+    final key = TableTabKey(
+      connectionId: connection.id,
+      database: database,
+      tableName: table.name,
+    );
+    unawaited(context.read<TableDataCubit>().openTable(connection, key));
   }
 }
 

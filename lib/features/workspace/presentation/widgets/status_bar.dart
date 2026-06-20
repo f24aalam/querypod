@@ -6,6 +6,10 @@ import '../../../connections/presentation/cubit/connection_cubit.dart';
 import '../../../connections/presentation/cubit/connection_state.dart';
 import '../cubit/workspace_metadata_cubit.dart';
 import '../cubit/workspace_metadata_state.dart';
+import '../cubit/editor_tabs_cubit.dart';
+import '../cubit/editor_tabs_state.dart';
+import '../cubit/table_data_cubit.dart';
+import '../cubit/table_data_state.dart';
 
 class StatusBar extends StatelessWidget {
   const StatusBar({super.key});
@@ -69,21 +73,62 @@ class StatusBar extends StatelessWidget {
                     style: TextStyle(fontSize: 11, color: fgColor),
                   ),
                   const Spacer(),
-                  Text(
-                    '0 rows',
-                    style: TextStyle(fontSize: 11, color: mutedColor),
-                  ),
-                  const SizedBox(width: 16),
-                  Text(
-                    '0ms',
-                    style: TextStyle(fontSize: 11, color: mutedColor),
-                  ),
+                  const _ActiveTableStats(),
                 ],
               ),
             );
           },
         );
       },
+    );
+  }
+}
+
+class _ActiveTableStats extends StatelessWidget {
+  const _ActiveTableStats();
+
+  @override
+  Widget build(BuildContext context) {
+    final mutedColor = context.theme.colors.mutedForeground;
+    return BlocSelector<EditorTabsCubit, EditorTabsState, EditorTabKey?>(
+      selector: (state) => state.activeTabKey,
+      builder: (context, activeKey) {
+        if (activeKey is! TableTabKey) {
+          return _StatsText(rows: 0, milliseconds: 0, color: mutedColor);
+        }
+
+        return BlocSelector<TableDataCubit, TableDataState, TableDataSession?>(
+          selector: (state) => state.session(activeKey),
+          builder: (context, session) => _StatsText(
+            rows: session?.rows.length ?? 0,
+            milliseconds: session?.queryDuration.inMilliseconds ?? 0,
+            color: mutedColor,
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _StatsText extends StatelessWidget {
+  final int rows;
+  final int milliseconds;
+  final Color color;
+
+  const _StatsText({
+    required this.rows,
+    required this.milliseconds,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Text('$rows rows', style: TextStyle(fontSize: 11, color: color)),
+        const SizedBox(width: 16),
+        Text('${milliseconds}ms', style: TextStyle(fontSize: 11, color: color)),
+      ],
     );
   }
 }

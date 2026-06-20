@@ -8,6 +8,7 @@ import '../../../connections/presentation/widgets/connection_form.dart';
 import '../../domain/entities/workspace_table.dart';
 import '../cubit/editor_tabs_cubit.dart';
 import '../cubit/editor_tabs_state.dart';
+import 'table_data_editor.dart';
 
 class EditorArea extends StatelessWidget {
   const EditorArea({super.key});
@@ -36,8 +37,8 @@ class _TabStrip extends StatefulWidget {
 }
 
 class _TabStripState extends State<_TabStrip> {
+  static const _tabWidth = 180.0;
   final _scrollController = ScrollController();
-  final _tabKeys = <EditorTabKey, GlobalKey>{};
 
   @override
   void dispose() {
@@ -50,14 +51,22 @@ class _TabStripState extends State<_TabStrip> {
     if (activeKey == null) return;
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      final tabContext = _tabKeys[activeKey]?.currentContext;
-      if (tabContext == null) return;
-      Scrollable.ensureVisible(
-        tabContext,
+      if (!mounted || !_scrollController.hasClients) return;
+      final index = state.tabs.indexWhere((tab) => tab.key == activeKey);
+      if (index < 0) return;
+      final position = _scrollController.position;
+      final start = index * _tabWidth;
+      final end = start + _tabWidth;
+      final visibleStart = position.pixels;
+      final visibleEnd = visibleStart + position.viewportDimension;
+      final target = start < visibleStart
+          ? start
+          : (end > visibleEnd ? end - position.viewportDimension : null);
+      if (target == null) return;
+      _scrollController.animateTo(
+        target.clamp(position.minScrollExtent, position.maxScrollExtent),
         duration: const Duration(milliseconds: 180),
         curve: Curves.easeOut,
-        alignmentPolicy: ScrollPositionAlignmentPolicy.keepVisibleAtEnd,
       );
     });
   }
@@ -74,7 +83,6 @@ class _TabStripState extends State<_TabStrip> {
         selector: (state) =>
             _TabStripLayout(state.tabs.map((tab) => tab.key).toList()),
         builder: (context, layout) {
-          _tabKeys.removeWhere((key, value) => !layout.keys.contains(key));
           if (layout.keys.isEmpty) return const SizedBox.shrink();
 
           return Container(
@@ -96,12 +104,7 @@ class _TabStripState extends State<_TabStrip> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: layout.keys
-                          .map(
-                            (key) => _EditorTabItem(
-                              key: _tabKeys.putIfAbsent(key, () => GlobalKey()),
-                              tabKey: key,
-                            ),
-                          )
+                          .map((key) => _EditorTabItem(tabKey: key))
                           .toList(),
                     ),
                   ),
@@ -154,7 +157,7 @@ class _TabItemView {
 class _EditorTabItem extends StatelessWidget {
   final EditorTabKey tabKey;
 
-  const _EditorTabItem({required this.tabKey, super.key});
+  const _EditorTabItem({required this.tabKey});
 
   @override
   Widget build(BuildContext context) {
@@ -311,7 +314,7 @@ class _ActiveEditor extends StatelessWidget {
           key: ValueKey(tab.key),
           child: tab.type == EditorTabType.connection
               ? const ConnectionForm()
-              : _TablePlaceholder(tab: tab),
+              : TableDataEditor(tab: tab),
         );
       },
     );
@@ -328,67 +331,6 @@ class _EmptyEditor extends StatelessWidget {
       child: Text(
         'Open a connection or table to begin',
         style: TextStyle(fontSize: 13, color: theme.colors.mutedForeground),
-      ),
-    );
-  }
-}
-
-class _TablePlaceholder extends StatelessWidget {
-  final EditorTab tab;
-
-  const _TablePlaceholder({required this.tab});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = context.theme;
-
-    return Align(
-      alignment: Alignment.topLeft,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  tab.tableType == WorkspaceTableType.view
-                      ? Icons.visibility_outlined
-                      : Icons.table_chart_outlined,
-                  size: 16,
-                  color: theme.colors.mutedForeground,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  tab.title,
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: theme.colors.foreground,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            Text(
-              tab.database ?? '',
-              style: TextStyle(
-                fontSize: 12,
-                color: theme.colors.mutedForeground,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Table rows coming next',
-              style: TextStyle(
-                fontSize: 13,
-                color: theme.colors.mutedForeground,
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }

@@ -67,6 +67,46 @@ class EditorTabsCubit extends Cubit<EditorTabsState> {
     );
   }
 
+  void renameQueryTab({required String queryId, required String title}) {
+    final key = QueryTabKey(queryId: queryId);
+    final index = state.tabs.indexWhere((tab) => tab.key == key);
+    if (index == -1) return;
+
+    final updated = state.tabs[index].copyWith(title: title);
+    if (updated == state.tabs[index]) return;
+
+    final tabs = List<EditorTab>.from(state.tabs)..[index] = updated;
+    emit(
+      EditorTabsState(
+        tabs: tabs,
+        activeTabKey: state.activeTabKey,
+        previewTabKey: state.previewTabKey,
+      ),
+    );
+  }
+
+  void openQuery({required String queryId, required String title}) {
+    final key = QueryTabKey(queryId: queryId);
+    final index = state.tabs.indexWhere((tab) => tab.key == key);
+    final tabs = List<EditorTab>.from(state.tabs);
+    final tab = EditorTab(key: key, type: EditorTabType.query, title: title);
+
+    if (index == -1) {
+      tabs.add(tab);
+    } else {
+      if (state.tabs[index] == tab && state.activeTabKey == key) return;
+      tabs[index] = tab;
+    }
+
+    emit(
+      EditorTabsState(
+        tabs: tabs,
+        activeTabKey: key,
+        previewTabKey: state.previewTabKey,
+      ),
+    );
+  }
+
   void openTablePreview({
     required String connectionId,
     required String database,
@@ -203,11 +243,33 @@ class EditorTabsCubit extends Cubit<EditorTabsState> {
     );
   }
 
+  void closeQueryTab(String queryId) {
+    closeTab(QueryTabKey(queryId: queryId));
+  }
+
   void closeTableTabs() {
     if (!state.tabs.any((tab) => tab.type == EditorTabType.table)) return;
 
     final tabs = state.tabs
         .where((tab) => tab.type != EditorTabType.table)
+        .toList();
+    final activeStillExists = tabs.any((tab) => tab.key == state.activeTabKey);
+
+    emit(
+      EditorTabsState(
+        tabs: tabs,
+        activeTabKey: activeStillExists
+            ? state.activeTabKey
+            : (tabs.isEmpty ? null : tabs.last.key),
+      ),
+    );
+  }
+
+  void closeQueryTabs() {
+    if (!state.tabs.any((tab) => tab.type == EditorTabType.query)) return;
+
+    final tabs = state.tabs
+        .where((tab) => tab.type != EditorTabType.query)
         .toList();
     final activeStillExists = tabs.any((tab) => tab.key == state.activeTabKey);
 

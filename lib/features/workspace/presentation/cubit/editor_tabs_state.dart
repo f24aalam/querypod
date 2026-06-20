@@ -1,6 +1,6 @@
 import '../../domain/entities/workspace_table.dart';
 
-enum EditorTabType { connection, table }
+enum EditorTabType { connection, table, query }
 
 sealed class EditorTabKey {
   const EditorTabKey();
@@ -37,6 +37,20 @@ class TableTabKey extends EditorTabKey {
 
   @override
   int get hashCode => Object.hash(connectionId, database, tableName);
+}
+
+class QueryTabKey extends EditorTabKey {
+  final String queryId;
+
+  const QueryTabKey({required this.queryId});
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is QueryTabKey && queryId == other.queryId;
+
+  @override
+  int get hashCode => queryId.hashCode;
 }
 
 class EditorTab {

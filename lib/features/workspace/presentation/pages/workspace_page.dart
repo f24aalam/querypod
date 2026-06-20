@@ -8,6 +8,7 @@ import '../../../connections/presentation/cubit/connection_state.dart';
 import '../cubit/activity_cubit.dart';
 import '../cubit/editor_tabs_cubit.dart';
 import '../cubit/editor_tabs_state.dart';
+import '../cubit/query_editor_cubit.dart';
 import '../cubit/table_data_cubit.dart';
 import '../cubit/workspace_metadata_cubit.dart';
 import '../cubit/workspace_metadata_state.dart';
@@ -40,6 +41,9 @@ class _WorkspacePageState extends State<WorkspacePage> {
     _syncWorkspaceConnection(
       context.read<ConnectionCubit>().state.activeConnection,
     );
+    context.read<QueryEditorCubit>().loadConnection(
+      context.read<ConnectionCubit>().state.activeConnection?.id,
+    );
   }
 
   void _syncWorkspaceConnection(Connection? connection) {
@@ -71,8 +75,12 @@ class _WorkspacePageState extends State<WorkspacePage> {
               curr.activeConnection?.sessionIdentity,
           listener: (context, state) {
             context.read<EditorTabsCubit>().closeTableTabs();
+            context.read<EditorTabsCubit>().closeQueryTabs();
             context.read<TableDataCubit>().clear();
             _syncWorkspaceConnection(state.activeConnection);
+            context.read<QueryEditorCubit>().loadConnection(
+              state.activeConnection?.id,
+            );
           },
         ),
         BlocListener<EditorTabsCubit, EditorTabsState>(

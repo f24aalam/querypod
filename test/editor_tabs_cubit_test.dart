@@ -135,4 +135,15 @@ void main() {
     expect(cubit.state.tabs.single.title, 'New name');
     expect(cubit.state.tabs.single.connectionId, 'connection');
   });
+
+  test('opening the same query reuses one tab and keeps it active', () {
+    final cubit = EditorTabsCubit();
+
+    cubit.openQuery(queryId: 'query_1', title: 'demo');
+    cubit.openQuery(queryId: 'query_1', title: 'demo');
+
+    expect(cubit.state.tabs, hasLength(1));
+    expect(cubit.state.activeTab?.type, EditorTabType.query);
+    expect(cubit.state.activeTab?.title, 'demo');
+  });
 }

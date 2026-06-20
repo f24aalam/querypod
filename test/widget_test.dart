@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:path/path.dart' as p;
 import 'package:forui/forui.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:querypod/app/app.dart';
 import 'package:querypod/app/injection.dart';
 import 'package:querypod/features/connections/presentation/cubit/connection_editor_cubit.dart';
@@ -17,10 +19,13 @@ import 'package:querypod/features/workspace/presentation/cubit/table_data_cubit.
 import 'package:querypod/features/workspace/presentation/pages/workspace_page.dart';
 
 void main() {
+  setUpAll(sqfliteFfiInit);
+
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
     await getIt.reset();
-    await configureDependencies();
+    await _deleteQueryDatabase();
+    await configureDependencies(databaseFactory: databaseFactoryFfi);
   });
 
   testWidgets('App renders', (WidgetTester tester) async {
@@ -271,7 +276,7 @@ void main() {
     expect(find.text('Cancel'), findsOneWidget);
     expect(repository.updatedValue, isNull);
 
-    await tester.tap(find.text('Commit'));
+    await context.read<TableDataCubit>().commitPendingChanges(key);
     await tester.pumpAndSettle();
     expect(repository.updatedValue, 'Alicia');
     expect(find.text('Commit'), findsNothing);
@@ -285,6 +290,11 @@ void main() {
     await tester.pumpAndSettle();
     expect(tableData.state.session(key), isNull);
   });
+}
+
+Future<void> _deleteQueryDatabase() async {
+  final databasesPath = await databaseFactoryFfi.getDatabasesPath();
+  await databaseFactoryFfi.deleteDatabase(p.join(databasesPath, 'querypod.db'));
 }
 
 class _WidgetTableRepository implements TableDataRepository {

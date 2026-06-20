@@ -8,6 +8,8 @@ import '../../../connections/presentation/widgets/connection_form.dart';
 import '../../domain/entities/workspace_table.dart';
 import '../cubit/editor_tabs_cubit.dart';
 import '../cubit/editor_tabs_state.dart';
+import '../cubit/query_editor_cubit.dart';
+import 'query_code_editor.dart';
 import 'table_data_editor.dart';
 
 class EditorArea extends StatelessWidget {
@@ -238,6 +240,8 @@ class _EditorTabBody extends StatelessWidget {
                         Icon(
                           tab.type == EditorTabType.connection
                               ? Icons.storage_outlined
+                              : tab.type == EditorTabType.query
+                              ? Icons.code_outlined
                               : (tab.tableType == WorkspaceTableType.view
                                     ? Icons.visibility_outlined
                                     : Icons.table_chart_outlined),
@@ -246,7 +250,7 @@ class _EditorTabBody extends StatelessWidget {
                         ),
                         const SizedBox(width: 6),
                         Expanded(
-                          child: tab.type == EditorTabType.table
+                          child: tab.type != EditorTabType.connection
                               ? FTooltip(
                                   tipBuilder: (context, controller) =>
                                       Text(tab.title),
@@ -317,10 +321,32 @@ class _ActiveEditor extends StatelessWidget {
           key: ValueKey(tab.key),
           child: tab.type == EditorTabType.connection
               ? const ConnectionForm()
-              : TableDataEditor(tab: tab),
+              : tab.type == EditorTabType.table
+              ? TableDataEditor(tab: tab)
+              : _QueryEditorTab(tab: tab),
         );
       },
     );
+  }
+}
+
+class _QueryEditorTab extends StatelessWidget {
+  final EditorTab tab;
+
+  const _QueryEditorTab({required this.tab});
+
+  @override
+  Widget build(BuildContext context) {
+    final key = tab.key as QueryTabKey;
+    final query = context.select(
+      (QueryEditorCubit cubit) => cubit.state.queryById(key.queryId),
+    );
+
+    if (query == null) {
+      return const Center(child: Text('Query not found'));
+    }
+
+    return QueryCodeEditor(controller: query.controller);
   }
 }
 
@@ -332,7 +358,7 @@ class _EmptyEditor extends StatelessWidget {
     final theme = context.theme;
     return Center(
       child: Text(
-        'Open a connection or table to begin',
+        'Open a connection, table, or query to begin',
         style: TextStyle(fontSize: 13, color: theme.colors.mutedForeground),
       ),
     );

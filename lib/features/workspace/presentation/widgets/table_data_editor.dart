@@ -941,31 +941,31 @@ class _PaginationBar extends StatelessWidget {
                     if (session.hasPendingChanges) const SizedBox(width: 12),
                   ],
                   if (session.hasPendingChanges) ...[
-                  FButton(
-                    size: FButtonSizeVariant.xs,
-                    variant: session.hasPendingDeletes
-                        ? FButtonVariant.destructive
-                        : FButtonVariant.primary,
-                    onPress: session.isCommittingChanges
-                        ? null
-                        : () => context
-                              .read<TableDataCubit>()
-                              .commitPendingChanges(tableKey),
-                    child: Text(
-                      session.isCommittingChanges ? 'Committing…' : 'Commit',
+                    FButton(
+                      size: FButtonSizeVariant.xs,
+                      variant: session.hasPendingDeletes
+                          ? FButtonVariant.destructive
+                          : FButtonVariant.primary,
+                      onPress: session.isCommittingChanges
+                          ? null
+                          : () => context
+                                .read<TableDataCubit>()
+                                .commitPendingChanges(tableKey),
+                      child: Text(
+                        session.isCommittingChanges ? 'Committing…' : 'Commit',
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 6),
-                  FButton(
-                    size: FButtonSizeVariant.xs,
-                    variant: FButtonVariant.outline,
-                    onPress: session.isCommittingChanges
-                        ? null
-                        : () => context
-                              .read<TableDataCubit>()
-                              .clearPendingChanges(tableKey),
-                    child: const Text('Cancel'),
-                  ),
+                    const SizedBox(width: 6),
+                    FButton(
+                      size: FButtonSizeVariant.xs,
+                      variant: FButtonVariant.outline,
+                      onPress: session.isCommittingChanges
+                          ? null
+                          : () => context
+                                .read<TableDataCubit>()
+                                .clearPendingChanges(tableKey),
+                      child: const Text('Cancel'),
+                    ),
                   ],
                 ],
               ),
@@ -1014,8 +1014,9 @@ class _PaginationBar extends StatelessWidget {
                       variant: FButtonVariant.outline,
                       onPress: disabled
                           ? null
-                          : () =>
-                                context.read<TableDataCubit>().refresh(tableKey),
+                          : () => context.read<TableDataCubit>().refresh(
+                              tableKey,
+                            ),
                       child: const Icon(Icons.refresh, size: 14),
                     ),
                   ),

@@ -1,16 +1,24 @@
+// ignore_for_file: prefer_initializing_formals
+
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:mysql_client_plus/exception.dart';
 import 'package:mysql_client_plus/mysql_client_plus.dart';
 
 import '../../domain/entities/connection.dart';
 import '../../domain/repositories/connection_repository.dart';
+import '../../../workspace/domain/repositories/query_repository.dart';
 import 'connection_state.dart';
 
 class ConnectionCubit extends Cubit<ConnectionsState> {
-  final ConnectionRepository _repository;
+  ConnectionCubit({
+    required ConnectionRepository repository,
+    required QueryRepository queryRepository,
+  }) : _repository = repository,
+       _queryRepository = queryRepository,
+       super(const ConnectionsState());
 
-  ConnectionCubit({required this._repository})
-    : super(const ConnectionsState());
+  final ConnectionRepository _repository;
+  final QueryRepository _queryRepository;
 
   ConnectionsState _feedback(
     String message, {
@@ -103,6 +111,7 @@ class ConnectionCubit extends Cubit<ConnectionsState> {
 
   Future<void> delete(String id) async {
     try {
+      await _queryRepository.deleteByConnection(id);
       await _repository.delete(id);
       if (state.selectedId == id) {
         await _repository.setSelectedId(null);

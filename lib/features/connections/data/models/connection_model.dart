@@ -11,7 +11,10 @@ class ConnectionModel extends Connection {
     required super.database,
   });
 
-  factory ConnectionModel.fromJson(Map<String, dynamic> json, {String password = ''}) {
+  factory ConnectionModel.fromJson(
+    Map<String, dynamic> json, {
+    String password = '',
+  }) {
     return ConnectionModel(
       id: json['id'] as String,
       name: json['name'] as String,

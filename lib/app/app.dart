@@ -6,6 +6,7 @@ import '../features/connections/presentation/cubit/connection_cubit.dart';
 import '../features/connections/presentation/cubit/connection_editor_cubit.dart';
 import '../features/workspace/presentation/cubit/activity_cubit.dart';
 import '../features/workspace/presentation/cubit/editor_tabs_cubit.dart';
+import '../features/workspace/presentation/cubit/query_editor_cubit.dart';
 import '../features/workspace/presentation/cubit/table_data_cubit.dart';
 import '../features/workspace/presentation/cubit/workspace_metadata_cubit.dart';
 import 'injection.dart';
@@ -26,6 +27,7 @@ class App extends StatelessWidget {
         BlocProvider(create: (_) => getIt<WorkspaceMetadataCubit>()),
         BlocProvider(create: (_) => ActivityCubit()),
         BlocProvider(create: (_) => EditorTabsCubit()),
+        BlocProvider(create: (_) => getIt<QueryEditorCubit>()),
         BlocProvider(create: (_) => getIt<TableDataCubit>()),
       ],
       child: BlocBuilder<ThemeCubit, ThemeMode>(

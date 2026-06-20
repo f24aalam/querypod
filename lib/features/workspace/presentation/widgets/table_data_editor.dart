@@ -57,7 +57,6 @@ class _TableBrowser extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = context.theme;
     final isLoading =
         session.status == TableDataStatus.pageLoading ||
         session.status == TableDataStatus.refreshing;
@@ -67,31 +66,261 @@ class _TableBrowser extends StatelessWidget {
         if (session.status == TableDataStatus.error)
           _ErrorBanner(tableKey: tableKey, message: session.errorMessage),
         Expanded(
-          child: Stack(
-            children: [
-              Positioned.fill(
-                child: session.structure == null
-                    ? const SizedBox.shrink()
-                    : _DataGrid(tableKey: tableKey, session: session),
-              ),
-              if (isLoading)
-                Positioned.fill(
-                  child: ColoredBox(
-                    color: theme.colors.background.withValues(alpha: 0.55),
-                    child: const Center(
-                      child: SizedBox(
-                        width: 22,
-                        height: 22,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      ),
-                    ),
-                  ),
-                ),
-            ],
+          child: _TableContent(
+            tableKey: tableKey,
+            session: session,
+            isLoading: isLoading,
           ),
         ),
         _PaginationBar(tableKey: tableKey, session: session),
       ],
+    );
+  }
+}
+
+class _TableContent extends StatelessWidget {
+  final TableTabKey tableKey;
+  final TableDataSession session;
+  final bool isLoading;
+
+  const _TableContent({
+    required this.tableKey,
+    required this.session,
+    required this.isLoading,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final selectedIndex = session.selectedRowIndex;
+    final hasSelection =
+        selectedIndex != null &&
+        selectedIndex >= 0 &&
+        selectedIndex < session.rows.length &&
+        session.structure != null;
+
+    final grid = _GridWithLoading(
+      tableKey: tableKey,
+      session: session,
+      isLoading: isLoading,
+    );
+    if (!hasSelection) return grid;
+
+    return FResizable(
+      axis: Axis.horizontal,
+      children: [
+        FResizableRegion.flex(
+          flex: 1,
+          minFlex: 1,
+          builder: (context, data, child) => child!,
+          child: grid,
+        ),
+        FResizableRegion.fixed(
+          extent: 320,
+          minExtent: 220,
+          builder: (context, data, child) => child!,
+          child: _RowDetailPanel(
+            tableKey: tableKey,
+            columns: session.structure!.columns,
+            row: session.rows[selectedIndex],
+            rowNumber: session.rangeStart + selectedIndex,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _GridWithLoading extends StatelessWidget {
+  final TableTabKey tableKey;
+  final TableDataSession session;
+  final bool isLoading;
+
+  const _GridWithLoading({
+    required this.tableKey,
+    required this.session,
+    required this.isLoading,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = context.theme;
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: session.structure == null
+              ? const SizedBox.shrink()
+              : _DataGrid(tableKey: tableKey, session: session),
+        ),
+        if (isLoading)
+          Positioned.fill(
+            child: ColoredBox(
+              color: theme.colors.background.withValues(alpha: 0.55),
+              child: const Center(
+                child: SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _RowDetailPanel extends StatelessWidget {
+  final TableTabKey tableKey;
+  final List<TableDataColumn> columns;
+  final TableDataRow row;
+  final int rowNumber;
+
+  const _RowDetailPanel({
+    required this.tableKey,
+    required this.columns,
+    required this.row,
+    required this.rowNumber,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = context.theme;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: theme.colors.background,
+        border: Border(left: BorderSide(color: theme.colors.border, width: 1)),
+      ),
+      child: Column(
+        children: [
+          Container(
+            height: 34,
+            padding: const EdgeInsets.only(left: 12, right: 4),
+            decoration: BoxDecoration(
+              border: Border(
+                bottom: BorderSide(color: theme.colors.border, width: 1),
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.article_outlined,
+                  size: 14,
+                  color: theme.colors.foreground,
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'Row $rowNumber',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: theme.colors.foreground,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Close row details',
+                  padding: EdgeInsets.zero,
+                  splashRadius: 12,
+                  onPressed: () => context
+                      .read<TableDataCubit>()
+                      .clearRowSelection(tableKey),
+                  icon: Icon(
+                    Icons.close,
+                    size: 14,
+                    color: theme.colors.mutedForeground,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: ListView.builder(
+              padding: EdgeInsets.zero,
+              itemCount: columns.length,
+              itemBuilder: (context, index) => _RowDetailField(
+                column: columns[index],
+                value: row.cells[index],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RowDetailField extends StatelessWidget {
+  final TableDataColumn column;
+  final TableCellValue value;
+
+  const _RowDetailField({required this.column, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = context.theme;
+    final displayedValue = value.fullText ?? value.display;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+      decoration: BoxDecoration(
+        border: Border(
+          bottom: BorderSide(color: theme.colors.border, width: 0.5),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              if (column.isPrimaryKey) ...[
+                Icon(
+                  Icons.key_outlined,
+                  size: 11,
+                  color: theme.colors.mutedForeground,
+                ),
+                const SizedBox(width: 4),
+              ],
+              Expanded(
+                child: Text(
+                  column.name,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: theme.colors.mutedForeground,
+                  ),
+                ),
+              ),
+              Text(
+                column.databaseType,
+                style: TextStyle(
+                  fontSize: 10,
+                  color: theme.colors.mutedForeground,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 5),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: SelectableText(
+              displayedValue,
+              maxLines: 1,
+              style: TextStyle(
+                fontSize: 12,
+                height: 1.35,
+                fontStyle: value.kind == TableCellKind.nullValue
+                    ? FontStyle.italic
+                    : FontStyle.normal,
+                color: value.kind == TableCellKind.nullValue
+                    ? theme.colors.mutedForeground
+                    : theme.colors.foreground,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

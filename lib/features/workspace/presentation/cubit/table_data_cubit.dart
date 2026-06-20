@@ -58,6 +58,12 @@ class TableDataCubit extends Cubit<TableDataState> {
     _setSession(session.copyWith(selectedRowIndex: () => index));
   }
 
+  void clearRowSelection(TableTabKey key) {
+    final session = state.session(key);
+    if (session == null || session.selectedRowIndex == null) return;
+    _setSession(session.copyWith(selectedRowIndex: () => null));
+  }
+
   void closeSession(TableTabKey key) {
     _generations[key] = (_generations[key] ?? 0) + 1;
     _connections.remove(key);

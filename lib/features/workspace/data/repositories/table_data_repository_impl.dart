@@ -117,7 +117,7 @@ class TableDataRepositoryImpl implements TableDataRepository {
           .map(
             (row) => TableDataRow([
               for (var index = 0; index < structure.columns.length; index++)
-                _cell(row.colAt(index)),
+                _cell(row.colAt(index), structure.columns[index]),
             ]),
           )
           .toList();
@@ -138,9 +138,25 @@ class TableDataRepositoryImpl implements TableDataRepository {
     return value.toString();
   }
 
-  TableCellValue _cell(dynamic value) {
+  TableCellValue _cell(dynamic value, TableDataColumn column) {
     if (value == null) return const TableCellValue.nullValue();
-    if (value is Uint8List) return TableCellValue.binary(value.length);
+    if (value is Uint8List) {
+      if (_isBinaryColumn(column.databaseType)) {
+        return TableCellValue.binary(value.length);
+      }
+      try {
+        return TableCellValue.text(utf8.decode(value));
+      } on FormatException {
+        return TableCellValue.binary(value.length);
+      }
+    }
     return TableCellValue.text(value.toString());
+  }
+
+  bool _isBinaryColumn(String databaseType) {
+    final type = databaseType.toLowerCase();
+    return type.contains('binary') ||
+        type.contains('blob') ||
+        type.contains('geometry');
   }
 }

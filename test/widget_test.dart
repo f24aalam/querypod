@@ -90,6 +90,42 @@ void main() {
     expect(tabRect.right, lessThanOrEqualTo(logicalWidth));
   });
 
+  testWidgets('tab body activates from blank area tap', (tester) async {
+    await tester.pumpWidget(const App());
+    await tester.pumpAndSettle();
+    final context = tester.element(find.byType(WorkspacePage));
+    final tabs = context.read<EditorTabsCubit>();
+
+    tabs.openConnectionEditor();
+    await tester.pump();
+    tabs.pinTable(
+      connectionId: 'connection',
+      database: 'app',
+      table: const WorkspaceTable(
+        name: 'users',
+        type: WorkspaceTableType.table,
+      ),
+    );
+    await tester.pump();
+
+    const tableKey = TableTabKey(
+      connectionId: 'connection',
+      database: 'app',
+      tableName: 'users',
+    );
+    final tableTab = find.byKey(
+      const ValueKey<(String, EditorTabKey)>(('tab-strip', tableKey)),
+    );
+    expect(tableTab, findsOneWidget);
+    final rect = tester.getRect(tableTab);
+
+    await tester.tapAt(Offset(rect.left + 8, rect.center.dy));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+
+    expect(tabs.state.activeTabKey, tableKey);
+  });
+
   testWidgets('connection draft survives tab switches and guards closing', (
     tester,
   ) async {
@@ -205,6 +241,17 @@ void main() {
     expect(find.text('Next'), findsOneWidget);
     expect(find.text('Rows per page'), findsOneWidget);
 
+    await tester.tap(find.text('Alice'));
+    await tester.pumpAndSettle();
+    expect(find.text('Row 1'), findsOneWidget);
+    expect(find.byTooltip('Close row details'), findsOneWidget);
+    expect(find.text('varchar(255)'), findsOneWidget);
+    expect(find.text('{"theme":"dark","notifications":true}'), findsWidgets);
+
+    await tester.tap(find.byTooltip('Close row details'));
+    await tester.pumpAndSettle();
+    expect(find.text('Row 1'), findsNothing);
+
     final tableTab = find.byKey(
       const ValueKey<(String, EditorTabKey)>(('tab-strip', key)),
     );
@@ -236,6 +283,12 @@ class _WidgetTableRepository implements TableDataRepository {
         length: 255,
         isPrimaryKey: false,
       ),
+      TableDataColumn(
+        name: 'settings',
+        databaseType: 'json',
+        length: 1024,
+        isPrimaryKey: false,
+      ),
     ],
     orderColumn: 'id',
   );
@@ -260,10 +313,12 @@ class _WidgetTableRepository implements TableDataRepository {
       TableDataRow(const [
         TableCellValue.text('1'),
         TableCellValue.text('Alice'),
+        TableCellValue.text('{"theme":"dark","notifications":true}'),
       ]),
       TableDataRow(const [
         TableCellValue.text('2'),
         TableCellValue.text('Bob'),
+        TableCellValue.text('{"theme":"light"}'),
       ]),
     ],
     queryDuration: const Duration(milliseconds: 5),

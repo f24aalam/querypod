@@ -226,33 +226,36 @@ class _EditorTabBody extends StatelessWidget {
           children: [
             Expanded(
               child: InkWell(
-                onTap: () => context.read<EditorTabsCubit>().activate(tab.key),
+                onTapDown: (_) =>
+                    context.read<EditorTabsCubit>().activate(tab.key),
                 onDoubleTap: () =>
                     context.read<EditorTabsCubit>().pinTab(tab.key),
-                child: Padding(
-                  padding: const EdgeInsets.only(left: 10),
-                  child: Row(
-                    children: [
-                      Icon(
-                        tab.type == EditorTabType.connection
-                            ? Icons.storage_outlined
-                            : (tab.tableType == WorkspaceTableType.view
-                                  ? Icons.visibility_outlined
-                                  : Icons.table_chart_outlined),
-                        size: 14,
-                        color: theme.colors.mutedForeground,
-                      ),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: tab.type == EditorTabType.table
-                            ? FTooltip(
-                                tipBuilder: (context, controller) =>
-                                    Text(tab.title),
-                                child: _TabTitle(tab: tab, theme: theme),
-                              )
-                            : _TabTitle(tab: tab, theme: theme),
-                      ),
-                    ],
+                child: SizedBox.expand(
+                  child: Padding(
+                    padding: const EdgeInsets.only(left: 10),
+                    child: Row(
+                      children: [
+                        Icon(
+                          tab.type == EditorTabType.connection
+                              ? Icons.storage_outlined
+                              : (tab.tableType == WorkspaceTableType.view
+                                    ? Icons.visibility_outlined
+                                    : Icons.table_chart_outlined),
+                          size: 14,
+                          color: theme.colors.mutedForeground,
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: tab.type == EditorTabType.table
+                              ? FTooltip(
+                                  tipBuilder: (context, controller) =>
+                                      Text(tab.title),
+                                  child: _TabTitle(tab: tab, theme: theme),
+                                )
+                              : _TabTitle(tab: tab, theme: theme),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),

@@ -4,6 +4,7 @@ import 'package:forui/forui.dart';
 
 import '../../../connections/presentation/cubit/connection_cubit.dart';
 import '../../domain/entities/workspace_table.dart';
+import '../cubit/editor_tabs_cubit.dart';
 import '../cubit/workspace_metadata_cubit.dart';
 import '../cubit/workspace_metadata_state.dart';
 
@@ -310,7 +311,8 @@ class _TableItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () => context.read<WorkspaceMetadataCubit>().selectTable(table),
+      onTap: () => _open(context, pin: false),
+      onDoubleTap: () => _open(context, pin: true),
       child: Container(
         color: isSelected ? theme.colors.secondary : Colors.transparent,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -335,6 +337,29 @@ class _TableItem extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  void _open(BuildContext context, {required bool pin}) {
+    final metadata = context.read<WorkspaceMetadataCubit>();
+    final connection = context.read<ConnectionCubit>().state.activeConnection;
+    final database = metadata.state.selectedDatabase;
+    if (connection == null || database == null) return;
+
+    metadata.selectTable(table);
+    final tabs = context.read<EditorTabsCubit>();
+    if (pin) {
+      tabs.pinTable(
+        connectionId: connection.id,
+        database: database,
+        table: table,
+      );
+    } else {
+      tabs.openTablePreview(
+        connectionId: connection.id,
+        database: database,
+        table: table,
+      );
+    }
   }
 }
 

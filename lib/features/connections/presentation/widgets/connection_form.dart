@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:forui/forui.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../domain/entities/connection.dart';
 import '../cubit/connection_cubit.dart';
@@ -21,6 +20,15 @@ class _ConnectionFormState extends State<ConnectionForm> {
   final _userController = TextEditingController();
   final _passwordController = TextEditingController();
   final _databaseController = TextEditingController();
+  bool _initialized = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_initialized) return;
+    _initialized = true;
+    _fillForm(context.read<ConnectionCubit>().state.selectedConnection);
+  }
 
   @override
   void dispose() {
@@ -83,13 +91,6 @@ class _ConnectionFormState extends State<ConnectionForm> {
                   : FToastVariant.primary,
               title: Text(state.feedbackMessage!),
             );
-          },
-        ),
-        BlocListener<ConnectionCubit, ConnectionsState>(
-          listenWhen: (prev, curr) =>
-              prev.openWorkspaceNonce != curr.openWorkspaceNonce,
-          listener: (context, state) {
-            context.go('/workspace');
           },
         ),
       ],

@@ -3,6 +3,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:forui/forui.dart';
 
 import '../features/connections/presentation/cubit/connection_cubit.dart';
+import '../features/workspace/presentation/cubit/activity_cubit.dart';
+import '../features/workspace/presentation/cubit/editor_tabs_cubit.dart';
 import '../features/workspace/presentation/cubit/workspace_metadata_cubit.dart';
 import 'injection.dart';
 import 'router.dart';
@@ -19,6 +21,8 @@ class App extends StatelessWidget {
         BlocProvider(create: (_) => ThemeCubit()),
         BlocProvider(create: (_) => getIt<ConnectionCubit>()..load()),
         BlocProvider(create: (_) => getIt<WorkspaceMetadataCubit>()),
+        BlocProvider(create: (_) => ActivityCubit()),
+        BlocProvider(create: (_) => EditorTabsCubit()),
       ],
       child: BlocBuilder<ThemeCubit, ThemeMode>(
         builder: (context, mode) {

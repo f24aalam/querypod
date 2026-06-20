@@ -121,13 +121,9 @@ class ConnectionCubit extends Cubit<ConnectionsState> {
 
   Future<void> select(String? id) async {
     await _repository.setSelectedId(id);
-    final selectedConnection = id == null
-        ? null
-        : state.connections.where((c) => c.id == id).firstOrNull;
     emit(
       state.copyWith(
         selectedId: () => id,
-        activeConnection: () => selectedConnection ?? state.activeConnection,
         selectionNonce: state.selectionNonce + 1,
       ),
     );

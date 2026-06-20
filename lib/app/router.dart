@@ -1,27 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import 'app_shell.dart';
-import '../features/connections/presentation/pages/connections_page.dart';
 import '../features/workspace/presentation/pages/workspace_page.dart';
 
 final router = GoRouter(
   routes: [
-    ShellRoute(
-      builder: (context, state, child) => AppShell(state: state, child: child),
-      routes: [
-        GoRoute(
-          path: '/',
-          pageBuilder: (context, state) =>
-              _fadePage(key: state.pageKey, child: const ConnectionsPage()),
-        ),
-        GoRoute(
-          path: '/workspace',
-          pageBuilder: (context, state) =>
-              _fadePage(key: state.pageKey, child: const WorkspacePage()),
-        ),
-      ],
+    GoRoute(
+      path: '/',
+      pageBuilder: (context, state) =>
+          _fadePage(key: state.pageKey, child: const WorkspacePage()),
     ),
+    GoRoute(path: '/workspace', redirect: (context, state) => '/'),
   ],
 );
 

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:forui/forui.dart';
 
+import '../../../workspace/presentation/cubit/editor_tabs_cubit.dart';
 import '../cubit/connection_cubit.dart';
 import '../cubit/connection_state.dart';
 
@@ -49,8 +50,10 @@ class ConnectionListPanel extends StatelessWidget {
                       variant: FButtonVariant.outline,
                       size: FButtonSizeVariant.xs,
                       mainAxisSize: MainAxisSize.min,
-                      onPress: () =>
-                          context.read<ConnectionCubit>().select(null),
+                      onPress: () {
+                        context.read<ConnectionCubit>().select(null);
+                        context.read<EditorTabsCubit>().openConnectionEditor();
+                      },
                       child: const Text('New'),
                     ),
                   ],
@@ -169,7 +172,13 @@ class _ConnectionItem extends StatelessWidget {
         ),
       ],
       child: GestureDetector(
-        onTap: () => context.read<ConnectionCubit>().select(id),
+        onTap: () {
+          context.read<ConnectionCubit>().select(id);
+          context.read<EditorTabsCubit>().openConnectionEditor(
+            connectionId: id,
+            connectionName: name,
+          );
+        },
         onDoubleTap: () =>
             context.read<ConnectionCubit>().openSavedConnection(id),
         child: Container(

@@ -5,9 +5,14 @@ import 'package:forui/forui.dart';
 import '../../../connections/domain/entities/connection.dart';
 import '../../../connections/presentation/cubit/connection_cubit.dart';
 import '../../../connections/presentation/cubit/connection_state.dart';
+import '../cubit/activity_cubit.dart';
+import '../cubit/editor_tabs_cubit.dart';
 import '../cubit/workspace_metadata_cubit.dart';
 import '../cubit/workspace_metadata_state.dart';
-import '../widgets/workspace_scaffold.dart';
+import '../widgets/activity_bar.dart';
+import '../widgets/context_sidebar.dart';
+import '../widgets/editor_area.dart';
+import '../widgets/status_bar.dart';
 
 class WorkspacePage extends StatefulWidget {
   const WorkspacePage({super.key});
@@ -53,7 +58,15 @@ class _WorkspacePageState extends State<WorkspacePage> {
           listenWhen: (prev, curr) =>
               prev.activeConnection?.id != curr.activeConnection?.id,
           listener: (context, state) {
+            context.read<EditorTabsCubit>().closeTableTabs();
             _syncWorkspaceConnection(state.activeConnection);
+          },
+        ),
+        BlocListener<ConnectionCubit, ConnectionsState>(
+          listenWhen: (prev, curr) =>
+              prev.openWorkspaceNonce != curr.openWorkspaceNonce,
+          listener: (context, state) {
+            context.read<ActivityCubit>().select(WorkbenchActivity.tables);
           },
         ),
         BlocListener<WorkspaceMetadataCubit, WorkspaceMetadataState>(
@@ -71,7 +84,51 @@ class _WorkspacePageState extends State<WorkspacePage> {
           },
         ),
       ],
-      child: const WorkspaceScaffold(),
+      child: ColoredBox(
+        color: context.theme.colors.background,
+        child: Column(
+          children: [
+            Expanded(
+              child: Row(
+                children: [
+                  BlocBuilder<ConnectionCubit, ConnectionsState>(
+                    buildWhen: (prev, curr) =>
+                        prev.activeConnection?.id != curr.activeConnection?.id,
+                    builder: (context, state) => ActivityBar(
+                      canOpenWorkspace: state.activeConnection != null,
+                    ),
+                  ),
+                  Expanded(
+                    child: FResizable(
+                      axis: Axis.horizontal,
+                      children: [
+                        FResizableRegion.fixed(
+                          extent: 280,
+                          minExtent: 160,
+                          builder: (context, data, child) => child!,
+                          child: const ContextSidebar(),
+                        ),
+                        FResizableRegion.flex(
+                          flex: 1,
+                          minFlex: 1,
+                          builder: (context, data, child) => child!,
+                          child: const EditorArea(),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Divider(
+              height: 1,
+              thickness: 1,
+              color: context.theme.colors.border,
+            ),
+            const StatusBar(),
+          ],
+        ),
+      ),
     );
   }
 }

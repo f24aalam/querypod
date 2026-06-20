@@ -2,8 +2,45 @@ import '../../domain/entities/workspace_table.dart';
 
 enum EditorTabType { connection, table }
 
+sealed class EditorTabKey {
+  const EditorTabKey();
+}
+
+class ConnectionEditorTabKey extends EditorTabKey {
+  const ConnectionEditorTabKey();
+
+  @override
+  bool operator ==(Object other) => other is ConnectionEditorTabKey;
+
+  @override
+  int get hashCode => 0x434f4e4e;
+}
+
+class TableTabKey extends EditorTabKey {
+  final String connectionId;
+  final String database;
+  final String tableName;
+
+  const TableTabKey({
+    required this.connectionId,
+    required this.database,
+    required this.tableName,
+  });
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is TableTabKey &&
+          connectionId == other.connectionId &&
+          database == other.database &&
+          tableName == other.tableName;
+
+  @override
+  int get hashCode => Object.hash(connectionId, database, tableName);
+}
+
 class EditorTab {
-  final String id;
+  final EditorTabKey key;
   final EditorTabType type;
   final String title;
   final String? connectionId;
@@ -12,7 +49,7 @@ class EditorTab {
   final bool isPinned;
 
   const EditorTab({
-    required this.id,
+    required this.key,
     required this.type,
     required this.title,
     this.connectionId,
@@ -27,7 +64,7 @@ class EditorTab {
     bool? isPinned,
   }) {
     return EditorTab(
-      id: id,
+      key: key,
       type: type,
       title: title ?? this.title,
       connectionId: connectionId != null ? connectionId() : this.connectionId,
@@ -36,23 +73,67 @@ class EditorTab {
       isPinned: isPinned ?? this.isPinned,
     );
   }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is EditorTab &&
+          key == other.key &&
+          type == other.type &&
+          title == other.title &&
+          connectionId == other.connectionId &&
+          database == other.database &&
+          tableType == other.tableType &&
+          isPinned == other.isPinned;
+
+  @override
+  int get hashCode => Object.hash(
+    key,
+    type,
+    title,
+    connectionId,
+    database,
+    tableType,
+    isPinned,
+  );
 }
 
 class EditorTabsState {
   final List<EditorTab> tabs;
-  final String? activeTabId;
-  final String? previewTabId;
+  final EditorTabKey? activeTabKey;
+  final EditorTabKey? previewTabKey;
 
-  const EditorTabsState({
-    this.tabs = const [],
-    this.activeTabId,
-    this.previewTabId,
-  });
+  EditorTabsState({
+    List<EditorTab> tabs = const [],
+    this.activeTabKey,
+    this.previewTabKey,
+  }) : tabs = List.unmodifiable(tabs);
 
   EditorTab? get activeTab {
     for (final tab in tabs) {
-      if (tab.id == activeTabId) return tab;
+      if (tab.key == activeTabKey) return tab;
     }
     return null;
   }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is EditorTabsState &&
+          activeTabKey == other.activeTabKey &&
+          previewTabKey == other.previewTabKey &&
+          _listEquals(tabs, other.tabs);
+
+  @override
+  int get hashCode =>
+      Object.hash(Object.hashAll(tabs), activeTabKey, previewTabKey);
+}
+
+bool _listEquals<T>(List<T> a, List<T> b) {
+  if (identical(a, b)) return true;
+  if (a.length != b.length) return false;
+  for (var i = 0; i < a.length; i++) {
+    if (a[i] != b[i]) return false;
+  }
+  return true;
 }

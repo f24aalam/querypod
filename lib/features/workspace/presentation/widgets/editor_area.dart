@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:forui/forui.dart';
 
+import '../../../connections/presentation/cubit/connection_editor_cubit.dart';
+import '../../../connections/presentation/widgets/connection_draft_guard.dart';
 import '../../../connections/presentation/widgets/connection_form.dart';
 import '../../domain/entities/workspace_table.dart';
 import '../cubit/editor_tabs_cubit.dart';
@@ -14,177 +16,304 @@ class EditorArea extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = context.theme;
 
-    return BlocBuilder<EditorTabsCubit, EditorTabsState>(
-      builder: (context, state) {
-        return Container(
-          color: theme.colors.background,
-          child: Column(
-            children: [
-              if (state.tabs.isNotEmpty) _TabStrip(state: state),
-              Expanded(child: _EditorStack(state: state)),
-            ],
-          ),
+    return Container(
+      color: theme.colors.background,
+      child: const Column(
+        children: [
+          _TabStrip(),
+          Expanded(child: _ActiveEditor()),
+        ],
+      ),
+    );
+  }
+}
+
+class _TabStrip extends StatefulWidget {
+  const _TabStrip();
+
+  @override
+  State<_TabStrip> createState() => _TabStripState();
+}
+
+class _TabStripState extends State<_TabStrip> {
+  final _scrollController = ScrollController();
+  final _tabKeys = <EditorTabKey, GlobalKey>{};
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _ensureActiveTabVisible(EditorTabsState state) {
+    final activeKey = state.activeTabKey;
+    if (activeKey == null) return;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final tabContext = _tabKeys[activeKey]?.currentContext;
+      if (tabContext == null) return;
+      Scrollable.ensureVisible(
+        tabContext,
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOut,
+        alignmentPolicy: ScrollPositionAlignmentPolicy.keepVisibleAtEnd,
+      );
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = context.theme;
+
+    return BlocListener<EditorTabsCubit, EditorTabsState>(
+      listenWhen: (previous, current) =>
+          previous.activeTabKey != current.activeTabKey,
+      listener: (context, state) => _ensureActiveTabVisible(state),
+      child: BlocSelector<EditorTabsCubit, EditorTabsState, _TabStripLayout>(
+        selector: (state) =>
+            _TabStripLayout(state.tabs.map((tab) => tab.key).toList()),
+        builder: (context, layout) {
+          _tabKeys.removeWhere((key, value) => !layout.keys.contains(key));
+          if (layout.keys.isEmpty) return const SizedBox.shrink();
+
+          return Container(
+            height: 34,
+            decoration: BoxDecoration(
+              color: theme.colors.secondary,
+              border: Border(
+                bottom: BorderSide(color: theme.colors.border, width: 1),
+              ),
+            ),
+            child: LayoutBuilder(
+              builder: (context, constraints) => SingleChildScrollView(
+                controller: _scrollController,
+                scrollDirection: Axis.horizontal,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minWidth: constraints.maxWidth),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: layout.keys
+                          .map(
+                            (key) => _EditorTabItem(
+                              key: _tabKeys.putIfAbsent(key, () => GlobalKey()),
+                              tabKey: key,
+                            ),
+                          )
+                          .toList(),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _TabStripLayout {
+  final List<EditorTabKey> keys;
+
+  _TabStripLayout(List<EditorTabKey> keys) : keys = List.unmodifiable(keys);
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    if (other is! _TabStripLayout || keys.length != other.keys.length) {
+      return false;
+    }
+    for (var i = 0; i < keys.length; i++) {
+      if (keys[i] != other.keys[i]) return false;
+    }
+    return true;
+  }
+
+  @override
+  int get hashCode => Object.hashAll(keys);
+}
+
+class _TabItemView {
+  final EditorTab tab;
+  final bool isActive;
+
+  const _TabItemView({required this.tab, required this.isActive});
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is _TabItemView && tab == other.tab && isActive == other.isActive;
+
+  @override
+  int get hashCode => Object.hash(tab, isActive);
+}
+
+class _EditorTabItem extends StatelessWidget {
+  final EditorTabKey tabKey;
+
+  const _EditorTabItem({required this.tabKey, super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocSelector<EditorTabsCubit, EditorTabsState, _TabItemView?>(
+      selector: (state) {
+        final matches = state.tabs.where((tab) => tab.key == tabKey);
+        if (matches.isEmpty) return null;
+        return _TabItemView(
+          tab: matches.first,
+          isActive: state.activeTabKey == tabKey,
+        );
+      },
+      builder: (context, view) {
+        if (view == null) return const SizedBox.shrink();
+        return _EditorTabBody(
+          tab: view.tab,
+          isActive: view.isActive,
+          onClose: () => _closeTab(context, view.tab),
         );
       },
     );
   }
-}
 
-class _TabStrip extends StatelessWidget {
-  final EditorTabsState state;
-
-  const _TabStrip({required this.state});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = context.theme;
-
-    return Container(
-      height: 34,
-      decoration: BoxDecoration(
-        color: theme.colors.secondary,
-        border: Border(
-          bottom: BorderSide(color: theme.colors.border, width: 1),
-        ),
-      ),
-      child: LayoutBuilder(
-        builder: (context, constraints) => SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: ConstrainedBox(
-            constraints: BoxConstraints(minWidth: constraints.maxWidth),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: state.tabs
-                    .map(
-                      (tab) => _EditorTabItem(
-                        tab: tab,
-                        isActive: tab.id == state.activeTabId,
-                      ),
-                    )
-                    .toList(),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
+  Future<void> _closeTab(BuildContext context, EditorTab tab) async {
+    if (tab.type == EditorTabType.connection) {
+      if (!await confirmDiscardConnectionDraft(context)) return;
+      if (!context.mounted) return;
+      context.read<ConnectionEditorCubit>().discard();
+    }
+    if (!context.mounted) return;
+    context.read<EditorTabsCubit>().closeTab(tab.key);
   }
 }
 
-class _EditorTabItem extends StatelessWidget {
+class _EditorTabBody extends StatelessWidget {
   final EditorTab tab;
   final bool isActive;
+  final VoidCallback onClose;
 
-  const _EditorTabItem({required this.tab, required this.isActive});
+  const _EditorTabBody({
+    required this.tab,
+    required this.isActive,
+    required this.onClose,
+  });
 
   @override
   Widget build(BuildContext context) {
     final theme = context.theme;
 
-    final tabWidget = Material(
+    return Material(
+      key: ValueKey<(String, EditorTabKey)>(('tab-strip', tab.key)),
       color: isActive ? theme.colors.background : Colors.transparent,
-      child: InkWell(
-        onTap: () => context.read<EditorTabsCubit>().activate(tab.id),
-        onDoubleTap: () => context.read<EditorTabsCubit>().pinTab(tab.id),
-        child: Container(
-          height: 34,
-          width: 180,
-          padding: const EdgeInsets.only(left: 10, right: 4),
-          decoration: BoxDecoration(
-            border: Border(
-              right: BorderSide(color: theme.colors.border, width: 1),
-              top: BorderSide(
-                color: isActive ? theme.colors.primary : Colors.transparent,
-                width: 1,
-              ),
+      child: Container(
+        height: 34,
+        width: 180,
+        decoration: BoxDecoration(
+          border: Border(
+            right: BorderSide(color: theme.colors.border, width: 1),
+            top: BorderSide(
+              color: isActive ? theme.colors.primary : Colors.transparent,
+              width: 1,
             ),
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                tab.type == EditorTabType.connection
-                    ? Icons.storage_outlined
-                    : (tab.tableType == WorkspaceTableType.view
-                          ? Icons.visibility_outlined
-                          : Icons.table_chart_outlined),
-                size: 14,
-                color: theme.colors.mutedForeground,
-              ),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  tab.title,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontStyle: tab.isPinned
-                        ? FontStyle.normal
-                        : FontStyle.italic,
-                    color: theme.colors.foreground,
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: InkWell(
+                onTap: () => context.read<EditorTabsCubit>().activate(tab.key),
+                onDoubleTap: () =>
+                    context.read<EditorTabsCubit>().pinTab(tab.key),
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 10),
+                  child: Row(
+                    children: [
+                      Icon(
+                        tab.type == EditorTabType.connection
+                            ? Icons.storage_outlined
+                            : (tab.tableType == WorkspaceTableType.view
+                                  ? Icons.visibility_outlined
+                                  : Icons.table_chart_outlined),
+                        size: 14,
+                        color: theme.colors.mutedForeground,
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: tab.type == EditorTabType.table
+                            ? FTooltip(
+                                tipBuilder: (context, controller) =>
+                                    Text(tab.title),
+                                child: _TabTitle(tab: tab, theme: theme),
+                              )
+                            : _TabTitle(tab: tab, theme: theme),
+                      ),
+                    ],
                   ),
                 ),
               ),
-              const SizedBox(width: 4),
-              SizedBox(
-                width: 24,
-                height: 24,
-                child: IconButton(
-                  padding: EdgeInsets.zero,
-                  splashRadius: 12,
-                  tooltip: 'Close',
-                  onPressed: () =>
-                      context.read<EditorTabsCubit>().closeTab(tab.id),
-                  icon: Icon(
-                    Icons.close,
-                    size: 14,
-                    color: theme.colors.mutedForeground,
-                  ),
+            ),
+            const SizedBox(width: 4),
+            SizedBox(
+              width: 24,
+              height: 24,
+              child: IconButton(
+                padding: EdgeInsets.zero,
+                splashRadius: 12,
+                tooltip: 'Close',
+                onPressed: onClose,
+                icon: Icon(
+                  Icons.close,
+                  size: 14,
+                  color: theme.colors.mutedForeground,
                 ),
               ),
-            ],
-          ),
+            ),
+            const SizedBox(width: 4),
+          ],
         ),
       ),
-    );
-
-    if (tab.type != EditorTabType.table) return tabWidget;
-
-    return FTooltip(
-      tipBuilder: (context, controller) => Text(tab.title),
-      child: tabWidget,
     );
   }
 }
 
-class _EditorStack extends StatelessWidget {
-  final EditorTabsState state;
+class _TabTitle extends StatelessWidget {
+  final EditorTab tab;
+  final FThemeData theme;
 
-  const _EditorStack({required this.state});
+  const _TabTitle({required this.tab, required this.theme});
 
   @override
   Widget build(BuildContext context) {
-    if (state.tabs.isEmpty || state.activeTabId == null) {
-      return const _EmptyEditor();
-    }
-
-    final activeIndex = state.tabs.indexWhere(
-      (tab) => tab.id == state.activeTabId,
+    return Text(
+      tab.title,
+      overflow: TextOverflow.ellipsis,
+      style: TextStyle(
+        fontSize: 12,
+        fontStyle: tab.isPinned ? FontStyle.normal : FontStyle.italic,
+        color: theme.colors.foreground,
+      ),
     );
-    return IndexedStack(
-      index: activeIndex < 0 ? 0 : activeIndex,
-      children: state.tabs
-          .map(
-            (tab) => KeyedSubtree(
-              key: ValueKey(tab.id),
-              child: tab.type == EditorTabType.connection
-                  ? const ConnectionForm()
-                  : _TablePlaceholder(tab: tab),
-            ),
-          )
-          .toList(),
+  }
+}
+
+class _ActiveEditor extends StatelessWidget {
+  const _ActiveEditor();
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocSelector<EditorTabsCubit, EditorTabsState, EditorTab?>(
+      selector: (state) => state.activeTab,
+      builder: (context, tab) {
+        if (tab == null) return const _EmptyEditor();
+        return KeyedSubtree(
+          key: ValueKey(tab.key),
+          child: tab.type == EditorTabType.connection
+              ? const ConnectionForm()
+              : _TablePlaceholder(tab: tab),
+        );
+      },
     );
   }
 }

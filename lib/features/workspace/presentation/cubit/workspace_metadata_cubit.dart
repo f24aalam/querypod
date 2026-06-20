@@ -8,6 +8,7 @@ import 'workspace_metadata_state.dart';
 
 class WorkspaceMetadataCubit extends Cubit<WorkspaceMetadataState> {
   final WorkspaceMetadataRepository _repository;
+  int _requestGeneration = 0;
 
   WorkspaceMetadataCubit({required this._repository})
     : super(const WorkspaceMetadataState());
@@ -35,13 +36,16 @@ class WorkspaceMetadataCubit extends Cubit<WorkspaceMetadataState> {
   }
 
   Future<void> loadConnection(Connection connection) async {
-    if (state.connectionId == connection.id && state.databases.isNotEmpty) {
+    final session = connection.sessionIdentity;
+    if (state.connectionSession == session && state.databases.isNotEmpty) {
       return;
     }
+    final request = ++_requestGeneration;
 
     emit(
       state.copyWith(
         connectionId: () => connection.id,
+        connectionSession: () => session,
         databases: const [],
         selectedDatabase: () => null,
         tables: const [],
@@ -54,6 +58,7 @@ class WorkspaceMetadataCubit extends Cubit<WorkspaceMetadataState> {
 
     try {
       final databases = await _repository.listDatabases(connection);
+      if (!_isCurrent(request, session)) return;
       final savedDatabase = connection.database;
       final initialDatabase = databases.any((db) => db.name == savedDatabase)
           ? savedDatabase
@@ -70,9 +75,15 @@ class WorkspaceMetadataCubit extends Cubit<WorkspaceMetadataState> {
       );
 
       if (initialDatabase != null) {
-        await _loadTables(connection, initialDatabase);
+        await _loadTables(
+          connection,
+          initialDatabase,
+          request: request,
+          session: session,
+        );
       }
     } catch (e) {
+      if (!_isCurrent(request, session)) return;
       emit(
         _feedback(
           _metadataErrorMessage(e, fallback: 'Failed to load databases'),
@@ -91,6 +102,9 @@ class WorkspaceMetadataCubit extends Cubit<WorkspaceMetadataState> {
 
   Future<void> selectDatabase(Connection connection, String database) async {
     if (state.selectedDatabase == database) return;
+    final session = connection.sessionIdentity;
+    if (state.connectionSession != session) return;
+    final request = ++_requestGeneration;
 
     emit(
       state.copyWith(
@@ -104,8 +118,14 @@ class WorkspaceMetadataCubit extends Cubit<WorkspaceMetadataState> {
     );
 
     try {
-      await _loadTables(connection, database);
+      await _loadTables(
+        connection,
+        database,
+        request: request,
+        session: session,
+      );
     } catch (e) {
+      if (!_isCurrent(request, session, database: database)) return;
       emit(
         _feedback(
           _metadataErrorMessage(
@@ -140,11 +160,18 @@ class WorkspaceMetadataCubit extends Cubit<WorkspaceMetadataState> {
   }
 
   void clear() {
+    _requestGeneration++;
     emit(const WorkspaceMetadataState());
   }
 
-  Future<void> _loadTables(Connection connection, String database) async {
+  Future<void> _loadTables(
+    Connection connection,
+    String database, {
+    required int request,
+    required ConnectionSessionIdentity session,
+  }) async {
     final tables = await _repository.listTables(connection, database);
+    if (!_isCurrent(request, session, database: database)) return;
     final filteredTables = _filter(tables, state.query);
 
     emit(
@@ -156,6 +183,16 @@ class WorkspaceMetadataCubit extends Cubit<WorkspaceMetadataState> {
         status: WorkspaceMetadataStatus.idle,
       ),
     );
+  }
+
+  bool _isCurrent(
+    int request,
+    ConnectionSessionIdentity session, {
+    String? database,
+  }) {
+    return request == _requestGeneration &&
+        state.connectionSession == session &&
+        (database == null || state.selectedDatabase == database);
   }
 
   List<WorkspaceTable> _filter(List<WorkspaceTable> tables, String query) {

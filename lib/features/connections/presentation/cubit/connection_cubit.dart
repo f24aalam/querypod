@@ -76,7 +76,7 @@ class ConnectionCubit extends Cubit<ConnectionsState> {
     }
   }
 
-  Future<void> save(Connection connection) async {
+  Future<bool> save(Connection connection) async {
     emit(state.copyWith(status: ConnectionStatus.saving));
     try {
       await _repository.save(connection);
@@ -88,6 +88,7 @@ class ConnectionCubit extends Cubit<ConnectionsState> {
           activeConnection: () => connection,
         ),
       );
+      return true;
     } catch (e) {
       emit(
         _feedback(
@@ -96,6 +97,7 @@ class ConnectionCubit extends Cubit<ConnectionsState> {
           status: ConnectionStatus.error,
         ),
       );
+      return false;
     }
   }
 
@@ -121,12 +123,7 @@ class ConnectionCubit extends Cubit<ConnectionsState> {
 
   Future<void> select(String? id) async {
     await _repository.setSelectedId(id);
-    emit(
-      state.copyWith(
-        selectedId: () => id,
-        selectionNonce: state.selectionNonce + 1,
-      ),
-    );
+    emit(state.copyWith(selectedId: () => id));
   }
 
   Future<void> openSavedConnection(String id) async {
@@ -138,7 +135,6 @@ class ConnectionCubit extends Cubit<ConnectionsState> {
       state.copyWith(
         selectedId: () => id,
         activeConnection: () => selectedConnection ?? state.activeConnection,
-        selectionNonce: state.selectionNonce + 1,
         openWorkspaceNonce: state.openWorkspaceNonce + 1,
       ),
     );

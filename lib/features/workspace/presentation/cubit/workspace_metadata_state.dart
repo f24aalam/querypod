@@ -1,10 +1,12 @@
 import '../../domain/entities/workspace_database.dart';
 import '../../domain/entities/workspace_table.dart';
+import '../../../connections/domain/entities/connection.dart';
 
 enum WorkspaceMetadataStatus { idle, loadingDatabases, loadingTables, error }
 
 class WorkspaceMetadataState {
   final String? connectionId;
+  final ConnectionSessionIdentity? connectionSession;
   final List<WorkspaceDatabase> databases;
   final String? selectedDatabase;
   final List<WorkspaceTable> tables;
@@ -18,6 +20,7 @@ class WorkspaceMetadataState {
 
   const WorkspaceMetadataState({
     this.connectionId,
+    this.connectionSession,
     this.databases = const [],
     this.selectedDatabase,
     this.tables = const [],
@@ -32,6 +35,7 @@ class WorkspaceMetadataState {
 
   WorkspaceMetadataState copyWith({
     String? Function()? connectionId,
+    ConnectionSessionIdentity? Function()? connectionSession,
     List<WorkspaceDatabase>? databases,
     String? Function()? selectedDatabase,
     List<WorkspaceTable>? tables,
@@ -45,6 +49,9 @@ class WorkspaceMetadataState {
   }) {
     return WorkspaceMetadataState(
       connectionId: connectionId != null ? connectionId() : this.connectionId,
+      connectionSession: connectionSession != null
+          ? connectionSession()
+          : this.connectionSession,
       databases: databases ?? this.databases,
       selectedDatabase: selectedDatabase != null
           ? selectedDatabase()

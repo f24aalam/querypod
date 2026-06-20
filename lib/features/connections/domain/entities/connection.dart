@@ -40,4 +40,45 @@ class Connection {
   }
 
   static String generateId() => const Uuid().v4();
+
+  ConnectionSessionIdentity get sessionIdentity => ConnectionSessionIdentity(
+    id: id,
+    host: host,
+    port: port,
+    user: user,
+    password: password,
+    database: database,
+  );
+}
+
+class ConnectionSessionIdentity {
+  final String id;
+  final String host;
+  final int port;
+  final String user;
+  final String password;
+  final String database;
+
+  const ConnectionSessionIdentity({
+    required this.id,
+    required this.host,
+    required this.port,
+    required this.user,
+    required this.password,
+    required this.database,
+  });
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ConnectionSessionIdentity &&
+          id == other.id &&
+          host == other.host &&
+          port == other.port &&
+          user == other.user &&
+          password == other.password &&
+          database == other.database;
+
+  @override
+  int get hashCode => Object.hash(id, host, port, user, password, database);
 }

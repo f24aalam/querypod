@@ -43,7 +43,7 @@ void main() {
 
     expect(cubit.state.tabs, hasLength(2));
     expect(cubit.state.tabs.first.isPinned, isTrue);
-    expect(cubit.state.previewTabId, cubit.state.tabs.last.id);
+    expect(cubit.state.previewTabKey, cubit.state.tabs.last.key);
   });
 
   test('double-clicking a preview tab pins and activates it', () {
@@ -54,12 +54,12 @@ void main() {
       table: users,
     );
 
-    final previewId = cubit.state.activeTabId!;
-    cubit.pinTab(previewId);
+    final previewKey = cubit.state.activeTabKey!;
+    cubit.pinTab(previewKey);
 
-    expect(cubit.state.activeTabId, previewId);
+    expect(cubit.state.activeTabKey, previewKey);
     expect(cubit.state.activeTab?.isPinned, isTrue);
-    expect(cubit.state.previewTabId, isNull);
+    expect(cubit.state.previewTabKey, isNull);
   });
 
   test('closing active tab selects the nearest tab', () {
@@ -67,7 +67,7 @@ void main() {
     cubit.openConnectionEditor();
     cubit.pinTable(connectionId: 'connection', database: 'app', table: users);
 
-    cubit.closeTab(cubit.state.activeTabId!);
+    cubit.closeTab(cubit.state.activeTabKey!);
 
     expect(cubit.state.activeTab?.type, EditorTabType.connection);
   });
@@ -81,5 +81,58 @@ void main() {
 
     expect(cubit.state.tabs, hasLength(1));
     expect(cubit.state.tabs.single.type, EditorTabType.connection);
+  });
+
+  test('typed table keys cannot collide when names contain separators', () {
+    final cubit = EditorTabsCubit();
+    cubit.pinTable(
+      connectionId: 'connection:one',
+      database: 'database',
+      table: users,
+    );
+    cubit.pinTable(
+      connectionId: 'connection',
+      database: 'one:database',
+      table: users,
+    );
+
+    expect(cubit.state.tabs, hasLength(2));
+    expect(cubit.state.tabs[0].key, isNot(cubit.state.tabs[1].key));
+  });
+
+  test('tab collections are externally immutable', () {
+    final cubit = EditorTabsCubit()..openConnectionEditor();
+
+    expect(
+      () => cubit.state.tabs.add(cubit.state.tabs.single),
+      throwsUnsupportedError,
+    );
+  });
+
+  test('repeated activation does not emit another state', () async {
+    final cubit = EditorTabsCubit()..openConnectionEditor();
+    final emitted = <EditorTabsState>[];
+    final subscription = cubit.stream.listen(emitted.add);
+
+    cubit.activate(cubit.state.activeTabKey!);
+    await Future<void>.delayed(Duration.zero);
+
+    expect(emitted, isEmpty);
+    await subscription.cancel();
+  });
+
+  test('saved connection synchronizes the editor title', () {
+    final cubit = EditorTabsCubit()
+      ..openConnectionEditor(
+        connectionId: 'connection',
+        connectionName: 'Old name',
+      )
+      ..syncConnectionEditor(
+        connectionId: 'connection',
+        connectionName: 'New name',
+      );
+
+    expect(cubit.state.tabs.single.title, 'New name');
+    expect(cubit.state.tabs.single.connectionId, 'connection');
   });
 }

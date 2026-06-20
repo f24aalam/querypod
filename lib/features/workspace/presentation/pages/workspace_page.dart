@@ -22,7 +22,7 @@ class WorkspacePage extends StatefulWidget {
 }
 
 class _WorkspacePageState extends State<WorkspacePage> {
-  String? _loadedConnectionId;
+  ConnectionSessionIdentity? _loadedConnectionSession;
 
   @override
   void didChangeDependencies() {
@@ -36,17 +36,18 @@ class _WorkspacePageState extends State<WorkspacePage> {
     final workspaceCubit = context.read<WorkspaceMetadataCubit>();
 
     if (connection == null) {
-      _loadedConnectionId = null;
+      _loadedConnectionSession = null;
       workspaceCubit.clear();
       return;
     }
 
-    if (_loadedConnectionId == connection.id &&
-        workspaceCubit.state.connectionId == connection.id) {
+    final session = connection.sessionIdentity;
+    if (_loadedConnectionSession == session &&
+        workspaceCubit.state.connectionSession == session) {
       return;
     }
 
-    _loadedConnectionId = connection.id;
+    _loadedConnectionSession = session;
     workspaceCubit.loadConnection(connection);
   }
 
@@ -56,7 +57,8 @@ class _WorkspacePageState extends State<WorkspacePage> {
       listeners: [
         BlocListener<ConnectionCubit, ConnectionsState>(
           listenWhen: (prev, curr) =>
-              prev.activeConnection?.id != curr.activeConnection?.id,
+              prev.activeConnection?.sessionIdentity !=
+              curr.activeConnection?.sessionIdentity,
           listener: (context, state) {
             context.read<EditorTabsCubit>().closeTableTabs();
             _syncWorkspaceConnection(state.activeConnection);
@@ -93,7 +95,8 @@ class _WorkspacePageState extends State<WorkspacePage> {
                 children: [
                   BlocBuilder<ConnectionCubit, ConnectionsState>(
                     buildWhen: (prev, curr) =>
-                        prev.activeConnection?.id != curr.activeConnection?.id,
+                        prev.activeConnection?.sessionIdentity !=
+                        curr.activeConnection?.sessionIdentity,
                     builder: (context, state) => ActivityBar(
                       canOpenWorkspace: state.activeConnection != null,
                     ),

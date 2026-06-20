@@ -4,7 +4,9 @@ import 'package:forui/forui.dart';
 
 import '../../../workspace/presentation/cubit/editor_tabs_cubit.dart';
 import '../cubit/connection_cubit.dart';
+import '../cubit/connection_editor_cubit.dart';
 import '../cubit/connection_state.dart';
+import 'connection_draft_guard.dart';
 
 class ConnectionListPanel extends StatelessWidget {
   const ConnectionListPanel({super.key});
@@ -50,10 +52,7 @@ class ConnectionListPanel extends StatelessWidget {
                       variant: FButtonVariant.outline,
                       size: FButtonSizeVariant.xs,
                       mainAxisSize: MainAxisSize.min,
-                      onPress: () {
-                        context.read<ConnectionCubit>().select(null);
-                        context.read<EditorTabsCubit>().openConnectionEditor();
-                      },
+                      onPress: () => _openNewConnection(context),
                       child: const Text('New'),
                     ),
                   ],
@@ -172,13 +171,7 @@ class _ConnectionItem extends StatelessWidget {
         ),
       ],
       child: GestureDetector(
-        onTap: () {
-          context.read<ConnectionCubit>().select(id);
-          context.read<EditorTabsCubit>().openConnectionEditor(
-            connectionId: id,
-            connectionName: name,
-          );
-        },
+        onTap: () => _openEditor(context),
         onDoubleTap: () =>
             context.read<ConnectionCubit>().openSavedConnection(id),
         child: Container(
@@ -219,6 +212,29 @@ class _ConnectionItem extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+
+  Future<void> _openEditor(BuildContext context) async {
+    final editor = context.read<ConnectionEditorCubit>();
+    final isSameDraft = editor.state.draft.sourceConnectionId == id;
+    if (!isSameDraft && !await confirmDiscardConnectionDraft(context)) return;
+    if (!context.mounted) return;
+
+    final connection = context
+        .read<ConnectionCubit>()
+        .state
+        .connections
+        .where((connection) => connection.id == id)
+        .firstOrNull;
+    if (connection == null) return;
+
+    await context.read<ConnectionCubit>().select(id);
+    if (!context.mounted) return;
+    editor.load(connection);
+    context.read<EditorTabsCubit>().openConnectionEditor(
+      connectionId: id,
+      connectionName: name,
     );
   }
 
@@ -270,4 +286,20 @@ class _ConnectionItem extends StatelessWidget {
       ),
     );
   }
+}
+
+Future<void> _openNewConnection(BuildContext context) async {
+  final editor = context.read<ConnectionEditorCubit>();
+  final isCurrentNewDraft = editor.state.isNew;
+  if (!isCurrentNewDraft && !await confirmDiscardConnectionDraft(context)) {
+    return;
+  }
+  if (!context.mounted) return;
+
+  if (!isCurrentNewDraft) {
+    editor.load(null);
+  }
+  await context.read<ConnectionCubit>().select(null);
+  if (!context.mounted) return;
+  context.read<EditorTabsCubit>().openConnectionEditor();
 }

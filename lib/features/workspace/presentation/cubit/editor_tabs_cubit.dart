@@ -4,22 +4,29 @@ import '../../domain/entities/workspace_table.dart';
 import 'editor_tabs_state.dart';
 
 class EditorTabsCubit extends Cubit<EditorTabsState> {
-  static const connectionEditorId = 'connection-editor';
+  static const connectionEditorKey = ConnectionEditorTabKey();
 
-  EditorTabsCubit() : super(const EditorTabsState());
+  EditorTabsCubit() : super(EditorTabsState());
 
   void openConnectionEditor({String? connectionId, String? connectionName}) {
     final title = connectionName ?? 'New Connection';
-    final index = state.tabs.indexWhere((tab) => tab.id == connectionEditorId);
-    final tabs = List<EditorTab>.from(state.tabs);
-
+    final index = state.tabs.indexWhere(
+      (tab) => tab.key == connectionEditorKey,
+    );
     final tab = EditorTab(
-      id: connectionEditorId,
+      key: connectionEditorKey,
       type: EditorTabType.connection,
       title: title,
       connectionId: connectionId,
     );
 
+    if (index >= 0 &&
+        state.tabs[index] == tab &&
+        state.activeTabKey == connectionEditorKey) {
+      return;
+    }
+
+    final tabs = List<EditorTab>.from(state.tabs);
     if (index == -1) {
       tabs.add(tab);
     } else {
@@ -29,8 +36,33 @@ class EditorTabsCubit extends Cubit<EditorTabsState> {
     emit(
       EditorTabsState(
         tabs: tabs,
-        activeTabId: connectionEditorId,
-        previewTabId: state.previewTabId,
+        activeTabKey: connectionEditorKey,
+        previewTabKey: state.previewTabKey,
+      ),
+    );
+  }
+
+  void syncConnectionEditor({
+    required String connectionId,
+    required String connectionName,
+  }) {
+    final index = state.tabs.indexWhere(
+      (tab) => tab.key == connectionEditorKey,
+    );
+    if (index == -1) return;
+
+    final updated = state.tabs[index].copyWith(
+      title: connectionName,
+      connectionId: () => connectionId,
+    );
+    if (updated == state.tabs[index]) return;
+
+    final tabs = List<EditorTab>.from(state.tabs)..[index] = updated;
+    emit(
+      EditorTabsState(
+        tabs: tabs,
+        activeTabKey: state.activeTabKey,
+        previewTabKey: state.previewTabKey,
       ),
     );
   }
@@ -40,36 +72,42 @@ class EditorTabsCubit extends Cubit<EditorTabsState> {
     required String database,
     required WorkspaceTable table,
   }) {
-    final id = _tableId(connectionId, database, table.name);
-    final existing = state.tabs.where((tab) => tab.id == id).firstOrNull;
+    final key = TableTabKey(
+      connectionId: connectionId,
+      database: database,
+      tableName: table.name,
+    );
+    final existing = state.tabs.where((tab) => tab.key == key).firstOrNull;
 
     if (existing != null) {
+      final previewKey = existing.isPinned ? state.previewTabKey : key;
+      if (state.activeTabKey == key && state.previewTabKey == previewKey) {
+        return;
+      }
       emit(
         EditorTabsState(
           tabs: state.tabs,
-          activeTabId: id,
-          previewTabId: existing.isPinned ? state.previewTabId : id,
+          activeTabKey: key,
+          previewTabKey: previewKey,
         ),
       );
       return;
     }
 
-    final tabs = state.tabs
-        .where((tab) => tab.id != state.previewTabId)
-        .toList();
-    tabs.add(
-      EditorTab(
-        id: id,
-        type: EditorTabType.table,
-        title: table.name,
-        connectionId: connectionId,
-        database: database,
-        tableType: table.type,
-        isPinned: false,
-      ),
-    );
+    final tabs =
+        state.tabs.where((tab) => tab.key != state.previewTabKey).toList()..add(
+          EditorTab(
+            key: key,
+            type: EditorTabType.table,
+            title: table.name,
+            connectionId: connectionId,
+            database: database,
+            tableType: table.type,
+            isPinned: false,
+          ),
+        );
 
-    emit(EditorTabsState(tabs: tabs, activeTabId: id, previewTabId: id));
+    emit(EditorTabsState(tabs: tabs, activeTabKey: key, previewTabKey: key));
   }
 
   void pinTable({
@@ -77,14 +115,18 @@ class EditorTabsCubit extends Cubit<EditorTabsState> {
     required String database,
     required WorkspaceTable table,
   }) {
-    final id = _tableId(connectionId, database, table.name);
-    final index = state.tabs.indexWhere((tab) => tab.id == id);
+    final key = TableTabKey(
+      connectionId: connectionId,
+      database: database,
+      tableName: table.name,
+    );
+    final index = state.tabs.indexWhere((tab) => tab.key == key);
     final tabs = List<EditorTab>.from(state.tabs);
 
     if (index == -1) {
       tabs.add(
         EditorTab(
-          id: id,
+          key: key,
           type: EditorTabType.table,
           title: table.name,
           connectionId: connectionId,
@@ -92,37 +134,40 @@ class EditorTabsCubit extends Cubit<EditorTabsState> {
           tableType: table.type,
         ),
       );
-    } else {
+    } else if (!tabs[index].isPinned) {
       tabs[index] = tabs[index].copyWith(isPinned: true);
+    } else if (state.activeTabKey == key) {
+      return;
     }
 
     emit(
       EditorTabsState(
         tabs: tabs,
-        activeTabId: id,
-        previewTabId: state.previewTabId == id ? null : state.previewTabId,
+        activeTabKey: key,
+        previewTabKey: state.previewTabKey == key ? null : state.previewTabKey,
       ),
     );
   }
 
-  void activate(String id) {
-    if (!state.tabs.any((tab) => tab.id == id)) return;
+  void activate(EditorTabKey key) {
+    if (state.activeTabKey == key) return;
+    if (!state.tabs.any((tab) => tab.key == key)) return;
     emit(
       EditorTabsState(
         tabs: state.tabs,
-        activeTabId: id,
-        previewTabId: state.previewTabId,
+        activeTabKey: key,
+        previewTabKey: state.previewTabKey,
       ),
     );
   }
 
-  void pinTab(String id) {
-    final index = state.tabs.indexWhere((tab) => tab.id == id);
+  void pinTab(EditorTabKey key) {
+    final index = state.tabs.indexWhere((tab) => tab.key == key);
     if (index == -1) return;
 
     final tab = state.tabs[index];
     if (tab.type != EditorTabType.table || tab.isPinned) {
-      activate(id);
+      activate(key);
       return;
     }
 
@@ -131,50 +176,48 @@ class EditorTabsCubit extends Cubit<EditorTabsState> {
     emit(
       EditorTabsState(
         tabs: tabs,
-        activeTabId: id,
-        previewTabId: state.previewTabId == id ? null : state.previewTabId,
+        activeTabKey: key,
+        previewTabKey: state.previewTabKey == key ? null : state.previewTabKey,
       ),
     );
   }
 
-  void closeTab(String id) {
-    final index = state.tabs.indexWhere((tab) => tab.id == id);
+  void closeTab(EditorTabKey key) {
+    final index = state.tabs.indexWhere((tab) => tab.key == key);
     if (index == -1) return;
 
     final tabs = List<EditorTab>.from(state.tabs)..removeAt(index);
-    var activeTabId = state.activeTabId;
-    if (activeTabId == id) {
-      activeTabId = tabs.isEmpty
+    var activeTabKey = state.activeTabKey;
+    if (activeTabKey == key) {
+      activeTabKey = tabs.isEmpty
           ? null
-          : tabs[index.clamp(0, tabs.length - 1)].id;
+          : tabs[index.clamp(0, tabs.length - 1)].key;
     }
 
     emit(
       EditorTabsState(
         tabs: tabs,
-        activeTabId: activeTabId,
-        previewTabId: state.previewTabId == id ? null : state.previewTabId,
+        activeTabKey: activeTabKey,
+        previewTabKey: state.previewTabKey == key ? null : state.previewTabKey,
       ),
     );
   }
 
   void closeTableTabs() {
+    if (!state.tabs.any((tab) => tab.type == EditorTabType.table)) return;
+
     final tabs = state.tabs
         .where((tab) => tab.type != EditorTabType.table)
         .toList();
-    final activeStillExists = tabs.any((tab) => tab.id == state.activeTabId);
+    final activeStillExists = tabs.any((tab) => tab.key == state.activeTabKey);
 
     emit(
       EditorTabsState(
         tabs: tabs,
-        activeTabId: activeStillExists
-            ? state.activeTabId
-            : (tabs.isEmpty ? null : tabs.last.id),
+        activeTabKey: activeStillExists
+            ? state.activeTabKey
+            : (tabs.isEmpty ? null : tabs.last.key),
       ),
     );
-  }
-
-  String _tableId(String connectionId, String database, String table) {
-    return 'table:$connectionId:$database:$table';
   }
 }

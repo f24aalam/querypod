@@ -19,12 +19,14 @@ class StatusBar extends StatelessWidget {
 
     return BlocBuilder<ConnectionCubit, ConnectionsState>(
       buildWhen: (prev, curr) =>
-          prev.activeConnection?.id != curr.activeConnection?.id,
+          prev.activeConnection?.name != curr.activeConnection?.name ||
+          prev.activeConnection?.sessionIdentity !=
+              curr.activeConnection?.sessionIdentity,
       builder: (context, connectionState) {
         return BlocBuilder<WorkspaceMetadataCubit, WorkspaceMetadataState>(
           buildWhen: (prev, curr) =>
               prev.selectedDatabase != curr.selectedDatabase ||
-              prev.connectionId != curr.connectionId,
+              prev.connectionSession != curr.connectionSession,
           builder: (context, workspaceState) {
             final connection = connectionState.activeConnection;
             final isConnected = connection != null;
@@ -32,6 +34,8 @@ class StatusBar extends StatelessWidget {
             final databaseName =
                 isConnected &&
                     workspaceState.connectionId == connection.id &&
+                    workspaceState.connectionSession ==
+                        connection.sessionIdentity &&
                     workspaceState.selectedDatabase != null
                 ? workspaceState.selectedDatabase!
                 : (isConnected && connection.database.isNotEmpty

@@ -12,7 +12,6 @@ class ConnectionsState {
   final String? feedbackMessage;
   final bool feedbackIsError;
   final int feedbackNonce;
-  final int selectionNonce;
   final int openWorkspaceNonce;
 
   const ConnectionsState({
@@ -25,7 +24,6 @@ class ConnectionsState {
     this.feedbackMessage,
     this.feedbackIsError = false,
     this.feedbackNonce = 0,
-    this.selectionNonce = 0,
     this.openWorkspaceNonce = 0,
   });
 
@@ -39,7 +37,6 @@ class ConnectionsState {
     String? Function()? feedbackMessage,
     bool? feedbackIsError,
     int? feedbackNonce,
-    int? selectionNonce,
     int? openWorkspaceNonce,
   }) {
     return ConnectionsState(
@@ -56,7 +53,6 @@ class ConnectionsState {
           : this.feedbackMessage,
       feedbackIsError: feedbackIsError ?? this.feedbackIsError,
       feedbackNonce: feedbackNonce ?? this.feedbackNonce,
-      selectionNonce: selectionNonce ?? this.selectionNonce,
       openWorkspaceNonce: openWorkspaceNonce ?? this.openWorkspaceNonce,
     );
   }

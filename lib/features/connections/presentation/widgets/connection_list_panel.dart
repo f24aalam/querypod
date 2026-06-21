@@ -125,7 +125,7 @@ class ConnectionListPanel extends StatelessWidget {
                         (conn) => _ConnectionItem(
                           id: conn.id,
                           name: conn.name,
-                          host: conn.host,
+                          type: conn.type.name.toUpperCase(),
                           isSelected: conn.id == state.selectedId,
                           theme: theme,
                         ),
@@ -144,14 +144,14 @@ class ConnectionListPanel extends StatelessWidget {
 class _ConnectionItem extends StatelessWidget {
   final String id;
   final String name;
-  final String host;
+  final String type;
   final bool isSelected;
   final FThemeData theme;
 
   const _ConnectionItem({
     required this.id,
     required this.name,
-    required this.host,
+    required this.type,
     required this.isSelected,
     required this.theme,
   });
@@ -201,10 +201,11 @@ class _ConnectionItem extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                     ),
                     Text(
-                      host,
+                      type,
                       style: TextStyle(
                         fontSize: 11,
                         color: theme.colors.mutedForeground,
+                        fontWeight: FontWeight.w500,
                       ),
                       overflow: TextOverflow.ellipsis,
                     ),

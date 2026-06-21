@@ -10,6 +10,7 @@ import 'package:querypod/app/injection.dart';
 import 'package:querypod/features/connections/presentation/cubit/connection_editor_cubit.dart';
 import 'package:querypod/features/connections/presentation/widgets/connection_form.dart';
 import 'package:querypod/features/connections/domain/entities/connection.dart';
+import 'package:querypod/features/workspace/domain/entities/query_result.dart';
 import 'package:querypod/features/workspace/domain/entities/table_data.dart';
 import 'package:querypod/features/workspace/domain/entities/workspace_table.dart';
 import 'package:querypod/features/workspace/domain/repositories/table_data_repository.dart';
@@ -300,6 +301,15 @@ Future<void> _deleteQueryDatabase() async {
 class _WidgetTableRepository implements TableDataRepository {
   String? updatedValue;
   bool deleted = false;
+
+  @override
+  Future<QueryResult> executeQuery(
+    Connection connection,
+    String database,
+    String sql,
+  ) async {
+    return const QueryResult();
+  }
 
   @override
   Future<TableStructure> inspectTable(

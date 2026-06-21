@@ -10,6 +10,7 @@ import '../cubit/editor_tabs_cubit.dart';
 import '../cubit/editor_tabs_state.dart';
 import '../cubit/query_editor_cubit.dart';
 import 'query_code_editor.dart';
+import 'query_result_viewer.dart';
 import 'table_data_editor.dart';
 
 class EditorArea extends StatelessWidget {
@@ -346,7 +347,31 @@ class _QueryEditorTab extends StatelessWidget {
       return const Center(child: Text('Query not found'));
     }
 
-    return QueryCodeEditor(controller: query.controller);
+    final editor = QueryCodeEditor(
+      controller: query.controller,
+      isRunning: query.isRunning,
+      onRun: () => context.read<QueryEditorCubit>().runQuery(query.id),
+    );
+
+    if (query.result == null) return editor;
+
+    return FResizable(
+      axis: Axis.vertical,
+      children: [
+        FResizableRegion.flex(
+          flex: 2,
+          minFlex: 1,
+          builder: (context, data, child) => child!,
+          child: editor,
+        ),
+        FResizableRegion.flex(
+          flex: 2,
+          minFlex: 1,
+          builder: (context, data, child) => child!,
+          child: QueryResultViewer(result: query.result!),
+        ),
+      ],
+    );
   }
 }
 

@@ -1,6 +1,8 @@
 import 'package:flutter_code_editor/flutter_code_editor.dart';
 import 'package:highlight/languages/sql.dart' as highlight;
 
+import '../../domain/entities/query_result.dart';
+
 class QueryDocument {
   final String id;
   final String connectionId;
@@ -8,6 +10,8 @@ class QueryDocument {
   final CodeController controller;
   final DateTime createdAt;
   final DateTime updatedAt;
+  final bool isRunning;
+  final QueryResult? result;
 
   QueryDocument({
     required this.id,
@@ -16,6 +20,8 @@ class QueryDocument {
     required this.controller,
     required this.createdAt,
     required this.updatedAt,
+    this.isRunning = false,
+    this.result,
   });
 
   QueryDocument copyWith({
@@ -23,6 +29,8 @@ class QueryDocument {
     String? connectionId,
     DateTime? updatedAt,
     CodeController? controller,
+    bool? isRunning,
+    QueryResult? result,
   }) {
     return QueryDocument(
       id: id,
@@ -31,6 +39,8 @@ class QueryDocument {
       controller: controller ?? this.controller,
       createdAt: createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      isRunning: isRunning ?? this.isRunning,
+      result: result ?? this.result,
     );
   }
 
@@ -106,7 +116,10 @@ bool _listEquals(List<QueryDocument> a, List<QueryDocument> b) {
   for (var i = 0; i < a.length; i++) {
     final left = a[i];
     final right = b[i];
-    if (left.id != right.id || left.title != right.title) return false;
+    if (left.id != right.id ||
+        left.title != right.title ||
+        left.isRunning != right.isRunning ||
+        left.result != right.result) return false;
   }
   return true;
 }

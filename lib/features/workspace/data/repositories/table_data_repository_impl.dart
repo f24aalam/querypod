@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:mysql_client_plus/mysql_client_plus.dart';
 
 import '../../../connections/domain/entities/connection.dart';
+import '../../domain/entities/query_result.dart';
 import '../../domain/entities/table_data.dart';
 import '../../domain/repositories/table_data_repository.dart';
 
@@ -280,5 +281,59 @@ class TableDataRepositoryImpl implements TableDataRepository {
     return type.contains('binary') ||
         type.contains('blob') ||
         type.contains('geometry');
+  }
+
+  @override
+  Future<QueryResult> executeQuery(
+    Connection connection,
+    String database,
+    String sql,
+  ) async {
+    final stopwatch = Stopwatch()..start();
+    MySQLConnection? conn;
+    try {
+      conn = await _connect(connection, database);
+      final result = await conn.execute(sql);
+      stopwatch.stop();
+
+      final columns = result.cols
+          .map(
+            (col) => TableDataColumn(
+              name: col.name,
+              databaseType: col.type.intVal.toString(),
+              length: col.length,
+              isPrimaryKey: false,
+            ),
+          )
+          .toList();
+
+      final structure = columns.isNotEmpty
+          ? TableStructure(columns: columns, orderColumn: columns.first.name)
+          : null;
+
+      final rows = result.rows
+          .map(
+            (row) => TableDataRow([
+              for (var index = 0; index < columns.length; index++)
+                _cell(row.colAt(index), columns[index]),
+            ]),
+          )
+          .toList();
+
+      return QueryResult(
+        structure: structure,
+        rows: rows,
+        queryDuration: stopwatch.elapsed,
+      );
+    } catch (e) {
+      stopwatch.stop();
+      return QueryResult(
+        queryDuration: stopwatch.elapsed,
+        errorMessage: e.toString(),
+        rows: const [],
+      );
+    } finally {
+      await conn?.close();
+    }
   }
 }

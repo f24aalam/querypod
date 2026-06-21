@@ -41,6 +41,15 @@ class ConnectionRepositoryImpl implements ConnectionRepository {
   }
 
   @override
+  Future<Connection?> getById(String id) async {
+    final connections = await getAll();
+    for (final connection in connections) {
+      if (connection.id == id) return connection;
+    }
+    return null;
+  }
+
+  @override
   Future<Connection> save(Connection connection) async {
     final connections = await getAll();
     final existingIndex = connections.indexWhere((c) => c.id == connection.id);

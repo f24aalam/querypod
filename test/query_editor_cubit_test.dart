@@ -1,6 +1,11 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querypod/features/workspace/domain/entities/workspace_query.dart';
 import 'package:querypod/features/workspace/domain/repositories/query_repository.dart';
+import 'package:querypod/features/connections/domain/entities/connection.dart';
+import 'package:querypod/features/connections/domain/repositories/connection_repository.dart';
+import 'package:querypod/features/workspace/domain/entities/query_result.dart';
+import 'package:querypod/features/workspace/domain/entities/table_data.dart';
+import 'package:querypod/features/workspace/domain/repositories/table_data_repository.dart';
 import 'package:querypod/features/workspace/presentation/cubit/query_editor_cubit.dart';
 
 void main() {
@@ -13,7 +18,13 @@ void main() {
           _query(id: 'q2', connectionId: 'conn-2', title: 'other'),
         ],
       );
-      final cubit = QueryEditorCubit(repository: repository);
+      final connectionRepository = _MockConnectionRepository();
+      final tableDataRepository = _MockTableDataRepository();
+      final cubit = QueryEditorCubit(
+        repository: repository,
+        connectionRepository: connectionRepository,
+        tableDataRepository: tableDataRepository,
+      );
 
       await cubit.loadConnection('conn-1');
 
@@ -28,7 +39,13 @@ void main() {
     'createQuery persists a new demo query for the active connection',
     () async {
       final repository = _InMemoryQueryRepository();
-      final cubit = QueryEditorCubit(repository: repository);
+      final connectionRepository = _MockConnectionRepository();
+      final tableDataRepository = _MockTableDataRepository();
+      final cubit = QueryEditorCubit(
+        repository: repository,
+        connectionRepository: connectionRepository,
+        tableDataRepository: tableDataRepository,
+      );
       await cubit.loadConnection('conn-1');
 
       final query = await cubit.createQuery();
@@ -44,7 +61,13 @@ void main() {
   test('renameQuery persists the new title', () async {
     final existing = _query(id: 'q1', connectionId: 'conn-1', title: 'demo');
     final repository = _InMemoryQueryRepository(seeded: [existing]);
-    final cubit = QueryEditorCubit(repository: repository);
+    final connectionRepository = _MockConnectionRepository();
+    final tableDataRepository = _MockTableDataRepository();
+    final cubit = QueryEditorCubit(
+      repository: repository,
+      connectionRepository: connectionRepository,
+      tableDataRepository: tableDataRepository,
+    );
     await cubit.loadConnection('conn-1');
 
     await cubit.renameQuery('q1', 'renamed');
@@ -58,7 +81,13 @@ void main() {
     final repository = _InMemoryQueryRepository(
       seeded: [_query(id: 'q1', connectionId: 'conn-1', title: 'demo')],
     );
-    final cubit = QueryEditorCubit(repository: repository);
+    final connectionRepository = _MockConnectionRepository();
+    final tableDataRepository = _MockTableDataRepository();
+    final cubit = QueryEditorCubit(
+      repository: repository,
+      connectionRepository: connectionRepository,
+      tableDataRepository: tableDataRepository,
+    );
     await cubit.loadConnection('conn-1');
 
     await cubit.deleteQuery('q1');
@@ -72,7 +101,13 @@ void main() {
     final repository = _InMemoryQueryRepository(
       seeded: [_query(id: 'q1', connectionId: 'conn-1', title: 'demo')],
     );
-    final cubit = QueryEditorCubit(repository: repository);
+    final connectionRepository = _MockConnectionRepository();
+    final tableDataRepository = _MockTableDataRepository();
+    final cubit = QueryEditorCubit(
+      repository: repository,
+      connectionRepository: connectionRepository,
+      tableDataRepository: tableDataRepository,
+    );
     await cubit.loadConnection('conn-1');
 
     cubit.state.queries.single.controller.fullText = 'SELECT id FROM users;';
@@ -133,4 +168,70 @@ class _InMemoryQueryRepository implements QueryRepository {
     saved.add(query);
     return query;
   }
+}
+
+class _MockConnectionRepository implements ConnectionRepository {
+  @override
+  Future<void> delete(String id) async {}
+
+  @override
+  Future<List<Connection>> getAll() async => [];
+
+  @override
+  Future<Connection?> getById(String id) async => null;
+
+  @override
+  Future<String?> getSelectedId() async => null;
+
+  @override
+  Future<Connection> save(Connection connection) async => connection;
+
+  @override
+  Future<void> setSelectedId(String? id) async {}
+}
+
+class _MockTableDataRepository implements TableDataRepository {
+  @override
+  Future<void> commitChanges(
+    Connection connection,
+    String database,
+    String table, {
+    required TableStructure structure,
+    required List<TableCellChange> cellChanges,
+    required List<TableDataRow> deletedRows,
+  }) async {}
+
+  @override
+  Future<int> countRows(
+    Connection connection,
+    String database,
+    String table,
+  ) async => 0;
+
+  @override
+  Future<QueryResult> executeQuery(
+    Connection connection,
+    String database,
+    String sql,
+  ) async => const QueryResult();
+
+  @override
+  Future<TableRowsPage> fetchRows(
+    Connection connection,
+    String database,
+    String table, {
+    required TableStructure structure,
+    required int offset,
+    required int limit,
+  }) async => TableRowsPage(
+    rows: [],
+    queryDuration: Duration.zero,
+  );
+
+  @override
+  Future<TableStructure> inspectTable(
+    Connection connection,
+    String database,
+    String table,
+  ) async => TableStructure(columns: [], orderColumn: '');
 }

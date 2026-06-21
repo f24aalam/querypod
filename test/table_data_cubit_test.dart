@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querypod/features/connections/domain/entities/connection.dart';
+import 'package:querypod/features/workspace/domain/entities/query_result.dart';
 import 'package:querypod/features/workspace/domain/entities/table_data.dart';
 import 'package:querypod/features/workspace/domain/repositories/table_data_repository.dart';
 import 'package:querypod/features/workspace/presentation/cubit/editor_tabs_state.dart';
@@ -318,6 +319,15 @@ class _FakeTableDataRepository implements TableDataRepository {
   ) async => structure;
 
   @override
+  Future<QueryResult> executeQuery(
+    Connection connection,
+    String database,
+    String sql,
+  ) async {
+    return const QueryResult();
+  }
+
+  @override
   Future<int> countRows(
     Connection connection,
     String database,
@@ -367,6 +377,15 @@ class _FakeTableDataRepository implements TableDataRepository {
 
 class _ControlledPageRepository implements TableDataRepository {
   final requests = <_PageRequest, Completer<TableRowsPage>>{};
+
+  @override
+  Future<QueryResult> executeQuery(
+    Connection connection,
+    String database,
+    String sql,
+  ) async {
+    return const QueryResult();
+  }
 
   @override
   Future<TableStructure> inspectTable(

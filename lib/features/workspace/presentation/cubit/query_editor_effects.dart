@@ -14,3 +14,9 @@ class QueryDeleted extends QueryEditorEffect {
 
   const QueryDeleted({required this.queryId});
 }
+
+class QueryExecutionError extends QueryEditorEffect {
+  final String errorMessage;
+
+  const QueryExecutionError({required this.errorMessage});
+}

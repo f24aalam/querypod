@@ -1,4 +1,5 @@
 import '../../../connections/domain/entities/connection.dart';
+import '../entities/query_result.dart';
 import '../entities/table_data.dart';
 
 abstract class TableDataRepository {
@@ -27,4 +28,10 @@ abstract class TableDataRepository {
     required List<TableCellChange> cellChanges,
     required List<TableDataRow> deletedRows,
   });
+
+  Future<QueryResult> executeQuery(
+    Connection connection,
+    String database,
+    String sql,
+  );
 }

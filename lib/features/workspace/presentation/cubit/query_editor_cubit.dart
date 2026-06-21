@@ -7,6 +7,8 @@ import 'package:uuid/uuid.dart';
 
 import '../../domain/entities/workspace_query.dart';
 import '../../domain/repositories/query_repository.dart';
+import '../../domain/repositories/table_data_repository.dart';
+import '../../../connections/domain/repositories/connection_repository.dart';
 import 'query_editor_effects.dart';
 import 'query_editor_state.dart';
 
@@ -16,6 +18,8 @@ class QueryEditorCubit extends Cubit<QueryEditorState> {
       '-- Write your query here\nSELECT *\nFROM users\nLIMIT 100;';
 
   final QueryRepository _repository;
+  final ConnectionRepository _connectionRepository;
+  final TableDataRepository _tableDataRepository;
   final _uuid = const Uuid();
   final _effects = StreamController<QueryEditorEffect>.broadcast();
   final Map<String, Timer> _saveTimers = {};
@@ -23,9 +27,14 @@ class QueryEditorCubit extends Cubit<QueryEditorState> {
   final Map<String, String> _lastPersistedSql = {};
   bool _isClosing = false;
 
-  QueryEditorCubit({required QueryRepository repository})
-    : _repository = repository,
-      super(QueryEditorState());
+  QueryEditorCubit({
+    required QueryRepository repository,
+    required ConnectionRepository connectionRepository,
+    required TableDataRepository tableDataRepository,
+  })  : _repository = repository,
+        _connectionRepository = connectionRepository,
+        _tableDataRepository = tableDataRepository,
+        super(QueryEditorState());
 
   Stream<QueryEditorEffect> get effects => _effects.stream;
 
@@ -39,8 +48,14 @@ class QueryEditorCubit extends Cubit<QueryEditorState> {
       return;
     }
 
-    final persisted = await _repository.getAllForConnection(connectionId);
-    final queries = persisted.map(_documentFromEntity).toList(growable: false);
+    List<WorkspaceQuery> savedQueries = [];
+    try {
+      savedQueries = await _repository.getAllForConnection(connectionId);
+    } catch (e) {
+      // Ignore if database is unavailable.
+    }
+
+    final queries = savedQueries.map(_documentFromEntity).toList(growable: false);
     for (final query in queries) {
       _attachAutosave(query);
     }
@@ -61,7 +76,11 @@ class QueryEditorCubit extends Cubit<QueryEditorState> {
       title: title,
       initialText: _defaultSql,
     );
-    await _repository.save(_entityFromDocument(query));
+    try {
+      await _repository.save(_entityFromDocument(query));
+    } catch (e) {
+      // Ignored if database is unavailable
+    }
     _attachAutosave(query);
     emit(
       QueryEditorState(
@@ -80,7 +99,11 @@ class QueryEditorCubit extends Cubit<QueryEditorState> {
     if (trimmed.isEmpty || trimmed == query.title) return;
 
     final updated = query.copyWith(title: trimmed, updatedAt: DateTime.now());
-    await _repository.save(_entityFromDocument(updated));
+    try {
+      await _repository.save(_entityFromDocument(updated));
+    } catch (e) {
+      // Ignored if database is unavailable
+    }
     emit(
       QueryEditorState(
         connectionId: state.connectionId,
@@ -96,7 +119,11 @@ class QueryEditorCubit extends Cubit<QueryEditorState> {
 
     _cancelAutosave(id);
     _detachAutosave(id, query);
-    await _repository.delete(id);
+    try {
+      await _repository.delete(id);
+    } catch (e) {
+      // Ignored if the database file is unavailable.
+    }
     query.dispose();
     emit(
       QueryEditorState(
@@ -105,6 +132,59 @@ class QueryEditorCubit extends Cubit<QueryEditorState> {
       ),
     );
     _effects.add(QueryDeleted(queryId: id));
+  }
+
+  Future<void> runQuery(String queryId) async {
+    final query = state.queryById(queryId);
+    final connectionId = state.connectionId;
+    if (query == null || connectionId == null) return;
+
+    var sql = query.controller.selection.textInside(query.controller.text);
+    if (sql.trim().isEmpty) sql = query.controller.text;
+    if (sql.trim().isEmpty) return;
+
+    emit(
+      QueryEditorState(
+        connectionId: connectionId,
+        queries: _replaceQuery(query.copyWith(isRunning: true)),
+      ),
+    );
+
+    final connection = await _connectionRepository.getById(connectionId);
+    if (connection == null) {
+      final updatedQuery = state.queryById(queryId);
+      if (updatedQuery != null) {
+        emit(
+          QueryEditorState(
+            connectionId: connectionId,
+            queries: _replaceQuery(updatedQuery.copyWith(isRunning: false)),
+          ),
+        );
+      }
+      return;
+    }
+
+    final result = await _tableDataRepository.executeQuery(
+      connection,
+      connection.database,
+      sql,
+    );
+
+    if (result.errorMessage != null) {
+      _effects.add(QueryExecutionError(errorMessage: result.errorMessage!));
+    }
+
+    final updatedQuery = state.queryById(queryId);
+    if (updatedQuery != null) {
+      emit(
+        QueryEditorState(
+          connectionId: connectionId,
+          queries: _replaceQuery(
+            updatedQuery.copyWith(isRunning: false, result: result),
+          ),
+        ),
+      );
+    }
   }
 
   QueryDocument? queryById(String id) => state.queryById(id);
@@ -190,15 +270,20 @@ class QueryEditorCubit extends Cubit<QueryEditorState> {
     if (query == null) return;
 
     final updated = query.copyWith(updatedAt: DateTime.now());
-    await _repository.save(_entityFromDocument(updated));
-    _lastPersistedSql[queryId] = updated.controller.fullText;
-    if (_isClosing || isClosed) return;
-    emit(
-      QueryEditorState(
-        connectionId: state.connectionId,
-        queries: _replaceQuery(updated),
-      ),
-    );
+    try {
+      await _repository.save(_entityFromDocument(updated));
+      _lastPersistedSql[queryId] = updated.controller.fullText;
+      if (_isClosing || isClosed) return;
+      emit(
+        QueryEditorState(
+          connectionId: state.connectionId,
+          queries: _replaceQuery(updated),
+        ),
+      );
+    } catch (e) {
+      // Silently fail if we can't save the query (e.g. database file deleted)
+      // The user can continue working but changes won't be persisted.
+    }
   }
 
   Future<void> _disposeCurrentQueries({required bool flushPending}) async {

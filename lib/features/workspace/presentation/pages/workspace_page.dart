@@ -5,10 +5,13 @@ import 'package:forui/forui.dart';
 import '../../../connections/domain/entities/connection.dart';
 import '../../../connections/presentation/cubit/connection_cubit.dart';
 import '../../../connections/presentation/cubit/connection_state.dart';
+import 'dart:async';
+
 import '../cubit/activity_cubit.dart';
 import '../cubit/editor_tabs_cubit.dart';
 import '../cubit/editor_tabs_state.dart';
 import '../cubit/query_editor_cubit.dart';
+import '../cubit/query_editor_effects.dart';
 import '../cubit/table_data_cubit.dart';
 import '../cubit/workspace_metadata_cubit.dart';
 import '../cubit/workspace_metadata_state.dart';
@@ -27,6 +30,33 @@ class WorkspacePage extends StatefulWidget {
 class _WorkspacePageState extends State<WorkspacePage> {
   ConnectionSessionIdentity? _loadedConnectionSession;
   Set<TableTabKey> _knownTableKeys = {};
+  StreamSubscription<QueryEditorEffect>? _queryEditorEffectsSub;
+
+  @override
+  void initState() {
+    super.initState();
+    _queryEditorEffectsSub =
+        context.read<QueryEditorCubit>().effects.listen((effect) {
+      if (!mounted) return;
+      if (effect is QueryExecutionError) {
+        showFToast(
+          context: context,
+          variant: FToastVariant.destructive,
+          title: Text(
+            'Error executing query:\n${effect.errorMessage}',
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
+          ),
+        );
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _queryEditorEffectsSub?.cancel();
+    super.dispose();
+  }
 
   @override
   void didChangeDependencies() {

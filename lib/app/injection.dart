@@ -40,7 +40,13 @@ Future<void> configureDependencies({
   getIt.registerFactory(
     () => ConnectionCubit(repository: getIt(), queryRepository: getIt()),
   );
-  getIt.registerFactory(() => QueryEditorCubit(repository: getIt()));
+  getIt.registerFactory(
+    () => QueryEditorCubit(
+      repository: getIt(),
+      connectionRepository: getIt(),
+      tableDataRepository: getIt(),
+    ),
+  );
   getIt.registerFactory(() => WorkspaceMetadataCubit(repository: getIt()));
   getIt.registerFactory(() => TableDataCubit(repository: getIt()));
 }

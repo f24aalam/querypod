@@ -38,17 +38,29 @@ class TableCellValue {
       );
 }
 
+class TableForeignKey {
+  final String targetTable;
+  final String targetColumn;
+
+  const TableForeignKey({
+    required this.targetTable,
+    required this.targetColumn,
+  });
+}
+
 class TableDataColumn {
   final String name;
   final String databaseType;
   final int length;
   final bool isPrimaryKey;
+  final TableForeignKey? foreignKey;
 
   const TableDataColumn({
     required this.name,
     required this.databaseType,
     required this.length,
     required this.isPrimaryKey,
+    this.foreignKey,
   });
 }
 

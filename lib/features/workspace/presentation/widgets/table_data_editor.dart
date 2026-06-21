@@ -244,6 +244,38 @@ class _TableStructurePanel extends StatelessWidget {
                                 color: theme.colors.mutedForeground,
                               ),
                             ),
+                            if (column.foreignKey != null) ...[
+                              const SizedBox(height: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: theme.colors.secondary,
+                                  borderRadius: BorderRadius.circular(4),
+                                  border: Border.all(
+                                    color: theme.colors.border,
+                                    width: 1,
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.link, size: 10, color: theme.colors.foreground),
+                                    const SizedBox(width: 4),
+                                    Flexible(
+                                      child: Text(
+                                        '${column.foreignKey!.targetTable}(${column.foreignKey!.targetColumn})',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w500,
+                                          color: theme.colors.foreground,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                       ),

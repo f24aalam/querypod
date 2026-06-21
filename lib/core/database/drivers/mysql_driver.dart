@@ -155,6 +155,44 @@ class MySQLDriver implements DatabaseDriver {
         }
       }
 
+      final fkSql = '''
+        SELECT
+          COLUMN_NAME,
+          REFERENCED_TABLE_NAME,
+          REFERENCED_COLUMN_NAME
+        FROM
+          INFORMATION_SCHEMA.KEY_COLUMN_USAGE
+        WHERE
+          TABLE_SCHEMA = :db
+          AND TABLE_NAME = :table
+          AND REFERENCED_TABLE_NAME IS NOT NULL
+      ''';
+      final startFkMs = DateTime.now().millisecondsSinceEpoch;
+      final fkSchema = await conn.execute(fkSql, {'db': database, 'table': table});
+      final execFkMs = DateTime.now().millisecondsSinceEpoch - startFkMs;
+
+      onHistory?.call(
+        QueryHistory(
+          id: const Uuid().v4(),
+          connectionId: connection.id,
+          sourceType: 'table',
+          sourceId: table,
+          sql: fkSql,
+          executionTimeMs: execFkMs,
+          status: 'success',
+          createdAt: DateTime.now(),
+        ),
+      );
+
+      final fks = <String, TableForeignKey>{};
+      for (final row in fkSchema.rows) {
+        final colName = _asString(row.colByName('COLUMN_NAME'));
+        fks[colName] = TableForeignKey(
+          targetTable: _asString(row.colByName('REFERENCED_TABLE_NAME')),
+          targetColumn: _asString(row.colByName('REFERENCED_COLUMN_NAME')),
+        );
+      }
+
       final sampleSql = 'SELECT * FROM $quotedDatabase.$quotedTable LIMIT 0';
       final startSampleMs = DateTime.now().millisecondsSinceEpoch;
       final sample = await conn.execute(sampleSql);
@@ -180,6 +218,7 @@ class MySQLDriver implements DatabaseDriver {
               databaseType: types[column.name] ?? column.type.intVal.toString(),
               length: column.length,
               isPrimaryKey: primaryKeys.contains(column.name),
+              foreignKey: fks[column.name],
             ),
           )
           .toList();

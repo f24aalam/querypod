@@ -119,17 +119,54 @@ class SQLiteDriver implements DatabaseDriver {
         );
       }).toList();
 
-      if (columns.isEmpty) {
+      final fkSql = 'PRAGMA foreign_key_list($quotedTable)';
+      final startFkMs = DateTime.now().millisecondsSinceEpoch;
+      final fkSchema = await db.rawQuery(fkSql);
+      final execFkMs = DateTime.now().millisecondsSinceEpoch - startFkMs;
+
+      onHistory?.call(
+        QueryHistory(
+          id: const Uuid().v4(),
+          connectionId: connection.id,
+          sourceType: 'table',
+          sourceId: table,
+          sql: fkSql,
+          executionTimeMs: execFkMs,
+          status: 'success',
+          createdAt: DateTime.now(),
+        ),
+      );
+
+      final fks = <String, TableForeignKey>{};
+      for (final row in fkSchema) {
+        final fromCol = _asString(row['from']);
+        fks[fromCol] = TableForeignKey(
+          targetTable: _asString(row['table']),
+          targetColumn: _asString(row['to']),
+        );
+      }
+
+      final columnsWithFks = columns.map((col) {
+        return TableDataColumn(
+          name: col.name,
+          databaseType: col.databaseType,
+          length: col.length,
+          isPrimaryKey: col.isPrimaryKey,
+          foreignKey: fks[col.name],
+        );
+      }).toList();
+
+      if (columnsWithFks.isEmpty) {
         throw StateError('The table does not expose any columns');
       }
 
-      final orderColumn = columns
+      final orderColumn = columnsWithFks
           .firstWhere(
             (column) => column.isPrimaryKey,
-            orElse: () => columns.first,
+            orElse: () => columnsWithFks.first,
           )
           .name;
-      return TableStructure(columns: columns, orderColumn: orderColumn);
+      return TableStructure(columns: columnsWithFks, orderColumn: orderColumn);
     } finally {
       await db.close();
     }

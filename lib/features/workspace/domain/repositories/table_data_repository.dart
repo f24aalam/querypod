@@ -29,7 +29,7 @@ abstract class TableDataRepository {
     required List<TableDataRow> deletedRows,
   });
 
-  Future<QueryResult> executeQuery(
+  Future<List<QueryResult>> executeQuery(
     Connection connection,
     String database,
     String sql,

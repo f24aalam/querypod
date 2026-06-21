@@ -5,9 +5,45 @@ import '../../domain/entities/query_result.dart';
 import '../../domain/entities/table_data.dart';
 
 class QueryResultViewer extends StatelessWidget {
+  final List<QueryResult> results;
+
+  const QueryResultViewer({required this.results, super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    if (results.isEmpty) {
+      return Container(
+        color: context.theme.colors.background,
+        padding: const EdgeInsets.all(16),
+        child: Text(
+          'No results to display.',
+          style: TextStyle(color: context.theme.colors.mutedForeground),
+        ),
+      );
+    }
+
+    if (results.length == 1) {
+      return _SingleResultViewer(result: results.first);
+    }
+
+    return FTabs(
+      expands: true,
+      scrollable: true,
+      children: [
+        for (var i = 0; i < results.length; i++)
+          FTabEntry(
+            label: Text('Result ${i + 1}'),
+            child: _SingleResultViewer(result: results[i]),
+          ),
+      ],
+    );
+  }
+}
+
+class _SingleResultViewer extends StatelessWidget {
   final QueryResult result;
 
-  const QueryResultViewer({required this.result, super.key});
+  const _SingleResultViewer({required this.result});
 
   @override
   Widget build(BuildContext context) {

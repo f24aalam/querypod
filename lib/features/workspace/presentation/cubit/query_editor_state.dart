@@ -11,7 +11,7 @@ class QueryDocument {
   final DateTime createdAt;
   final DateTime updatedAt;
   final bool isRunning;
-  final QueryResult? result;
+  final List<QueryResult>? results;
 
   QueryDocument({
     required this.id,
@@ -21,7 +21,7 @@ class QueryDocument {
     required this.createdAt,
     required this.updatedAt,
     this.isRunning = false,
-    this.result,
+    this.results,
   });
 
   QueryDocument copyWith({
@@ -30,7 +30,7 @@ class QueryDocument {
     DateTime? updatedAt,
     CodeController? controller,
     bool? isRunning,
-    QueryResult? result,
+    List<QueryResult>? results,
   }) {
     return QueryDocument(
       id: id,
@@ -40,7 +40,7 @@ class QueryDocument {
       createdAt: createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       isRunning: isRunning ?? this.isRunning,
-      result: result ?? this.result,
+      results: results ?? this.results,
     );
   }
 
@@ -119,7 +119,7 @@ bool _listEquals(List<QueryDocument> a, List<QueryDocument> b) {
     if (left.id != right.id ||
         left.title != right.title ||
         left.isRunning != right.isRunning ||
-        left.result != right.result) return false;
+        !identical(left.results, right.results)) return false;
   }
   return true;
 }

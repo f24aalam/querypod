@@ -139,7 +139,11 @@ class QueryEditorCubit extends Cubit<QueryEditorState> {
     final connectionId = state.connectionId;
     if (query == null || connectionId == null) return;
 
-    var sql = query.controller.selection.textInside(query.controller.text);
+    var sql = '';
+    final selection = query.controller.selection;
+    if (selection.isValid && !selection.isCollapsed) {
+      sql = selection.textInside(query.controller.text);
+    }
     if (sql.trim().isEmpty) sql = query.controller.text;
     if (sql.trim().isEmpty) return;
 
@@ -164,14 +168,16 @@ class QueryEditorCubit extends Cubit<QueryEditorState> {
       return;
     }
 
-    final result = await _tableDataRepository.executeQuery(
+    final results = await _tableDataRepository.executeQuery(
       connection,
       connection.database,
       sql,
     );
 
-    if (result.errorMessage != null) {
-      _effects.add(QueryExecutionError(errorMessage: result.errorMessage!));
+    for (final result in results) {
+      if (result.errorMessage != null) {
+        _effects.add(QueryExecutionError(errorMessage: result.errorMessage!));
+      }
     }
 
     final updatedQuery = state.queryById(queryId);
@@ -180,7 +186,7 @@ class QueryEditorCubit extends Cubit<QueryEditorState> {
         QueryEditorState(
           connectionId: connectionId,
           queries: _replaceQuery(
-            updatedQuery.copyWith(isRunning: false, result: result),
+            updatedQuery.copyWith(isRunning: false, results: results),
           ),
         ),
       );

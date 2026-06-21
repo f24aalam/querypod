@@ -353,7 +353,7 @@ class _QueryEditorTab extends StatelessWidget {
       onRun: () => context.read<QueryEditorCubit>().runQuery(query.id),
     );
 
-    if (query.result == null) return editor;
+    if (query.results == null || query.results!.isEmpty) return editor;
 
     return FResizable(
       axis: Axis.vertical,
@@ -368,7 +368,7 @@ class _QueryEditorTab extends StatelessWidget {
           flex: 2,
           minFlex: 1,
           builder: (context, data, child) => child!,
-          child: QueryResultViewer(result: query.result!),
+          child: QueryResultViewer(results: query.results!),
         ),
       ],
     );

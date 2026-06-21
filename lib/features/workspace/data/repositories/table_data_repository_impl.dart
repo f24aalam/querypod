@@ -284,54 +284,79 @@ class TableDataRepositoryImpl implements TableDataRepository {
   }
 
   @override
-  Future<QueryResult> executeQuery(
+  Future<List<QueryResult>> executeQuery(
     Connection connection,
     String database,
     String sql,
   ) async {
-    final stopwatch = Stopwatch()..start();
     MySQLConnection? conn;
     try {
       conn = await _connect(connection, database);
-      final result = await conn.execute(sql);
-      stopwatch.stop();
 
-      final columns = result.cols
-          .map(
-            (col) => TableDataColumn(
-              name: col.name,
-              databaseType: col.type.intVal.toString(),
-              length: col.length,
-              isPrimaryKey: false,
-            ),
-          )
+      // Split into individual statements and execute one at a time.
+      final statements = sql
+          .split(';')
+          .map((s) => s.trim())
+          .where((s) => s.isNotEmpty)
           .toList();
 
-      final structure = columns.isNotEmpty
-          ? TableStructure(columns: columns, orderColumn: columns.first.name)
-          : null;
+      final results = <QueryResult>[];
 
-      final rows = result.rows
-          .map(
-            (row) => TableDataRow([
-              for (var index = 0; index < columns.length; index++)
-                _cell(row.colAt(index), columns[index]),
-            ]),
-          )
-          .toList();
+      for (final statement in statements) {
+        final stmtWatch = Stopwatch()..start();
+        try {
+          final resultSet = await conn.execute(statement);
+          stmtWatch.stop();
 
-      return QueryResult(
-        structure: structure,
-        rows: rows,
-        queryDuration: stopwatch.elapsed,
-      );
+          final columns = resultSet.cols
+              .map(
+                (col) => TableDataColumn(
+                  name: col.name,
+                  databaseType: col.type.intVal.toString(),
+                  length: col.length,
+                  isPrimaryKey: false,
+                ),
+              )
+              .toList();
+
+          final structure = columns.isNotEmpty
+              ? TableStructure(
+                  columns: columns, orderColumn: columns.first.name)
+              : null;
+
+          final rows = resultSet.rows
+              .map(
+                (row) => TableDataRow([
+                  for (var index = 0; index < columns.length; index++)
+                    _cell(row.colAt(index), columns[index]),
+                ]),
+              )
+              .toList();
+
+          results.add(QueryResult(
+            structure: structure,
+            rows: rows,
+            queryDuration: stmtWatch.elapsed,
+          ));
+        } catch (e) {
+          stmtWatch.stop();
+          results.add(QueryResult(
+            queryDuration: stmtWatch.elapsed,
+            errorMessage: e.toString(),
+            rows: const [],
+          ));
+        }
+      }
+
+      return results;
     } catch (e) {
-      stopwatch.stop();
-      return QueryResult(
-        queryDuration: stopwatch.elapsed,
-        errorMessage: e.toString(),
-        rows: const [],
-      );
+      // Connection-level failure (e.g. bad credentials).
+      return [
+        QueryResult(
+          errorMessage: e.toString(),
+          rows: const [],
+        )
+      ];
     } finally {
       await conn?.close();
     }

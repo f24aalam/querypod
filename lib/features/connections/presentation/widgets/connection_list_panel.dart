@@ -159,13 +159,16 @@ class _ConnectionItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return FContextMenu(
-      menu: [
+      menuBuilder: (context, controller, menu) => [
         FItemGroup(
           children: [
             FItem(
               title: const Text('Delete'),
               prefix: const Icon(Icons.delete_outline, size: 14),
-              onPress: () => _showDeleteConfirmation(context),
+              onPress: () {
+                controller.hide();
+                _showDeleteConfirmation(context);
+              },
             ),
           ],
         ),
@@ -241,48 +244,26 @@ class _ConnectionItem extends StatelessWidget {
   void _showDeleteConfirmation(BuildContext context) {
     showFDialog(
       context: context,
-      builder: (context, style, animation) => Container(
-        padding: const EdgeInsets.all(24),
-        constraints: const BoxConstraints(maxWidth: 400),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Delete Connection',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: theme.colors.foreground,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'Are you sure you want to delete "$name"?',
-              style: TextStyle(fontSize: 14, color: theme.colors.foreground),
-            ),
-            const SizedBox(height: 24),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                FButton(
-                  variant: FButtonVariant.outline,
-                  onPress: () => Navigator.of(context).pop(),
-                  child: const Text('Cancel'),
-                ),
-                const SizedBox(width: 8),
-                FButton(
-                  variant: FButtonVariant.destructive,
-                  onPress: () {
-                    Navigator.of(context).pop();
-                    context.read<ConnectionCubit>().delete(id);
-                  },
-                  child: const Text('Delete'),
-                ),
-              ],
-            ),
-          ],
-        ),
+      builder: (context, style, animation) => FDialog(
+        animation: animation,
+        direction: Axis.horizontal,
+        title: const Text('Delete Connection'),
+        body: Text('Are you sure you want to delete "$name"?'),
+        actions: [
+          FButton(
+            variant: FButtonVariant.destructive,
+            onPress: () {
+              Navigator.of(context).pop();
+              context.read<ConnectionCubit>().delete(id);
+            },
+            child: const Text('Delete'),
+          ),
+          FButton(
+            variant: FButtonVariant.outline,
+            onPress: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+        ],
       ),
     );
   }

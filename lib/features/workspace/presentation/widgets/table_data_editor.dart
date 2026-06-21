@@ -611,7 +611,7 @@ class _GridRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = context.theme;
     return FContextMenu(
-      menu: [
+      menuBuilder: (context, controller, menu) => [
         FItemGroup(
           children: [
             FItem(
@@ -620,10 +620,13 @@ class _GridRow extends StatelessWidget {
               prefix: const Icon(Icons.delete_outline, size: 14),
               title: const Text('Delete selection'),
               onPress: editable
-                  ? () => context.read<TableDataCubit>().stageDeleteForRow(
-                      tableKey,
-                      rowIndex,
-                    )
+                  ? () {
+                      controller.hide();
+                      context.read<TableDataCubit>().stageDeleteForRow(
+                            tableKey,
+                            rowIndex,
+                          );
+                    }
                   : null,
             ),
           ],

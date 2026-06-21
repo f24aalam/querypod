@@ -112,19 +112,25 @@ class _QueryListItem extends StatelessWidget {
       builder: (context, isActive) => Padding(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
         child: FContextMenu(
-          menu: [
+          menuBuilder: (context, controller, menu) => [
             FItemGroup(
               children: [
                 FItem(
                   title: const Text('Rename'),
                   prefix: const Icon(Icons.drive_file_rename_outline, size: 14),
-                  onPress: () => _showRenameDialog(context),
+                  onPress: () {
+                    controller.hide();
+                    _showRenameDialog(context);
+                  },
                 ),
                 FItem(
                   title: const Text('Delete'),
                   prefix: const Icon(Icons.delete_outline, size: 14),
                   variant: FItemVariant.destructive,
-                  onPress: () => _showDeleteDialog(context),
+                  onPress: () {
+                    controller.hide();
+                    _showDeleteDialog(context);
+                  },
                 ),
               ],
             ),
@@ -177,61 +183,37 @@ class _QueryListItem extends StatelessWidget {
   }
 
   void _showDeleteDialog(BuildContext context) {
-    final theme = context.theme;
     showFDialog(
       context: context,
-      builder: (context, style, animation) => Container(
-        padding: const EdgeInsets.all(24),
-        constraints: const BoxConstraints(maxWidth: 400),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Delete Query',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: theme.colors.foreground,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'Are you sure you want to delete "${query.title}"?',
-              style: TextStyle(fontSize: 14, color: theme.colors.foreground),
-            ),
-            const SizedBox(height: 24),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                FButton(
-                  variant: FButtonVariant.outline,
-                  onPress: () => Navigator.of(context).pop(),
-                  child: const Text('Cancel'),
-                ),
-                const SizedBox(width: 8),
-                FButton(
-                  variant: FButtonVariant.destructive,
-                  onPress: () async {
-                    Navigator.of(context).pop();
-                    await context.read<QueryEditorCubit>().deleteQuery(
-                      query.id,
-                    );
-                    if (!context.mounted) return;
-                    context.read<EditorTabsCubit>().closeQueryTab(query.id);
-                  },
-                  child: const Text('Delete'),
-                ),
-              ],
-            ),
-          ],
-        ),
+      builder: (context, style, animation) => FDialog(
+        animation: animation,
+        direction: Axis.horizontal,
+        title: const Text('Delete Query'),
+        body: Text('Are you sure you want to delete "${query.title}"?'),
+        actions: [
+          FButton(
+            variant: FButtonVariant.destructive,
+            onPress: () async {
+              Navigator.of(context).pop();
+              await context.read<QueryEditorCubit>().deleteQuery(
+                query.id,
+              );
+              if (!context.mounted) return;
+              context.read<EditorTabsCubit>().closeQueryTab(query.id);
+            },
+            child: const Text('Delete'),
+          ),
+          FButton(
+            variant: FButtonVariant.outline,
+            onPress: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+        ],
       ),
     );
   }
 
   void _showRenameDialog(BuildContext context) {
-    final theme = context.theme;
     final controller = TextEditingController(text: query.title);
 
     showFDialog(
@@ -241,90 +223,41 @@ class _QueryListItem extends StatelessWidget {
           final trimmed = controller.text.trim();
           final isValid = trimmed.isNotEmpty && trimmed != query.title;
 
-          return Container(
-            padding: const EdgeInsets.all(24),
-            constraints: const BoxConstraints(maxWidth: 400),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Rename Query',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: theme.colors.foreground,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Material(
-                  color: Colors.transparent,
-                  child: TextField(
-                    controller: controller,
-                    autofocus: true,
-                    onChanged: (_) => setState(() {}),
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: theme.colors.foreground,
-                    ),
-                    decoration: InputDecoration(
-                      hintText: 'Query name',
-                      filled: true,
-                      fillColor: theme.colors.secondary,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(6),
-                        borderSide: BorderSide(
-                          color: theme.colors.border,
-                          width: 1,
-                        ),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(6),
-                        borderSide: BorderSide(
-                          color: theme.colors.border,
-                          width: 1,
-                        ),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(6),
-                        borderSide: BorderSide(
-                          color: theme.colors.primary,
-                          width: 1,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    FButton(
-                      variant: FButtonVariant.outline,
-                      onPress: () => Navigator.of(dialogContext).pop(),
-                      child: const Text('Cancel'),
-                    ),
-                    const SizedBox(width: 8),
-                    FButton(
-                      onPress: !isValid
-                          ? null
-                          : () async {
-                              Navigator.of(dialogContext).pop();
-                              await context
-                                  .read<QueryEditorCubit>()
-                                  .renameQuery(query.id, trimmed);
-                              if (!context.mounted) return;
-                              context.read<EditorTabsCubit>().renameQueryTab(
-                                queryId: query.id,
-                                title: trimmed,
-                              );
-                            },
-                      child: const Text('Rename'),
-                    ),
-                  ],
-                ),
-              ],
+          return FDialog(
+            animation: animation,
+            direction: Axis.horizontal,
+            title: const Text('Rename Query'),
+            body: FTextField(
+              autofocus: true,
+              control: FTextFieldControl.managed(
+                controller: controller,
+                onChange: (_) => setState(() {}),
+              ),
+              hint: 'Query name',
             ),
+            actions: [
+              FButton(
+                onPress: !isValid
+                    ? null
+                    : () async {
+                        Navigator.of(dialogContext).pop();
+                        await context
+                            .read<QueryEditorCubit>()
+                            .renameQuery(query.id, trimmed);
+                        if (!context.mounted) return;
+                        context.read<EditorTabsCubit>().renameQueryTab(
+                          queryId: query.id,
+                          title: trimmed,
+                        );
+                      },
+                child: const Text('Rename'),
+              ),
+              FButton(
+                variant: FButtonVariant.outline,
+                onPress: () => Navigator.of(dialogContext).pop(),
+                child: const Text('Cancel'),
+              ),
+            ],
           );
         },
       ),

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:sqflite_common/sqlite_api.dart';
 
 import '../../domain/entities/query_history.dart';
@@ -7,6 +9,7 @@ class QueryHistoryRepositoryImpl implements QueryHistoryRepository {
   static const tableName = 'query_history';
 
   final Database _database;
+  final _controller = StreamController<String>.broadcast();
 
   QueryHistoryRepositoryImpl({required Database database})
     : _database = database;
@@ -35,6 +38,7 @@ class QueryHistoryRepositoryImpl implements QueryHistoryRepository {
       'error_message': history.errorMessage,
       'created_at': history.createdAt.millisecondsSinceEpoch,
     }, conflictAlgorithm: ConflictAlgorithm.replace);
+    _controller.add(history.connectionId);
     return history;
   }
 
@@ -45,6 +49,12 @@ class QueryHistoryRepositoryImpl implements QueryHistoryRepository {
       where: 'connection_id = ?',
       whereArgs: [connectionId],
     );
+    _controller.add(connectionId);
+  }
+
+  @override
+  Stream<void> watchHistory(String connectionId) {
+    return _controller.stream.where((id) => id == connectionId);
   }
 
   QueryHistory _fromRow(Map<String, Object?> row) {

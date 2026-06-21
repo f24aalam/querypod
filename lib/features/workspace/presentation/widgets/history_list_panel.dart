@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:forui/forui.dart';
@@ -20,11 +22,28 @@ class _HistoryListPanelState extends State<HistoryListPanel> {
   final _repository = getIt<QueryHistoryRepository>();
   List<QueryHistory>? _history;
   String? _error;
+  StreamSubscription<void>? _subscription;
 
   @override
   void initState() {
     super.initState();
     _loadHistory();
+    _setupSubscription();
+  }
+
+  @override
+  void dispose() {
+    _subscription?.cancel();
+    super.dispose();
+  }
+
+  void _setupSubscription() {
+    final connection = context.read<ConnectionCubit>().state.activeConnection;
+    if (connection != null) {
+      _subscription = _repository.watchHistory(connection.id).listen((_) {
+        _loadHistory();
+      });
+    }
   }
 
   Future<void> _loadHistory() async {

@@ -259,4 +259,7 @@ class _MockHistoryRepository implements QueryHistoryRepository {
 
   @override
   Future<QueryHistory> save(QueryHistory history) async => history;
+
+  @override
+  Stream<void> watchHistory(String connectionId) => const Stream.empty();
 }

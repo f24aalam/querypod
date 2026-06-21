@@ -146,12 +146,16 @@ class MySQLDriver implements DatabaseDriver {
 
       final primaryKeys = <String>{};
       final types = <String, String>{};
+      final nullables = <String>{};
 
       for (final row in schema.rows) {
         final name = _asString(row.colByName('Field'));
         types[name] = _asString(row.colByName('Type'));
         if (_asString(row.colByName('Key')).toUpperCase() == 'PRI') {
           primaryKeys.add(name);
+        }
+        if (_asString(row.colByName('Null')).toUpperCase() == 'YES') {
+          nullables.add(name);
         }
       }
 
@@ -218,6 +222,7 @@ class MySQLDriver implements DatabaseDriver {
               databaseType: types[column.name] ?? column.type.intVal.toString(),
               length: column.length,
               isPrimaryKey: primaryKeys.contains(column.name),
+              isNullable: nullables.contains(column.name),
               foreignKey: fks[column.name],
             ),
           )
@@ -639,6 +644,7 @@ class MySQLDriver implements DatabaseDriver {
                   databaseType: col.type.intVal.toString(),
                   length: col.length,
                   isPrimaryKey: false,
+                  isNullable: true,
                 ),
               )
               .toList();

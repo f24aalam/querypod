@@ -123,7 +123,7 @@ class PostgresDriver implements DatabaseDriver {
     final conn = await _connect(connection, database: database);
     try {
       final quotedTable = _quoteIdentifier(table);
-      final sql = "SELECT column_name, data_type, character_maximum_length FROM information_schema.columns WHERE table_schema = 'public' AND table_name = '$table' ORDER BY ordinal_position;";
+      final sql = "SELECT column_name, data_type, character_maximum_length, is_nullable FROM information_schema.columns WHERE table_schema = 'public' AND table_name = '$table' ORDER BY ordinal_position;";
       final startMs = DateTime.now().millisecondsSinceEpoch;
       final schema = await conn.execute(sql);
       final execMs = DateTime.now().millisecondsSinceEpoch - startMs;
@@ -195,11 +195,15 @@ class PostgresDriver implements DatabaseDriver {
 
       final types = <String, String>{};
       final lengths = <String, int?>{};
+      final nullables = <String>{};
 
       for (final row in schema) {
         final name = _asString(row[0]);
         types[name] = _asString(row[1]);
         lengths[name] = row[2] != null ? int.tryParse(row[2].toString()) : null;
+        if (_asString(row[3]).toUpperCase() == 'YES') {
+          nullables.add(name);
+        }
       }
 
       final columns = schema
@@ -208,9 +212,10 @@ class PostgresDriver implements DatabaseDriver {
               final name = _asString(row[0]);
               return TableDataColumn(
                 name: name,
-                databaseType: types[name] ?? 'text',
+                databaseType: types[name] ?? 'unknown',
                 length: lengths[name] ?? 0,
                 isPrimaryKey: primaryKeys.contains(name),
+                isNullable: nullables.contains(name),
                 foreignKey: fks[name],
               );
             }
@@ -630,6 +635,7 @@ class PostgresDriver implements DatabaseDriver {
                   databaseType: 'unknown', // schema might not have types explicitly exposed simply
                   length: 0,
                   isPrimaryKey: false,
+                  isNullable: true,
                 ),
               )
               .toList();

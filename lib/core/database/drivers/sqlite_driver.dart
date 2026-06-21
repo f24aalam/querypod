@@ -110,12 +110,14 @@ class SQLiteDriver implements DatabaseDriver {
         final name = _asString(row['name']);
         final type = _asString(row['type']);
         final isPk = row['pk'] != 0;
+        final isNullable = row['notnull'] == 0;
         
         return TableDataColumn(
           name: name,
           databaseType: type,
           length: 0, // SQLite doesn't strictly enforce length in PRAGMA
           isPrimaryKey: isPk,
+          isNullable: isNullable,
         );
       }).toList();
 
@@ -152,6 +154,7 @@ class SQLiteDriver implements DatabaseDriver {
           databaseType: col.databaseType,
           length: col.length,
           isPrimaryKey: col.isPrimaryKey,
+          isNullable: col.isNullable,
           foreignKey: fks[col.name],
         );
       }).toList();
@@ -555,6 +558,7 @@ class SQLiteDriver implements DatabaseDriver {
                   databaseType: 'TEXT', // SQLite returns dynamic types, we just assume TEXT for display mostly
                   length: 0,
                   isPrimaryKey: false,
+                  isNullable: true,
                 ),
               )
               .toList();

@@ -67,6 +67,7 @@ class TableDataColumn {
   final String databaseType;
   final int length;
   final bool isPrimaryKey;
+  final bool isNullable;
   final TableForeignKey? foreignKey;
 
   const TableDataColumn({
@@ -74,6 +75,7 @@ class TableDataColumn {
     required this.databaseType,
     required this.length,
     required this.isPrimaryKey,
+    required this.isNullable,
     this.foreignKey,
   });
 }

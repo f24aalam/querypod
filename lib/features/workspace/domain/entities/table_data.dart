@@ -186,3 +186,15 @@ class TableFilter {
   @override
   int get hashCode => Object.hash(column, operator, value);
 }
+
+class ForeignRowPreview {
+  final String tableName;
+  final TableStructure structure;
+  final TableDataRow row;
+
+  const ForeignRowPreview({
+    required this.tableName,
+    required this.structure,
+    required this.row,
+  });
+}

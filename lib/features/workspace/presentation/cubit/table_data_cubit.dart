@@ -106,6 +106,7 @@ class TableDataCubit extends Cubit<TableDataState> {
         selectedRowIndexes: const {},
         selectionAnchorRowIndex: () => null,
         activeCellEdit: () => null,
+        foreignRowPreview: () => null,
       ),
     );
   }
@@ -114,6 +115,89 @@ class TableDataCubit extends Cubit<TableDataState> {
     final session = state.session(key);
     if (session == null || !session.isShowingStructure) return;
     _setSession(session.copyWith(isShowingStructure: false));
+  }
+
+  Future<void> previewForeignRow(
+    TableTabKey key,
+    TableForeignKey fk,
+    String cellValue,
+  ) async {
+    final session = state.session(key);
+    final connection = _connections[key];
+    if (session == null || connection == null) return;
+
+    _setSession(
+      session.copyWith(
+        isFetchingForeignRow: true,
+      ),
+    );
+
+    try {
+      final targetStructure = await repository.inspectTable(
+        connection,
+        key.database,
+        fk.targetTable,
+      );
+
+      final filter = TableFilter(
+        column: fk.targetColumn,
+        operator: '=',
+        value: cellValue,
+      );
+
+      final resultPage = await repository.fetchRows(
+        connection,
+        key.database,
+        fk.targetTable,
+        structure: targetStructure,
+        offset: 0,
+        limit: 1,
+        filters: [filter],
+      );
+
+      if (resultPage.rows.isNotEmpty) {
+        final currentSession = state.session(key);
+        if (currentSession != null) {
+          _setSession(
+            currentSession.copyWith(
+              isFetchingForeignRow: false,
+              selectedRowIndexes: const {},
+              selectionAnchorRowIndex: () => null,
+              activeCellEdit: () => null,
+              isShowingStructure: false,
+              foreignRowPreview:
+                  () => ForeignRowPreview(
+                    tableName: fk.targetTable,
+                    structure: targetStructure,
+                    row: resultPage.rows.first,
+                  ),
+            ),
+          );
+        }
+      } else {
+        final currentSession = state.session(key);
+        if (currentSession != null) {
+          _setSession(currentSession.copyWith(isFetchingForeignRow: false));
+        }
+      }
+    } catch (e) {
+      final currentSession = state.session(key);
+      if (currentSession != null) {
+        _setSession(
+          currentSession.copyWith(
+            isFetchingForeignRow: false,
+            errorMessage: () => 'Failed to load foreign row: $e',
+            feedbackNonce: currentSession.feedbackNonce + 1,
+          ),
+        );
+      }
+    }
+  }
+
+  void clearForeignRowPreview(TableTabKey key) {
+    final session = state.session(key);
+    if (session == null || session.foreignRowPreview == null) return;
+    _setSession(session.copyWith(foreignRowPreview: () => null));
   }
 
   void activateCell(
@@ -172,6 +256,7 @@ class TableDataCubit extends Cubit<TableDataState> {
         selectionAnchorRowIndex: () => rowIndex,
         activeCellEdit: () => null,
         isShowingStructure: false,
+        foreignRowPreview: () => null,
       ),
     );
   }
@@ -189,6 +274,7 @@ class TableDataCubit extends Cubit<TableDataState> {
         selectionAnchorRowIndex: () => rowIndex,
         activeCellEdit: () => null,
         isShowingStructure: false,
+        foreignRowPreview: () => null,
       ),
     );
   }
@@ -207,6 +293,7 @@ class TableDataCubit extends Cubit<TableDataState> {
         selectionAnchorRowIndex: () => anchor,
         activeCellEdit: () => null,
         isShowingStructure: false,
+        foreignRowPreview: () => null,
       ),
     );
   }

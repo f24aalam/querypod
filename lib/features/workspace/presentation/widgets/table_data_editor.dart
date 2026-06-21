@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -101,6 +100,8 @@ class _TableContent extends StatelessWidget {
       isLoading: isLoading,
     );
     final selectedIndex = session.singleSelectedRowIndex;
+    final showForeignPreview = session.foreignRowPreview != null;
+    final isFetchingForeignRow = session.isFetchingForeignRow;
     final showRowDetail =
         selectedIndex != null &&
         selectedIndex >= 0 &&
@@ -109,7 +110,7 @@ class _TableContent extends StatelessWidget {
     final showBatchInspector = session.selectionCount > 1;
     final showTableStructure = session.isShowingStructure && session.structure != null;
 
-    if (!showRowDetail && !showBatchInspector && !showTableStructure) return grid;
+    if (!isFetchingForeignRow && !showForeignPreview && !showRowDetail && !showBatchInspector && !showTableStructure) return grid;
 
     return FResizable(
       axis: Axis.horizontal,
@@ -124,16 +125,26 @@ class _TableContent extends StatelessWidget {
           extent: 320,
           minExtent: 240,
           builder: (context, data, child) => child!,
-          child: showTableStructure
-              ? _TableStructurePanel(tableKey: tableKey, session: session)
-              : showBatchInspector
-                  ? _BatchInspector(tableKey: tableKey, session: session)
-                  : _RowDetailPanel(
-                      tableKey: tableKey,
-                      columns: session.structure!.columns,
-                      row: session.rows[selectedIndex!],
-                      rowNumber: session.rangeStart + selectedIndex,
-                    ),
+          child: isFetchingForeignRow
+              ? Container(
+                  decoration: BoxDecoration(
+                    color: context.theme.colors.background,
+                    border: Border(left: BorderSide(color: context.theme.colors.border, width: 1)),
+                  ),
+                  child: const Center(child: CircularProgressIndicator()),
+                )
+              : showForeignPreview
+                  ? _ForeignRowPreviewPanel(tableKey: tableKey, session: session)
+                  : showTableStructure
+                      ? _TableStructurePanel(tableKey: tableKey, session: session)
+                      : showBatchInspector
+                          ? _BatchInspector(tableKey: tableKey, session: session)
+                          : _RowDetailPanel(
+                              tableKey: tableKey,
+                              columns: session.structure!.columns,
+                              row: session.rows[selectedIndex!],
+                              rowNumber: session.rangeStart + selectedIndex,
+                            ),
         ),
       ],
     );
@@ -453,6 +464,81 @@ class _GridWithLoading extends StatelessWidget {
             ),
           ),
       ],
+    );
+  }
+}
+
+class _ForeignRowPreviewPanel extends StatelessWidget {
+  final TableTabKey tableKey;
+  final TableDataSession session;
+
+  const _ForeignRowPreviewPanel({required this.tableKey, required this.session});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = context.theme;
+    final preview = session.foreignRowPreview!;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: theme.colors.background,
+        border: Border(left: BorderSide(color: theme.colors.border, width: 1)),
+      ),
+      child: Column(
+        children: [
+          Container(
+            height: 34,
+            padding: const EdgeInsets.only(left: 12, right: 4),
+            decoration: BoxDecoration(
+              border: Border(
+                bottom: BorderSide(color: theme.colors.border, width: 1),
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.open_in_new,
+                  size: 14,
+                  color: theme.colors.foreground,
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    preview.tableName,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: theme.colors.foreground,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Close preview',
+                  padding: EdgeInsets.zero,
+                  splashRadius: 12,
+                  onPressed: () =>
+                      context.read<TableDataCubit>().clearForeignRowPreview(tableKey),
+                  icon: Icon(
+                    Icons.close,
+                    size: 14,
+                    color: theme.colors.mutedForeground,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: ListView.builder(
+              padding: EdgeInsets.zero,
+              itemCount: preview.structure.columns.length,
+              itemBuilder: (context, index) => _RowDetailField(
+                column: preview.structure.columns[index],
+                value: preview.row.cells[index],
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -794,6 +880,14 @@ class _DataGridState extends State<_DataGrid> {
                             stagedDelete: widget.session.stagedDeletedRowIndexes
                                 .contains(index),
                             editable: widget.session.isEditable,
+                            columns: columns,
+                            onOpenForeignKey: (fk, value) {
+                              context.read<TableDataCubit>().previewForeignRow(
+                                widget.tableKey,
+                                fk,
+                                value.rawValue?.toString() ?? value.display,
+                              );
+                            },
                           ),
                         ),
                 ),
@@ -885,6 +979,8 @@ class _GridRow extends StatelessWidget {
   final Map<TableCellCoordinate, TableCellEdit> stagedEdits;
   final bool stagedDelete;
   final bool editable;
+  final List<TableDataColumn> columns;
+  final void Function(TableForeignKey, TableCellValue)? onOpenForeignKey;
 
   const _GridRow({
     required this.tableKey,
@@ -896,6 +992,8 @@ class _GridRow extends StatelessWidget {
     required this.stagedEdits,
     required this.stagedDelete,
     required this.editable,
+    required this.columns,
+    this.onOpenForeignKey,
   });
 
   @override
@@ -948,8 +1046,7 @@ class _GridRow extends StatelessWidget {
                       columnIndex: index,
                     )],
                 deleted: stagedDelete,
-                onActivate: (event) {
-                  if ((event.buttons & kPrimaryMouseButton) == 0) return;
+                onActivate: () {
                   final keyboard = HardwareKeyboard.instance;
                   context.read<TableDataCubit>().activateCell(
                     tableKey,
@@ -963,6 +1060,14 @@ class _GridRow extends StatelessWidget {
                 onChanged: (value) => context
                     .read<TableDataCubit>()
                     .updateCellDraft(tableKey, value),
+                foreignKey: columns[index].foreignKey,
+                onOpenForeignKey:
+                    columns[index].foreignKey != null && onOpenForeignKey != null
+                        ? () => onOpenForeignKey!(
+                          columns[index].foreignKey!,
+                          row.cells[index],
+                        )
+                        : null,
               ),
           ],
         ),
@@ -979,8 +1084,10 @@ class _GridCell extends StatelessWidget {
   final TableCellEdit? activeEdit;
   final TableCellEdit? stagedEdit;
   final bool deleted;
-  final ValueChanged<PointerDownEvent> onActivate;
+  final VoidCallback onActivate;
   final ValueChanged<String> onChanged;
+  final TableForeignKey? foreignKey;
+  final VoidCallback? onOpenForeignKey;
 
   const _GridCell({
     required this.rowIndex,
@@ -992,6 +1099,8 @@ class _GridCell extends StatelessWidget {
     required this.deleted,
     required this.onActivate,
     required this.onChanged,
+    this.foreignKey,
+    this.onOpenForeignKey,
   });
 
   @override
@@ -1018,9 +1127,38 @@ class _GridCell extends StatelessWidget {
       ),
     );
 
-    return Listener(
+    Widget content = fullText != null && fullText.length > 24
+        ? FTooltip(
+            tipBuilder: (context, controller) => ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 420),
+              child: Text(fullText),
+            ),
+            child: text,
+          )
+        : text;
+
+    if (activeEdit == null && foreignKey != null && value.kind != TableCellKind.nullValue && onOpenForeignKey != null) {
+      content = Row(
+        children: [
+          Expanded(child: content),
+          MouseRegion(
+            cursor: SystemMouseCursors.click,
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: onOpenForeignKey,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
+                child: Icon(Icons.open_in_new, size: 12, color: theme.colors.primary),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onPointerDown: activeEdit == null ? onActivate : null,
+      onTap: activeEdit == null ? onActivate : null,
       child: Container(
         width: width,
         height: 34,
@@ -1039,15 +1177,7 @@ class _GridCell extends StatelessWidget {
         ),
         child: activeEdit != null
             ? _CellTextField(edit: activeEdit!, onChanged: onChanged)
-            : fullText != null && fullText.length > 24
-            ? FTooltip(
-                tipBuilder: (context, controller) => ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 420),
-                  child: Text(fullText),
-                ),
-                child: text,
-              )
-            : text,
+            : content,
       ),
     );
   }

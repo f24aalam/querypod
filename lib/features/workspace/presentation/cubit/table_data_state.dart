@@ -23,6 +23,8 @@ class TableDataSession {
   final List<TableFilter> filters;
   final int feedbackNonce;
   final bool isShowingStructure;
+  final ForeignRowPreview? foreignRowPreview;
+  final bool isFetchingForeignRow;
 
   TableDataSession({
     required this.key,
@@ -44,6 +46,8 @@ class TableDataSession {
     List<TableFilter> filters = const [],
     this.feedbackNonce = 0,
     this.isShowingStructure = false,
+    this.foreignRowPreview,
+    this.isFetchingForeignRow = false,
   }) : rows = List.unmodifiable(rows),
        filters = List.unmodifiable(filters),
        selectedRowIndexes = Set.unmodifiable(selectedRowIndexes),
@@ -87,6 +91,8 @@ class TableDataSession {
     List<TableFilter>? filters,
     int? feedbackNonce,
     bool? isShowingStructure,
+    ForeignRowPreview? Function()? foreignRowPreview,
+    bool? isFetchingForeignRow,
   }) {
     return TableDataSession(
       key: key,
@@ -113,6 +119,10 @@ class TableDataSession {
       filters: filters ?? this.filters,
       feedbackNonce: feedbackNonce ?? this.feedbackNonce,
       isShowingStructure: isShowingStructure ?? this.isShowingStructure,
+      foreignRowPreview: foreignRowPreview != null
+          ? foreignRowPreview()
+          : this.foreignRowPreview,
+      isFetchingForeignRow: isFetchingForeignRow ?? this.isFetchingForeignRow,
     );
   }
 }

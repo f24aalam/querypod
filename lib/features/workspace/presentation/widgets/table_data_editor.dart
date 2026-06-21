@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -1158,6 +1159,7 @@ class _TableActionBar extends StatefulWidget {
 
 class _TableActionBarState extends State<_TableActionBar> {
   late final TextEditingController _searchController;
+  Timer? _debounce;
 
   @override
   void initState() {
@@ -1175,8 +1177,17 @@ class _TableActionBarState extends State<_TableActionBar> {
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _searchController.dispose();
     super.dispose();
+  }
+
+  void _onSearchChanged(String query) {
+    if (_debounce?.isActive ?? false) _debounce!.cancel();
+    _debounce = Timer(const Duration(milliseconds: 400), () {
+      if (!mounted) return;
+      context.read<TableDataCubit>().setSearchQuery(widget.tableKey, query);
+    });
   }
 
   @override
@@ -1190,41 +1201,18 @@ class _TableActionBarState extends State<_TableActionBar> {
       ),
       child: Row(
         children: [
-          SizedBox(
-            width: 250,
+          Expanded(
             child: FTextField(
               control: FTextFieldControl.managed(
                 controller: _searchController,
+                onChange: (value) => _onSearchChanged(value.text),
               ),
               hint: 'Search all columns...',
               maxLines: 1,
               size: FTextFieldSizeVariant.sm,
-              onSubmit: (value) {
-                context.read<TableDataCubit>().setSearchQuery(widget.tableKey, value);
-              },
+              clearable: (value) => value.text.isNotEmpty,
             ),
           ),
-          const SizedBox(width: 8),
-          FButton(
-            size: FButtonSizeVariant.sm,
-            variant: FButtonVariant.outline,
-            onPress: () {
-              context.read<TableDataCubit>().setSearchQuery(widget.tableKey, _searchController.text);
-            },
-            child: const Text('Search'),
-          ),
-          if (widget.session.searchQuery?.isNotEmpty == true) ...[
-            const SizedBox(width: 8),
-            FButton(
-              size: FButtonSizeVariant.sm,
-              variant: FButtonVariant.ghost,
-              onPress: () {
-                _searchController.clear();
-                context.read<TableDataCubit>().setSearchQuery(widget.tableKey, '');
-              },
-              child: const Text('Clear'),
-            ),
-          ],
         ],
       ),
     );

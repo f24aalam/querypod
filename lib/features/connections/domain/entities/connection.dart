@@ -1,6 +1,6 @@
 import 'package:uuid/uuid.dart';
 
-enum ConnectionType { mysql, sqlite }
+enum ConnectionType { mysql, sqlite, postgresql }
 
 class Connection {
   final String id;

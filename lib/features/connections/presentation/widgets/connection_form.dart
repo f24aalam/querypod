@@ -117,11 +117,13 @@ class ConnectionForm extends StatelessWidget {
                                       ),
                                       items: const {
                                         'MySQL': ConnectionType.mysql,
+                                        'PostgreSQL': ConnectionType.postgresql,
                                         'SQLite': ConnectionType.sqlite,
                                       },
                                     ),
                                     const SizedBox(height: 16),
-                                    if (draft.type == ConnectionType.mysql) ...[
+                                    if (draft.type == ConnectionType.mysql ||
+                                        draft.type == ConnectionType.postgresql) ...[
                                       _FormField(
                                         label: 'Host',
                                         value: draft.host,

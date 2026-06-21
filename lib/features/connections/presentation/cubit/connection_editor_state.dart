@@ -70,16 +70,23 @@ class ConnectionDraft {
     );
   }
 
-  Connection toConnection() => Connection(
-    id: id,
-    name: name,
-    host: host,
-    port: int.tryParse(port) ?? 3306,
-    user: user,
-    password: password,
-    database: database,
-    type: type,
-  );
+  Connection toConnection() {
+    int defaultPort = 3306;
+    if (type == ConnectionType.postgresql) {
+      defaultPort = 5432;
+    }
+
+    return Connection(
+      id: id,
+      name: name,
+      host: host,
+      port: int.tryParse(port) ?? defaultPort,
+      user: user,
+      password: password,
+      database: database,
+      type: type,
+    );
+  }
 
   @override
   bool operator ==(Object other) =>

@@ -51,6 +51,7 @@ dependencies:
   equatable: ^2.0.8
   intl: ^0.20.2
   file_selector: ^1.1.0
+  postgres: ^3.5.12
 
 dev_dependencies:
   flutter_test:

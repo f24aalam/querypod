@@ -1,8 +1,7 @@
 // ignore_for_file: prefer_initializing_formals
 
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:mysql_client_plus/exception.dart';
-import 'package:mysql_client_plus/mysql_client_plus.dart';
+import '../../../../core/database/database_driver_factory.dart';
 
 import '../../domain/entities/connection.dart';
 import '../../domain/repositories/connection_repository.dart';
@@ -34,25 +33,7 @@ class ConnectionCubit extends Cubit<ConnectionsState> {
   }
 
   String _connectionErrorMessage(Object error, Connection connection) {
-    if (error is MySQLException) {
-      final base = error.message.isNotEmpty
-          ? error.message
-          : 'MySQL client returned an error';
-      return 'Failed to connect: $base';
-    }
-
-    final message = error.toString();
-    final localhostHint =
-        (connection.host == '127.0.0.1' || connection.host == 'localhost') &&
-        (message.contains('Connection refused') ||
-            message.contains('No route to host') ||
-            message.contains('OS Error'));
-
-    if (localhostHint) {
-      return 'Failed to connect: $message. If this app is running on a simulator/device, 127.0.0.1 points to the device, not your computer.';
-    }
-
-    return 'Failed to connect: $message';
+    return error.toString().replaceFirst('Exception: ', '');
   }
 
   Future<void> load() async {
@@ -156,27 +137,26 @@ class ConnectionCubit extends Cubit<ConnectionsState> {
       emit(_feedback('Name is required', isError: true));
       return;
     }
-    if (connection.host.isEmpty) {
-      emit(_feedback('Host is required', isError: true));
-      return;
-    }
-    if (connection.port <= 0) {
-      emit(_feedback('Port is required', isError: true));
-      return;
+
+    if (connection.type == ConnectionType.mysql) {
+      if (connection.host.isEmpty) {
+        emit(_feedback('Host is required', isError: true));
+        return;
+      }
+      if (connection.port <= 0) {
+        emit(_feedback('Port is required', isError: true));
+        return;
+      }
+    } else if (connection.type == ConnectionType.sqlite) {
+      if (connection.database.isEmpty) {
+        emit(_feedback('Database File Path is required', isError: true));
+        return;
+      }
     }
 
     try {
-      final conn = await MySQLConnection.createConnection(
-        host: connection.host,
-        port: connection.port,
-        userName: connection.user,
-        password: connection.password,
-        databaseName: connection.database.isEmpty ? null : connection.database,
-        secure: false,
-      );
-      await conn.connect();
-      await conn.execute('SELECT 1');
-      await conn.close();
+      final driver = DatabaseDriverFactory.getDriver(connection.type);
+      await driver.testConnection(connection);
 
       emit(
         _feedback('Connection successful', isError: false).copyWith(

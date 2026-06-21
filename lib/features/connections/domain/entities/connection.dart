@@ -1,5 +1,7 @@
 import 'package:uuid/uuid.dart';
 
+enum ConnectionType { mysql, sqlite }
+
 class Connection {
   final String id;
   final String name;
@@ -8,6 +10,7 @@ class Connection {
   final String user;
   final String password;
   final String database;
+  final ConnectionType type;
 
   const Connection({
     required this.id,
@@ -17,6 +20,7 @@ class Connection {
     required this.user,
     required this.password,
     required this.database,
+    this.type = ConnectionType.mysql,
   });
 
   Connection copyWith({
@@ -27,6 +31,7 @@ class Connection {
     String? user,
     String? password,
     String? database,
+    ConnectionType? type,
   }) {
     return Connection(
       id: id ?? this.id,
@@ -36,6 +41,7 @@ class Connection {
       user: user ?? this.user,
       password: password ?? this.password,
       database: database ?? this.database,
+      type: type ?? this.type,
     );
   }
 
@@ -48,6 +54,7 @@ class Connection {
     user: user,
     password: password,
     database: database,
+    type: type,
   );
 }
 
@@ -58,6 +65,7 @@ class ConnectionSessionIdentity {
   final String user;
   final String password;
   final String database;
+  final ConnectionType type;
 
   const ConnectionSessionIdentity({
     required this.id,
@@ -66,6 +74,7 @@ class ConnectionSessionIdentity {
     required this.user,
     required this.password,
     required this.database,
+    required this.type,
   });
 
   @override
@@ -77,8 +86,10 @@ class ConnectionSessionIdentity {
           port == other.port &&
           user == other.user &&
           password == other.password &&
-          database == other.database;
+          database == other.database &&
+          type == other.type;
 
   @override
-  int get hashCode => Object.hash(id, host, port, user, password, database);
+  int get hashCode =>
+      Object.hash(id, host, port, user, password, database, type);
 }

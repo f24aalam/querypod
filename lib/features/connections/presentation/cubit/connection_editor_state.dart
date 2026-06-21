@@ -9,6 +9,7 @@ class ConnectionDraft {
   final String user;
   final String password;
   final String database;
+  final ConnectionType type;
 
   const ConnectionDraft({
     required this.id,
@@ -19,6 +20,7 @@ class ConnectionDraft {
     required this.user,
     required this.password,
     required this.database,
+    required this.type,
   });
 
   factory ConnectionDraft.empty() => ConnectionDraft(
@@ -30,6 +32,7 @@ class ConnectionDraft {
     user: '',
     password: '',
     database: '',
+    type: ConnectionType.mysql,
   );
 
   factory ConnectionDraft.fromConnection(Connection connection) =>
@@ -42,6 +45,7 @@ class ConnectionDraft {
         user: connection.user,
         password: connection.password,
         database: connection.database,
+        type: connection.type,
       );
 
   ConnectionDraft copyWith({
@@ -51,6 +55,7 @@ class ConnectionDraft {
     String? user,
     String? password,
     String? database,
+    ConnectionType? type,
   }) {
     return ConnectionDraft(
       id: id,
@@ -61,6 +66,7 @@ class ConnectionDraft {
       user: user ?? this.user,
       password: password ?? this.password,
       database: database ?? this.database,
+      type: type ?? this.type,
     );
   }
 
@@ -72,6 +78,7 @@ class ConnectionDraft {
     user: user,
     password: password,
     database: database,
+    type: type,
   );
 
   @override
@@ -85,7 +92,8 @@ class ConnectionDraft {
           port == other.port &&
           user == other.user &&
           password == other.password &&
-          database == other.database;
+          database == other.database &&
+          type == other.type;
 
   @override
   int get hashCode => Object.hash(
@@ -97,6 +105,7 @@ class ConnectionDraft {
     user,
     password,
     database,
+    type,
   );
 }
 

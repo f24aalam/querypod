@@ -1,0 +1,547 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
+import 'package:mysql_client_plus/exception.dart';
+import 'package:mysql_client_plus/mysql_client_plus.dart';
+import 'package:uuid/uuid.dart';
+
+import '../../../features/connections/domain/entities/connection.dart';
+import '../../../features/workspace/domain/entities/query_history.dart';
+import '../../../features/workspace/domain/entities/query_result.dart';
+import '../../../features/workspace/domain/entities/table_data.dart';
+import '../../../features/workspace/domain/entities/workspace_database.dart';
+import '../../../features/workspace/domain/entities/workspace_table.dart';
+import '../database_driver.dart';
+
+class MySQLDriver implements DatabaseDriver {
+  String _asString(dynamic value) {
+    if (value == null) return '';
+    if (value is String) return value;
+    if (value is Uint8List) return utf8.decode(value, allowMalformed: true);
+    return value.toString();
+  }
+
+  Future<MySQLConnection> _connect(
+    Connection connection, {
+    String? database,
+  }) async {
+    final conn = await MySQLConnection.createConnection(
+      host: connection.host,
+      port: connection.port,
+      userName: connection.user,
+      password: connection.password,
+      databaseName: (database ?? connection.database).isEmpty
+          ? null
+          : (database ?? connection.database),
+      secure: false,
+    );
+    await conn.connect();
+    return conn;
+  }
+
+  @override
+  Future<void> testConnection(Connection connection) async {
+    try {
+      final conn = await _connect(connection);
+      await conn.execute('SELECT 1');
+      await conn.close();
+    } catch (e) {
+      if (e is MySQLException) {
+        final base = e.message.isNotEmpty ? e.message : 'MySQL client returned an error';
+        throw Exception('Failed to connect: $base');
+      }
+
+      final message = e.toString();
+      final localhostHint =
+          (connection.host == '127.0.0.1' || connection.host == 'localhost') &&
+          (message.contains('Connection refused') ||
+              message.contains('No route to host') ||
+              message.contains('OS Error'));
+
+      if (localhostHint) {
+        throw Exception('Failed to connect: $message. If this app is running on a simulator/device, 127.0.0.1 points to the device, not your computer.');
+      }
+
+      throw Exception('Failed to connect: $message');
+    }
+  }
+
+  @override
+  Future<List<WorkspaceDatabase>> listDatabases(Connection connection) async {
+    final conn = await _connect(connection);
+    try {
+      final results = await conn.execute('SHOW DATABASES');
+      return results.rows
+          .map((row) => WorkspaceDatabase(name: _asString(row.colByName('Database'))))
+          .where((db) => db.name.isNotEmpty)
+          .toList();
+    } finally {
+      await conn.close();
+    }
+  }
+
+  @override
+  Future<List<WorkspaceTable>> listTables(
+    Connection connection,
+    String database,
+  ) async {
+    final conn = await _connect(connection, database: database);
+    try {
+      final results = await conn.execute('SHOW FULL TABLES FROM `$database`');
+
+      return results.rows
+          .map((row) {
+            final values = row.assoc();
+            final tableName = values.entries
+                .firstWhere(
+                  (entry) => entry.key.startsWith('Tables_in_'),
+                  orElse: () => const MapEntry('', null),
+                )
+                .value;
+            final tableType =
+                _asString(row.colByName('Table_type')).toUpperCase() == 'VIEW'
+                ? WorkspaceTableType.view
+                : WorkspaceTableType.table;
+
+            return WorkspaceTable(name: _asString(tableName), type: tableType);
+          })
+          .where((table) => table.name.isNotEmpty)
+          .toList();
+    } finally {
+      await conn.close();
+    }
+  }
+
+  @override
+  Future<TableStructure> inspectTable(
+    Connection connection,
+    String database,
+    String table, {
+    void Function(QueryHistory)? onHistory,
+  }) async {
+    final conn = await _connect(connection, database: database);
+    try {
+      final quotedDatabase = _quoteIdentifier(database);
+      final quotedTable = _quoteIdentifier(table);
+      final sql = 'SHOW COLUMNS FROM $quotedDatabase.$quotedTable';
+      final startMs = DateTime.now().millisecondsSinceEpoch;
+      final schema = await conn.execute(sql);
+      final execMs = DateTime.now().millisecondsSinceEpoch - startMs;
+
+      onHistory?.call(
+        QueryHistory(
+          id: const Uuid().v4(),
+          connectionId: connection.id,
+          sourceType: 'table',
+          sourceId: table,
+          sql: sql,
+          executionTimeMs: execMs,
+          status: 'success',
+          createdAt: DateTime.now(),
+        ),
+      );
+
+      final primaryKeys = <String>{};
+      final types = <String, String>{};
+
+      for (final row in schema.rows) {
+        final name = _asString(row.colByName('Field'));
+        types[name] = _asString(row.colByName('Type'));
+        if (_asString(row.colByName('Key')).toUpperCase() == 'PRI') {
+          primaryKeys.add(name);
+        }
+      }
+
+      final sampleSql = 'SELECT * FROM $quotedDatabase.$quotedTable LIMIT 0';
+      final startSampleMs = DateTime.now().millisecondsSinceEpoch;
+      final sample = await conn.execute(sampleSql);
+      final execSampleMs = DateTime.now().millisecondsSinceEpoch - startSampleMs;
+
+      onHistory?.call(
+        QueryHistory(
+          id: const Uuid().v4(),
+          connectionId: connection.id,
+          sourceType: 'table',
+          sourceId: table,
+          sql: sampleSql,
+          executionTimeMs: execSampleMs,
+          status: 'success',
+          createdAt: DateTime.now(),
+        ),
+      );
+
+      final columns = sample.cols
+          .map(
+            (column) => TableDataColumn(
+              name: column.name,
+              databaseType: types[column.name] ?? column.type.intVal.toString(),
+              length: column.length,
+              isPrimaryKey: primaryKeys.contains(column.name),
+            ),
+          )
+          .toList();
+
+      if (columns.isEmpty) {
+        throw StateError('The table does not expose any columns');
+      }
+      final orderColumn = columns
+          .firstWhere(
+            (column) => column.isPrimaryKey,
+            orElse: () => columns.first,
+          )
+          .name;
+      return TableStructure(columns: columns, orderColumn: orderColumn);
+    } finally {
+      await conn.close();
+    }
+  }
+
+  @override
+  Future<int> countRows(
+    Connection connection,
+    String database,
+    String table, {
+    void Function(QueryHistory)? onHistory,
+  }) async {
+    final conn = await _connect(connection, database: database);
+    try {
+      final sql =
+          'SELECT COUNT(*) AS total FROM '
+          '${_quoteIdentifier(database)}.${_quoteIdentifier(table)}';
+      final startMs = DateTime.now().millisecondsSinceEpoch;
+      final result = await conn.execute(sql);
+      final execMs = DateTime.now().millisecondsSinceEpoch - startMs;
+
+      onHistory?.call(
+        QueryHistory(
+          id: const Uuid().v4(),
+          connectionId: connection.id,
+          sourceType: 'table',
+          sourceId: table,
+          sql: sql,
+          executionTimeMs: execMs,
+          status: 'success',
+          createdAt: DateTime.now(),
+        ),
+      );
+
+      final value = result.rows.first.colByName('total');
+      return int.tryParse(_asString(value)) ?? 0;
+    } finally {
+      await conn.close();
+    }
+  }
+
+  @override
+  Future<TableRowsPage> fetchRows(
+    Connection connection,
+    String database,
+    String table, {
+    required TableStructure structure,
+    required int offset,
+    required int limit,
+    void Function(QueryHistory)? onHistory,
+  }) async {
+    final conn = await _connect(connection, database: database);
+    final stopwatch = Stopwatch()..start();
+    try {
+      final sql =
+          'SELECT * FROM ${_quoteIdentifier(database)}.${_quoteIdentifier(table)} '
+          'ORDER BY ${_quoteIdentifier(structure.orderColumn)} ASC '
+          'LIMIT $limit OFFSET $offset';
+      final startMs = DateTime.now().millisecondsSinceEpoch;
+      final result = await conn.execute(sql);
+      final execMs = DateTime.now().millisecondsSinceEpoch - startMs;
+
+      onHistory?.call(
+        QueryHistory(
+          id: const Uuid().v4(),
+          connectionId: connection.id,
+          sourceType: 'table',
+          sourceId: table,
+          sql: sql,
+          executionTimeMs: execMs,
+          status: 'success',
+          createdAt: DateTime.now(),
+        ),
+      );
+
+      final rows = result.rows
+          .map(
+            (row) => TableDataRow([
+              for (var index = 0; index < structure.columns.length; index++)
+                _cell(row.colAt(index), structure.columns[index]),
+            ]),
+          )
+          .toList();
+      stopwatch.stop();
+      return TableRowsPage(rows: rows, queryDuration: stopwatch.elapsed);
+    } finally {
+      stopwatch.stop();
+      await conn.close();
+    }
+  }
+
+  @override
+  Future<void> commitChanges(
+    Connection connection,
+    String database,
+    String table, {
+    required TableStructure structure,
+    required List<TableCellChange> cellChanges,
+    required List<TableDataRow> deletedRows,
+    void Function(QueryHistory)? onHistory,
+  }) async {
+    final primaryKeyIndexes = <int>[
+      for (var index = 0; index < structure.columns.length; index++)
+        if (structure.columns[index].isPrimaryKey) index,
+    ];
+    if (primaryKeyIndexes.isEmpty) {
+      throw StateError('This table has no primary key and is read-only');
+    }
+
+    final conn = await _connect(connection, database: database);
+    try {
+      await conn.transactional((txn) async {
+        for (final change in cellChanges) {
+          await _executeUpdate(
+            connection.id,
+            txn,
+            database,
+            table,
+            structure,
+            primaryKeyIndexes,
+            change,
+            onHistory,
+          );
+        }
+        for (final row in deletedRows) {
+          await _executeDelete(
+            connection.id,
+            txn,
+            database,
+            table,
+            structure,
+            primaryKeyIndexes,
+            row,
+            onHistory,
+          );
+        }
+      });
+    } finally {
+      await conn.close();
+    }
+  }
+
+  Future<void> _executeUpdate(
+    String connectionId,
+    MySQLConnection conn,
+    String database,
+    String table,
+    TableStructure structure,
+    List<int> primaryKeyIndexes,
+    TableCellChange change,
+    void Function(QueryHistory)? onHistory,
+  ) async {
+    final column = structure.columns[change.columnIndex];
+    final where = _primaryKeyWhere(structure, primaryKeyIndexes);
+    final sql =
+        'UPDATE ${_quoteIdentifier(database)}.${_quoteIdentifier(table)} '
+        'SET ${_quoteIdentifier(column.name)} = ? WHERE $where LIMIT 1';
+    final statement = await conn.prepare(sql);
+    try {
+      final updatedValue =
+          change.row.cells[change.columnIndex].kind == TableCellKind.binary
+          ? _decodeHex(change.value)
+          : change.value;
+      final startMs = DateTime.now().millisecondsSinceEpoch;
+      await statement.execute([
+        updatedValue,
+        for (final index in primaryKeyIndexes) change.row.cells[index].rawValue,
+      ]);
+      final execMs = DateTime.now().millisecondsSinceEpoch - startMs;
+
+      onHistory?.call(
+        QueryHistory(
+          id: const Uuid().v4(),
+          connectionId: connectionId,
+          sourceType: 'table',
+          sourceId: table,
+          sql: sql,
+          executionTimeMs: execMs,
+          status: 'success',
+          createdAt: DateTime.now(),
+        ),
+      );
+    } finally {
+      await statement.deallocate();
+    }
+  }
+
+  Future<void> _executeDelete(
+    String connectionId,
+    MySQLConnection conn,
+    String database,
+    String table,
+    TableStructure structure,
+    List<int> primaryKeyIndexes,
+    TableDataRow row,
+    void Function(QueryHistory)? onHistory,
+  ) async {
+    final where = _primaryKeyWhere(structure, primaryKeyIndexes);
+    final sql =
+        'DELETE FROM ${_quoteIdentifier(database)}.${_quoteIdentifier(table)} '
+        'WHERE $where LIMIT 1';
+    final statement = await conn.prepare(sql);
+    try {
+      final startMs = DateTime.now().millisecondsSinceEpoch;
+      await statement.execute([
+        for (final index in primaryKeyIndexes) row.cells[index].rawValue,
+      ]);
+      final execMs = DateTime.now().millisecondsSinceEpoch - startMs;
+
+      onHistory?.call(
+        QueryHistory(
+          id: const Uuid().v4(),
+          connectionId: connectionId,
+          sourceType: 'table',
+          sourceId: table,
+          sql: sql,
+          executionTimeMs: execMs,
+          status: 'success',
+          createdAt: DateTime.now(),
+        ),
+      );
+    } finally {
+      await statement.deallocate();
+    }
+  }
+
+  String _primaryKeyWhere(
+    TableStructure structure,
+    List<int> primaryKeyIndexes,
+  ) {
+    return primaryKeyIndexes
+        .map((index) => '${_quoteIdentifier(structure.columns[index].name)} = ?')
+        .join(' AND ');
+  }
+
+  String _quoteIdentifier(String value) => '`${value.replaceAll('`', '``')}`';
+
+  TableCellValue _cell(dynamic value, TableDataColumn column) {
+    if (value == null) return const TableCellValue.nullValue();
+    if (value is Uint8List) {
+      if (_isBinaryColumn(column.databaseType)) {
+        return TableCellValue.binary(value);
+      }
+      try {
+        return TableCellValue.text(utf8.decode(value));
+      } on FormatException {
+        return TableCellValue.binary(value);
+      }
+    }
+    return TableCellValue.text(value.toString());
+  }
+
+  Uint8List _decodeHex(String value) {
+    final normalized = value.trim().replaceFirst(
+      RegExp(r'^0x', caseSensitive: false),
+      '',
+    );
+    if (normalized.length.isOdd ||
+        !RegExp(r'^[0-9a-fA-F]*$').hasMatch(normalized)) {
+      throw const FormatException('Binary values must use hexadecimal text');
+    }
+    return Uint8List.fromList([
+      for (var index = 0; index < normalized.length; index += 2)
+        int.parse(normalized.substring(index, index + 2), radix: 16),
+    ]);
+  }
+
+  bool _isBinaryColumn(String databaseType) {
+    final type = databaseType.toLowerCase();
+    return type.contains('binary') ||
+        type.contains('blob') ||
+        type.contains('geometry');
+  }
+
+  @override
+  Future<List<QueryResult>> executeQuery(
+    Connection connection,
+    String database,
+    String sql,
+  ) async {
+    MySQLConnection? conn;
+    try {
+      conn = await _connect(connection, database: database);
+
+      // Split into individual statements and execute one at a time.
+      final statements = sql
+          .split(';')
+          .map((s) => s.trim())
+          .where((s) => s.isNotEmpty)
+          .toList();
+
+      final results = <QueryResult>[];
+
+      for (final statement in statements) {
+        final stmtWatch = Stopwatch()..start();
+        try {
+          final resultSet = await conn.execute(statement);
+          stmtWatch.stop();
+
+          final columns = resultSet.cols
+              .map(
+                (col) => TableDataColumn(
+                  name: col.name,
+                  databaseType: col.type.intVal.toString(),
+                  length: col.length,
+                  isPrimaryKey: false,
+                ),
+              )
+              .toList();
+
+          final structure = columns.isNotEmpty
+              ? TableStructure(
+                  columns: columns,
+                  orderColumn: columns.first.name,
+                )
+              : null;
+
+          final rows = resultSet.rows
+              .map(
+                (row) => TableDataRow([
+                  for (var index = 0; index < columns.length; index++)
+                    _cell(row.colAt(index), columns[index]),
+                ]),
+              )
+              .toList();
+
+          results.add(
+            QueryResult(
+              structure: structure,
+              rows: rows,
+              queryDuration: stmtWatch.elapsed,
+            ),
+          );
+        } catch (e) {
+          stmtWatch.stop();
+          results.add(
+            QueryResult(
+              queryDuration: stmtWatch.elapsed,
+              errorMessage: e.toString(),
+              rows: const [],
+            ),
+          );
+        }
+      }
+
+      return results;
+    } catch (e) {
+      // Connection-level failure (e.g. bad credentials).
+      return [QueryResult(errorMessage: e.toString(), rows: const [])];
+    } finally {
+      await conn?.close();
+    }
+  }
+}

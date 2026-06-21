@@ -9,6 +9,7 @@ class ConnectionModel extends Connection {
     required super.user,
     required super.password,
     required super.database,
+    super.type = ConnectionType.mysql,
   });
 
   factory ConnectionModel.fromJson(
@@ -23,6 +24,10 @@ class ConnectionModel extends Connection {
       user: json['user'] as String,
       password: password,
       database: json['database'] as String,
+      type: ConnectionType.values.firstWhere(
+        (e) => e.name == json['type'],
+        orElse: () => ConnectionType.mysql,
+      ),
     );
   }
 
@@ -34,6 +39,7 @@ class ConnectionModel extends Connection {
       'port': port,
       'user': user,
       'database': database,
+      'type': type.name,
     };
   }
 
@@ -46,6 +52,7 @@ class ConnectionModel extends Connection {
       user: entity.user,
       password: entity.password,
       database: entity.database,
+      type: entity.type,
     );
   }
 }

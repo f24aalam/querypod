@@ -1,6 +1,9 @@
+import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:forui/forui.dart';
+
+import '../../domain/entities/connection.dart';
 
 import '../../../workspace/presentation/cubit/editor_tabs_cubit.dart';
 import '../cubit/connection_cubit.dart';
@@ -101,40 +104,96 @@ class ConnectionForm extends StatelessWidget {
                                       value: draft.name,
                                       onChanged: editor.updateName,
                                     ),
-                                    const SizedBox(height: 12),
-                                    _FormField(
-                                      label: 'Host',
-                                      value: draft.host,
-                                      onChanged: editor.updateHost,
+                                    const SizedBox(height: 16),
+                                    FSelect<ConnectionType>(
+                                      label: const Text('Connection Type'),
+                                      control: FSelectControl.lifted(
+                                        value: draft.type,
+                                        onChange: (value) {
+                                          if (value != null) {
+                                            editor.updateType(value);
+                                          }
+                                        },
+                                      ),
+                                      items: const {
+                                        'MySQL': ConnectionType.mysql,
+                                        'SQLite': ConnectionType.sqlite,
+                                      },
                                     ),
-                                    const SizedBox(height: 12),
-                                    _FormField(
-                                      label: 'Port',
-                                      value: draft.port,
-                                      onChanged: editor.updatePort,
-                                      keyboardType: TextInputType.number,
-                                    ),
-                                    const SizedBox(height: 12),
-                                    _FormField(
-                                      label: 'User',
-                                      value: draft.user,
-                                      onChanged: editor.updateUser,
-                                    ),
-                                    const SizedBox(height: 12),
-                                    _FormField(
-                                      label: 'Password',
-                                      value: draft.password,
-                                      onChanged: editor.updatePassword,
-                                      obscure: true,
-                                      optional: true,
-                                    ),
-                                    const SizedBox(height: 12),
-                                    _FormField(
-                                      label: 'Database',
-                                      value: draft.database,
-                                      onChanged: editor.updateDatabase,
-                                      optional: true,
-                                    ),
+                                    const SizedBox(height: 16),
+                                    if (draft.type == ConnectionType.mysql) ...[
+                                      _FormField(
+                                        label: 'Host',
+                                        value: draft.host,
+                                        onChanged: editor.updateHost,
+                                      ),
+                                      const SizedBox(height: 12),
+                                      _FormField(
+                                        label: 'Port',
+                                        value: draft.port,
+                                        onChanged: editor.updatePort,
+                                        keyboardType: TextInputType.number,
+                                      ),
+                                      const SizedBox(height: 12),
+                                      _FormField(
+                                        label: 'User',
+                                        value: draft.user,
+                                        onChanged: editor.updateUser,
+                                      ),
+                                      const SizedBox(height: 12),
+                                      _FormField(
+                                        label: 'Password',
+                                        value: draft.password,
+                                        onChanged: editor.updatePassword,
+                                        obscure: true,
+                                        optional: true,
+                                      ),
+                                      const SizedBox(height: 12),
+                                      _FormField(
+                                        label: 'Database',
+                                        value: draft.database,
+                                        onChanged: editor.updateDatabase,
+                                        optional: true,
+                                      ),
+                                    ] else ...[
+                                      Row(
+                                        crossAxisAlignment: CrossAxisAlignment.end,
+                                        children: [
+                                          Expanded(
+                                            child: _FormField(
+                                              label: 'Database File Path',
+                                              value: draft.database,
+                                              onChanged: editor.updateDatabase,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Padding(
+                                            padding: const EdgeInsets.only(bottom: 2),
+                                            child: FButton.icon(
+                                              onPress: () async {
+                                                const typeGroup = XTypeGroup(
+                                                  label: 'SQLite Databases',
+                                                  extensions: <String>[
+                                                    'sqlite',
+                                                    'db',
+                                                    'sqlite3',
+                                                  ],
+                                                );
+                                                final file = await openFile(
+                                                  acceptedTypeGroups: <XTypeGroup>[
+                                                    typeGroup,
+                                                  ],
+                                                );
+                                                if (file != null) {
+                                                  editor.updateDatabase(file.path);
+                                                }
+                                              },
+                                              child: const Icon(Icons.folder_open),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
                                     const SizedBox(height: 20),
                                     Row(
                                       children: [

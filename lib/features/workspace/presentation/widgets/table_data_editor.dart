@@ -150,11 +150,11 @@ class _TableStructurePanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = context.theme;
     final columns = session.structure!.columns;
+    final indexes = session.structure!.indexes;
 
     return Container(
       decoration: BoxDecoration(
         color: theme.colors.background,
-        border: Border(left: BorderSide(color: theme.colors.border, width: 1)),
       ),
       child: Column(
         children: [
@@ -200,93 +200,191 @@ class _TableStructurePanel extends StatelessWidget {
             ),
           ),
           Expanded(
-            child: ListView.builder(
-              padding: EdgeInsets.zero,
-              itemCount: columns.length,
-              itemBuilder: (context, index) {
-                final column = columns[index];
-                return Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-                  decoration: BoxDecoration(
-                    border: Border(
-                      bottom: BorderSide(color: theme.colors.border, width: 0.5),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      if (column.isPrimaryKey) ...[
-                        Icon(
-                          Icons.key_outlined,
-                          size: 14,
-                          color: Colors.amber.shade600,
-                        ),
-                        const SizedBox(width: 8),
-                      ] else ...[
-                        const SizedBox(width: 22),
-                      ],
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              column.name,
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w500,
-                                color: theme.colors.foreground,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              '${column.databaseType}${column.length > 0 ? '(${column.length})' : ''}',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: theme.colors.mutedForeground,
-                              ),
-                            ),
-                            if (column.foreignKey != null) ...[
-                              const SizedBox(height: 6),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: theme.colors.secondary,
-                                  borderRadius: BorderRadius.circular(4),
-                                  border: Border.all(
-                                    color: theme.colors.border,
-                                    width: 1,
-                                  ),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(Icons.link, size: 10, color: theme.colors.foreground),
-                                    const SizedBox(width: 4),
-                                    Flexible(
-                                      child: Text(
-                                        '${column.foreignKey!.targetTable}(${column.foreignKey!.targetColumn})',
-                                        style: TextStyle(
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.w500,
-                                          color: theme.colors.foreground,
-                                        ),
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
+            child: FTabs(
+              expands: true,
+              style: const FTabsStyleDelta.delta(
+                decoration: DecorationDelta.boxDelta(
+                  borderRadius: BorderRadius.zero,
+                ),
+              ),
+              children: [
+                FTabEntry(
+                  label: Text('Columns (${columns.length})', style: const TextStyle(fontSize: 12)),
+                  child: _buildColumns(context, columns),
+                ),
+                FTabEntry(
+                  label: Text('Indexes (${indexes.length})', style: const TextStyle(fontSize: 12)),
+                  child: _buildIndexes(context, indexes),
+                ),
+              ],
             ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildColumns(BuildContext context, List<TableDataColumn> columns) {
+    final theme = context.theme;
+    return ListView.builder(
+      padding: EdgeInsets.zero,
+      itemCount: columns.length,
+      itemBuilder: (context, index) {
+        final column = columns[index];
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+          decoration: BoxDecoration(
+            border: Border(
+              bottom: BorderSide(color: theme.colors.border, width: 0.5),
+            ),
+          ),
+          child: Row(
+            children: [
+              if (column.isPrimaryKey) ...[
+                Icon(
+                  Icons.key_outlined,
+                  size: 14,
+                  color: Colors.amber.shade600,
+                ),
+                const SizedBox(width: 8),
+              ] else ...[
+                const SizedBox(width: 22),
+              ],
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      column.name,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: theme.colors.foreground,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${column.databaseType}${column.length > 0 ? '(${column.length})' : ''}',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: theme.colors.mutedForeground,
+                      ),
+                    ),
+                    if (column.foreignKey != null) ...[
+                      const SizedBox(height: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: theme.colors.secondary,
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(
+                            color: theme.colors.border,
+                            width: 1,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.link, size: 10, color: theme.colors.foreground),
+                            const SizedBox(width: 4),
+                            Flexible(
+                              child: Text(
+                                '${column.foreignKey!.targetTable}(${column.foreignKey!.targetColumn})',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w500,
+                                  color: theme.colors.foreground,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildIndexes(BuildContext context, List<TableIndex> indexes) {
+    final theme = context.theme;
+    if (indexes.isEmpty) {
+      return Center(
+        child: Text(
+          'No indexes found',
+          style: TextStyle(fontSize: 13, color: theme.colors.mutedForeground),
+        ),
+      );
+    }
+    return ListView.builder(
+      padding: EdgeInsets.zero,
+      itemCount: indexes.length,
+      itemBuilder: (context, index) {
+        final idx = indexes[index];
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+          decoration: BoxDecoration(
+            border: Border(
+              bottom: BorderSide(color: theme.colors.border, width: 0.5),
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      idx.name,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: theme.colors.foreground,
+                      ),
+                    ),
+                  ),
+                  if (idx.isPrimaryKey || idx.isUnique) ...[
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: idx.isPrimaryKey ? Colors.amber.withValues(alpha: 0.2) : theme.colors.primary.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(
+                          color: idx.isPrimaryKey ? Colors.amber.shade700 : theme.colors.primary,
+                          width: 1,
+                        ),
+                      ),
+                      child: Text(
+                        idx.isPrimaryKey ? 'PK' : 'UNIQUE',
+                        style: TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.bold,
+                          color: idx.isPrimaryKey ? Colors.amber.shade700 : theme.colors.primary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                idx.columns.join(', '),
+                style: TextStyle(
+                  fontSize: 11,
+                  color: theme.colors.mutedForeground,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

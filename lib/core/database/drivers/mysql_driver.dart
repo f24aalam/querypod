@@ -223,6 +223,48 @@ class MySQLDriver implements DatabaseDriver {
           )
           .toList();
 
+      final idxSql = '''
+        SELECT INDEX_NAME, NON_UNIQUE, COLUMN_NAME 
+        FROM INFORMATION_SCHEMA.STATISTICS 
+        WHERE TABLE_SCHEMA = :db AND TABLE_NAME = :table
+        ORDER BY SEQ_IN_INDEX;
+      ''';
+      final startIdxMs = DateTime.now().millisecondsSinceEpoch;
+      final idxSchema = await conn.execute(idxSql, {'db': database, 'table': table});
+      final execIdxMs = DateTime.now().millisecondsSinceEpoch - startIdxMs;
+
+      onHistory?.call(
+        QueryHistory(
+          id: const Uuid().v4(),
+          connectionId: connection.id,
+          sourceType: 'table',
+          sourceId: table,
+          sql: idxSql,
+          executionTimeMs: execIdxMs,
+          status: 'success',
+          createdAt: DateTime.now(),
+        ),
+      );
+
+      final indexesMap = <String, TableIndex>{};
+      for (final row in idxSchema.rows) {
+        final indexName = _asString(row.colByName('INDEX_NAME'));
+        final isUnique = _asString(row.colByName('NON_UNIQUE')) == '0';
+        final colName = _asString(row.colByName('COLUMN_NAME'));
+        
+        if (indexesMap.containsKey(indexName)) {
+           indexesMap[indexName]!.columns.add(colName);
+        } else {
+           indexesMap[indexName] = TableIndex(
+             name: indexName,
+             columns: [colName],
+             isUnique: isUnique,
+             isPrimaryKey: indexName.toUpperCase() == 'PRIMARY',
+           );
+        }
+      }
+      final indexes = indexesMap.values.toList();
+
       if (columns.isEmpty) {
         throw StateError('The table does not expose any columns');
       }
@@ -232,7 +274,11 @@ class MySQLDriver implements DatabaseDriver {
             orElse: () => columns.first,
           )
           .name;
-      return TableStructure(columns: columns, orderColumn: orderColumn);
+      return TableStructure(
+        columns: columns, 
+        indexes: indexes,
+        orderColumn: orderColumn,
+      );
     } finally {
       await conn.close();
     }

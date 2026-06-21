@@ -217,6 +217,60 @@ class PostgresDriver implements DatabaseDriver {
           )
           .toList();
 
+      final idxSql = '''
+        SELECT
+            i.relname as index_name,
+            a.attname as column_name,
+            ix.indisunique as is_unique,
+            ix.indisprimary as is_primary
+        FROM
+            pg_class t
+            JOIN pg_index ix ON t.oid = ix.indrelid
+            JOIN pg_class i ON i.oid = ix.indexrelid
+            JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = ANY(ix.indkey)
+        WHERE
+            t.relkind = 'r' AND t.relname = @table
+        ORDER BY
+            i.relname, a.attnum;
+      ''';
+      
+      final startIdxMs = DateTime.now().millisecondsSinceEpoch;
+      final idxSchema = await conn.execute(pg.Sql.named(idxSql), parameters: {'table': table});
+      final execIdxMs = DateTime.now().millisecondsSinceEpoch - startIdxMs;
+
+      onHistory?.call(
+        QueryHistory(
+          id: const Uuid().v4(),
+          connectionId: connection.id,
+          sourceType: 'table',
+          sourceId: table,
+          sql: idxSql,
+          executionTimeMs: execIdxMs,
+          status: 'success',
+          createdAt: DateTime.now(),
+        ),
+      );
+
+      final indexesMap = <String, TableIndex>{};
+      for (final row in idxSchema) {
+        final indexName = _asString(row[0]);
+        final colName = _asString(row[1]);
+        final isUnique = row[2] as bool? ?? false;
+        final isPrimaryKey = row[3] as bool? ?? false;
+        
+        if (indexesMap.containsKey(indexName)) {
+           indexesMap[indexName]!.columns.add(colName);
+        } else {
+           indexesMap[indexName] = TableIndex(
+             name: indexName,
+             columns: [colName],
+             isUnique: isUnique,
+             isPrimaryKey: isPrimaryKey,
+           );
+        }
+      }
+      final indexes = indexesMap.values.toList();
+
       if (columns.isEmpty) {
         throw StateError('The table does not expose any columns');
       }
@@ -226,7 +280,11 @@ class PostgresDriver implements DatabaseDriver {
             orElse: () => columns.first,
           )
           .name;
-      return TableStructure(columns: columns, orderColumn: orderColumn);
+      return TableStructure(
+        columns: columns, 
+        indexes: indexes,
+        orderColumn: orderColumn,
+      );
     } finally {
       await conn.close();
     }

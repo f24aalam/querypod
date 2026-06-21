@@ -160,13 +160,45 @@ class SQLiteDriver implements DatabaseDriver {
         throw StateError('The table does not expose any columns');
       }
 
+      final indexes = <TableIndex>[];
+      final indexSql = 'PRAGMA index_list($quotedTable)';
+      final indexList = await db.rawQuery(indexSql);
+      
+      for (final row in indexList) {
+        final indexName = _asString(row['name']);
+        final isUnique = row['unique'] == 1;
+        final origin = _asString(row['origin']);
+        
+        final infoSql = 'PRAGMA index_info(${_quoteIdentifier(indexName)})';
+        final infoList = await db.rawQuery(infoSql);
+        
+        final indexCols = <String>[];
+        for (final infoRow in infoList) {
+           final colName = _asString(infoRow['name']);
+           if (colName.isNotEmpty) indexCols.add(colName);
+        }
+        
+        if (indexCols.isNotEmpty) {
+          indexes.add(TableIndex(
+            name: indexName,
+            columns: indexCols,
+            isUnique: isUnique,
+            isPrimaryKey: origin == 'pk',
+          ));
+        }
+      }
+
       final orderColumn = columnsWithFks
           .firstWhere(
             (column) => column.isPrimaryKey,
             orElse: () => columnsWithFks.first,
           )
           .name;
-      return TableStructure(columns: columnsWithFks, orderColumn: orderColumn);
+      return TableStructure(
+        columns: columnsWithFks, 
+        indexes: indexes,
+        orderColumn: orderColumn,
+      );
     } finally {
       await db.close();
     }

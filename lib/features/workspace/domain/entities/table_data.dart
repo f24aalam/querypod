@@ -48,6 +48,20 @@ class TableForeignKey {
   });
 }
 
+class TableIndex {
+  final String name;
+  final List<String> columns;
+  final bool isUnique;
+  final bool isPrimaryKey;
+
+  const TableIndex({
+    required this.name,
+    required this.columns,
+    required this.isUnique,
+    required this.isPrimaryKey,
+  });
+}
+
 class TableDataColumn {
   final String name;
   final String databaseType;
@@ -131,10 +145,12 @@ class TableCellChange {
 
 class TableStructure {
   final List<TableDataColumn> columns;
+  final List<TableIndex> indexes;
   final String orderColumn;
 
   TableStructure({
     required List<TableDataColumn> columns,
+    this.indexes = const [],
     required this.orderColumn,
   }) : columns = List.unmodifiable(columns);
 }

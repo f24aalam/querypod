@@ -22,6 +22,7 @@ class TableDataSession {
   final String? searchQuery;
   final List<TableFilter> filters;
   final int feedbackNonce;
+  final bool isShowingStructure;
 
   TableDataSession({
     required this.key,
@@ -42,6 +43,7 @@ class TableDataSession {
     this.searchQuery,
     List<TableFilter> filters = const [],
     this.feedbackNonce = 0,
+    this.isShowingStructure = false,
   }) : rows = List.unmodifiable(rows),
        filters = List.unmodifiable(filters),
        selectedRowIndexes = Set.unmodifiable(selectedRowIndexes),
@@ -84,6 +86,7 @@ class TableDataSession {
     String? Function()? searchQuery,
     List<TableFilter>? filters,
     int? feedbackNonce,
+    bool? isShowingStructure,
   }) {
     return TableDataSession(
       key: key,
@@ -109,6 +112,7 @@ class TableDataSession {
       searchQuery: searchQuery != null ? searchQuery() : this.searchQuery,
       filters: filters ?? this.filters,
       feedbackNonce: feedbackNonce ?? this.feedbackNonce,
+      isShowingStructure: isShowingStructure ?? this.isShowingStructure,
     );
   }
 }

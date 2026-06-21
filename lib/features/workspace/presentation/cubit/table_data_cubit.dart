@@ -97,6 +97,25 @@ class TableDataCubit extends Cubit<TableDataState> {
     await _loadInitial(key, refreshing: true);
   }
 
+  void showTableStructure(TableTabKey key) {
+    final session = state.session(key);
+    if (session == null) return;
+    _setSession(
+      session.copyWith(
+        isShowingStructure: true,
+        selectedRowIndexes: const {},
+        selectionAnchorRowIndex: () => null,
+        activeCellEdit: () => null,
+      ),
+    );
+  }
+
+  void hideTableStructure(TableTabKey key) {
+    final session = state.session(key);
+    if (session == null || !session.isShowingStructure) return;
+    _setSession(session.copyWith(isShowingStructure: false));
+  }
+
   void activateCell(
     TableTabKey key,
     int rowIndex,

@@ -343,7 +343,7 @@ class _TableItem extends StatelessWidget {
     );
   }
 
-  void _open(BuildContext context, {required bool pin}) {
+  void _open(BuildContext context, {required bool pin, bool describe = false}) {
     final metadata = context.read<WorkspaceMetadataCubit>();
     final connection = context.read<ConnectionCubit>().state.activeConnection;
     final database = metadata.state.selectedDatabase;
@@ -370,7 +370,14 @@ class _TableItem extends StatelessWidget {
       database: database,
       tableName: table.name,
     );
-    unawaited(context.read<TableDataCubit>().openTable(connection, key));
+    unawaited(
+      context.read<TableDataCubit>().openTable(connection, key).then((_) {
+        if (!context.mounted) return;
+        if (describe) {
+          context.read<TableDataCubit>().showTableStructure(key);
+        }
+      }),
+    );
   }
 }
 

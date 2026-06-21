@@ -107,8 +107,9 @@ class _TableContent extends StatelessWidget {
         selectedIndex < session.rows.length &&
         session.structure != null;
     final showBatchInspector = session.selectionCount > 1;
+    final showTableStructure = session.isShowingStructure && session.structure != null;
 
-    if (!showRowDetail && !showBatchInspector) return grid;
+    if (!showRowDetail && !showBatchInspector && !showTableStructure) return grid;
 
     return FResizable(
       axis: Axis.horizontal,
@@ -123,16 +124,137 @@ class _TableContent extends StatelessWidget {
           extent: 320,
           minExtent: 240,
           builder: (context, data, child) => child!,
-          child: showBatchInspector
-              ? _BatchInspector(tableKey: tableKey, session: session)
-              : _RowDetailPanel(
-                  tableKey: tableKey,
-                  columns: session.structure!.columns,
-                  row: session.rows[selectedIndex!],
-                  rowNumber: session.rangeStart + selectedIndex,
-                ),
+          child: showTableStructure
+              ? _TableStructurePanel(tableKey: tableKey, session: session)
+              : showBatchInspector
+                  ? _BatchInspector(tableKey: tableKey, session: session)
+                  : _RowDetailPanel(
+                      tableKey: tableKey,
+                      columns: session.structure!.columns,
+                      row: session.rows[selectedIndex!],
+                      rowNumber: session.rangeStart + selectedIndex,
+                    ),
         ),
       ],
+    );
+  }
+}
+
+class _TableStructurePanel extends StatelessWidget {
+  final TableTabKey tableKey;
+  final TableDataSession session;
+
+  const _TableStructurePanel({required this.tableKey, required this.session});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = context.theme;
+    final columns = session.structure!.columns;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: theme.colors.background,
+        border: Border(left: BorderSide(color: theme.colors.border, width: 1)),
+      ),
+      child: Column(
+        children: [
+          Container(
+            height: 34,
+            padding: const EdgeInsets.only(left: 12, right: 4),
+            decoration: BoxDecoration(
+              border: Border(
+                bottom: BorderSide(color: theme.colors.border, width: 1),
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.info_outline,
+                  size: 14,
+                  color: theme.colors.foreground,
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'Table Structure',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: theme.colors.foreground,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Close table structure',
+                  padding: EdgeInsets.zero,
+                  splashRadius: 12,
+                  onPressed: () =>
+                      context.read<TableDataCubit>().hideTableStructure(tableKey),
+                  icon: Icon(
+                    Icons.close,
+                    size: 14,
+                    color: theme.colors.mutedForeground,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: ListView.builder(
+              padding: EdgeInsets.zero,
+              itemCount: columns.length,
+              itemBuilder: (context, index) {
+                final column = columns[index];
+                return Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                  decoration: BoxDecoration(
+                    border: Border(
+                      bottom: BorderSide(color: theme.colors.border, width: 0.5),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      if (column.isPrimaryKey) ...[
+                        Icon(
+                          Icons.key_outlined,
+                          size: 14,
+                          color: Colors.amber.shade600,
+                        ),
+                        const SizedBox(width: 8),
+                      ] else ...[
+                        const SizedBox(width: 22),
+                      ],
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              column.name,
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                                color: theme.colors.foreground,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              '${column.databaseType}${column.length > 0 ? '(${column.length})' : ''}',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: theme.colors.mutedForeground,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -1010,6 +1132,28 @@ class _PaginationBar extends StatelessWidget {
                               context.read<TableDataCubit>().nextPage(tableKey)
                         : null,
                     child: const Text('Next'),
+                  ),
+                  const SizedBox(width: 6),
+                  FTooltip(
+                    tipBuilder: (context, controller) =>
+                        const Text('Table Structure'),
+                    child: FButton.icon(
+                      size: FButtonSizeVariant.xs,
+                      variant: session.isShowingStructure
+                          ? FButtonVariant.secondary
+                          : FButtonVariant.outline,
+                      onPress: disabled
+                          ? null
+                          : () {
+                              final cubit = context.read<TableDataCubit>();
+                              if (session.isShowingStructure) {
+                                cubit.hideTableStructure(tableKey);
+                              } else {
+                                cubit.showTableStructure(tableKey);
+                              }
+                            },
+                      child: const Icon(Icons.info_outline, size: 14),
+                    ),
                   ),
                   const SizedBox(width: 6),
                   FTooltip(

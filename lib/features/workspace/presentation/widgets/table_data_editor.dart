@@ -1277,6 +1277,14 @@ class _FilterSheetState extends State<_FilterSheet> {
       operator: f.operator,
       valueController: TextEditingController(text: f.value),
     )).toList();
+
+    if (_rows.isEmpty) {
+      _rows.add(_FilterFormRow(
+        column: widget.columns.isNotEmpty ? widget.columns.first.name : '',
+        operator: widget.operators.isNotEmpty ? widget.operators.first : '=',
+        valueController: TextEditingController(),
+      ));
+    }
   }
 
   @override
@@ -1353,66 +1361,70 @@ class _FilterSheetState extends State<_FilterSheet> {
             ),
           ),
           Expanded(
-            child: _rows.isEmpty
-                ? Center(
-                    child: Text(
-                      'No filters applied.',
-                      style: TextStyle(color: theme.colors.mutedForeground),
+            child: ListView.separated(
+              padding: const EdgeInsets.all(16),
+              itemCount: _rows.length + 1,
+              separatorBuilder: (context, index) => const SizedBox(height: 12),
+              itemBuilder: (context, index) {
+                if (index == _rows.length) {
+                  return Align(
+                    alignment: Alignment.centerLeft,
+                    child: FButton(
+                      variant: FButtonVariant.outline,
+                      onPress: _addFilter,
+                      child: const Text('Add more'),
                     ),
-                  )
-                : ListView.separated(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: _rows.length,
-                    separatorBuilder: (context, index) => const SizedBox(height: 12),
-                    itemBuilder: (context, index) {
-                      final row = _rows[index];
-                      return Row(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Expanded(
-                            flex: 2,
-                            child: FSelect<String>(
-                              items: { for (var c in widget.columns) c.name : c.name },
-                              control: FSelectControl.lifted(
-                                value: row.column,
-                                onChange: (val) {
-                                  if (val != null) setState(() => row.column = val);
-                                },
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            flex: 1,
-                            child: FSelect<String>(
-                              items: { for (var op in widget.operators) op : op },
-                              control: FSelectControl.lifted(
-                                value: row.operator,
-                                onChange: (val) {
-                                  if (val != null) setState(() => row.operator = val);
-                                },
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            flex: 2,
-                            child: FTextField(
-                              control: FTextFieldControl.managed(
-                                controller: row.valueController,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          FButton.icon(
-                            variant: FButtonVariant.outline,
-                            onPress: () => _removeFilter(index),
-                            child: const Icon(Icons.delete_outline, size: 16),
-                          ),
-                        ],
-                      );
-                    },
-                  ),
+                  );
+                }
+
+                final row = _rows[index];
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Expanded(
+                      flex: 2,
+                      child: FSelect<String>(
+                        items: { for (var c in widget.columns) c.name : c.name },
+                        control: FSelectControl.lifted(
+                          value: row.column,
+                          onChange: (val) {
+                            if (val != null) setState(() => row.column = val);
+                          },
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      flex: 1,
+                      child: FSelect<String>(
+                        items: { for (var op in widget.operators) op : op },
+                        control: FSelectControl.lifted(
+                          value: row.operator,
+                          onChange: (val) {
+                            if (val != null) setState(() => row.operator = val);
+                          },
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      flex: 2,
+                      child: FTextField(
+                        control: FTextFieldControl.managed(
+                          controller: row.valueController,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    FButton.icon(
+                      variant: FButtonVariant.outline,
+                      onPress: () => _removeFilter(index),
+                      child: const Icon(Icons.delete_outline, size: 16),
+                    ),
+                  ],
+                );
+              },
+            ),
           ),
           Container(
             padding: const EdgeInsets.all(16),
@@ -1423,8 +1435,8 @@ class _FilterSheetState extends State<_FilterSheet> {
               children: [
                 FButton(
                   variant: FButtonVariant.outline,
-                  onPress: _addFilter,
-                  child: const Text('Add more'),
+                  onPress: () => widget.onApply(const []),
+                  child: const Text('Clear filter'),
                 ),
                 const Spacer(),
                 FButton(

@@ -1216,11 +1216,15 @@ class _TableActionBarState extends State<_TableActionBar> {
           const SizedBox(width: 8),
           FTooltip(
             tipBuilder: (context, controller) => const Text('Filters'),
-            child: FButton.icon(
-              variant: widget.session.filters.isNotEmpty ? FButtonVariant.primary : FButtonVariant.outline,
-              size: FButtonSizeVariant.sm,
-              onPress: () => _showFilterSheet(context),
-              child: const Icon(Icons.filter_list, size: 16),
+            child: Badge(
+              isLabelVisible: widget.session.filters.isNotEmpty,
+              label: Text(widget.session.filters.length.toString()),
+              child: FButton.icon(
+                variant: FButtonVariant.outline,
+                size: FButtonSizeVariant.sm,
+                onPress: () => _showFilterSheet(context),
+                child: const Icon(Icons.filter_list, size: 16),
+              ),
             ),
           ),
         ],

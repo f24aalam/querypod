@@ -11,7 +11,7 @@ import '../features/workspace/presentation/cubit/table_data_cubit.dart';
 import '../features/workspace/presentation/cubit/workspace_metadata_cubit.dart';
 import 'injection.dart';
 import 'router.dart';
-import 'theme.dart';
+
 import 'theme_cubit.dart';
 
 class App extends StatelessWidget {
@@ -30,23 +30,29 @@ class App extends StatelessWidget {
         BlocProvider(create: (_) => getIt<QueryEditorCubit>()),
         BlocProvider(create: (_) => getIt<TableDataCubit>()),
       ],
-      child: BlocBuilder<ThemeCubit, ThemeMode>(
-        builder: (context, mode) {
-          final foruiTheme = mode == ThemeMode.dark ? darkTheme : lightTheme;
+      child: BlocBuilder<ThemeCubit, ThemeState>(
+        builder: (context, state) {
+          final lightTheme = state.scheme.getTheme(Brightness.light);
+          final darkTheme = state.scheme.getTheme(Brightness.dark);
+          
           return MaterialApp.router(
             routerConfig: router,
             theme: lightTheme.toApproximateMaterialTheme(),
             darkTheme: darkTheme.toApproximateMaterialTheme(),
-            themeMode: mode,
+            themeMode: state.mode,
             debugShowCheckedModeBanner: false,
             supportedLocales: FLocalizations.supportedLocales,
             localizationsDelegates: const [
               ...FLocalizations.localizationsDelegates,
             ],
-            builder: (_, child) => FTheme(
-              data: foruiTheme,
-              child: FToaster(child: FTooltipGroup(child: child!)),
-            ),
+            builder: (context, child) {
+              final brightness = Theme.of(context).brightness;
+              final foruiTheme = state.scheme.getTheme(brightness);
+              return FTheme(
+                data: foruiTheme,
+                child: FToaster(child: FTooltipGroup(child: child!)),
+              );
+            },
           );
         },
       ),

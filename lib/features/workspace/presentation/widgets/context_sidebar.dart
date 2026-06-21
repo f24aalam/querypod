@@ -23,10 +23,6 @@ class ContextSidebar extends StatelessWidget {
           WorkbenchActivity.tables => const TableListPanel(),
           WorkbenchActivity.history => const _HistorySidebarPanel(),
           WorkbenchActivity.query => const _QuerySidebarPanel(),
-          WorkbenchActivity.settings => const _SidebarPlaceholder(
-            title: 'SETTINGS',
-            message: 'Settings coming soon',
-          ),
         };
       },
     );
@@ -286,40 +282,6 @@ class _QueryListItem extends StatelessWidget {
   }
 }
 
-class _SidebarPlaceholder extends StatelessWidget {
-  final String title;
-  final String message;
-
-  const _SidebarPlaceholder({required this.title, required this.message});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = context.theme;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: theme.colors.background,
-        border: Border(right: BorderSide(color: theme.colors.border, width: 1)),
-      ),
-      child: Column(
-        children: [
-          _SidebarHeader(title: title),
-          Expanded(
-            child: Center(
-              child: Text(
-                message,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: theme.colors.mutedForeground,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 class _SidebarHeader extends StatelessWidget {
   final String title;

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:forui/forui.dart';
 
+import '../../../settings/presentation/widgets/settings_dialog.dart';
 import '../cubit/activity_cubit.dart';
 
 class ActivityBar extends StatelessWidget {
@@ -70,8 +71,8 @@ class ActivityBar extends StatelessWidget {
             _ActivityIcon(
               icon: Icons.settings_outlined,
               tooltip: 'Settings',
-              isActive: activeActivity == WorkbenchActivity.settings,
-              onTap: () => _select(context, WorkbenchActivity.settings),
+              isActive: false,
+              onTap: () => showSettingsDialog(context),
             ),
           ],
         ),

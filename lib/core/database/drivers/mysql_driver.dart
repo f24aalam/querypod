@@ -14,6 +14,9 @@ import '../../../features/workspace/domain/entities/workspace_table.dart';
 import '../database_driver.dart';
 
 class MySQLDriver implements DatabaseDriver {
+  @override
+  List<String> get supportedOperators => ['=', '!=', '>', '<', '>=', '<=', 'LIKE', 'NOT LIKE'];
+
   String _asString(dynamic value) {
     if (value == null) return '';
     if (value is String) return value;
@@ -203,6 +206,7 @@ class MySQLDriver implements DatabaseDriver {
     String table, {
     required TableStructure structure,
     String? searchQuery,
+    List<TableFilter>? filters,
     void Function(QueryHistory)? onHistory,
   }) async {
     final conn = await _connect(connection, database: database);
@@ -212,13 +216,27 @@ class MySQLDriver implements DatabaseDriver {
           '${_quoteIdentifier(database)}.${_quoteIdentifier(table)}';
       
       final queryParams = <String, dynamic>{};
+      final whereClauses = <String>[];
+      
       if (searchQuery != null && searchQuery.isNotEmpty) {
-        final clauses = <String>[];
+        final searchClauses = <String>[];
         for (int i = 0; i < structure.columns.length; i++) {
-          clauses.add('${_quoteIdentifier(structure.columns[i].name)} LIKE :search$i');
+          searchClauses.add('${_quoteIdentifier(structure.columns[i].name)} LIKE :search$i');
           queryParams['search$i'] = '%$searchQuery%';
         }
-        sql += ' WHERE ${clauses.join(' OR ')}';
+        whereClauses.add('(${searchClauses.join(' OR ')})');
+      }
+      
+      if (filters != null && filters.isNotEmpty) {
+        for (int i = 0; i < filters.length; i++) {
+          final filter = filters[i];
+          whereClauses.add('${_quoteIdentifier(filter.column)} ${filter.operator} :filter$i');
+          queryParams['filter$i'] = filter.value;
+        }
+      }
+      
+      if (whereClauses.isNotEmpty) {
+        sql += ' WHERE ${whereClauses.join(' AND ')}';
       }
       final startMs = DateTime.now().millisecondsSinceEpoch;
       final result = await conn.execute(sql, queryParams);
@@ -253,6 +271,7 @@ class MySQLDriver implements DatabaseDriver {
     required int offset,
     required int limit,
     String? searchQuery,
+    List<TableFilter>? filters,
     void Function(QueryHistory)? onHistory,
   }) async {
     final conn = await _connect(connection, database: database);
@@ -261,13 +280,27 @@ class MySQLDriver implements DatabaseDriver {
       var sql = 'SELECT * FROM ${_quoteIdentifier(database)}.${_quoteIdentifier(table)}';
       
       final queryParams = <String, dynamic>{};
+      final whereClauses = <String>[];
+      
       if (searchQuery != null && searchQuery.isNotEmpty) {
-        final clauses = <String>[];
+        final searchClauses = <String>[];
         for (int i = 0; i < structure.columns.length; i++) {
-          clauses.add('${_quoteIdentifier(structure.columns[i].name)} LIKE :search$i');
+          searchClauses.add('${_quoteIdentifier(structure.columns[i].name)} LIKE :search$i');
           queryParams['search$i'] = '%$searchQuery%';
         }
-        sql += ' WHERE ${clauses.join(' OR ')}';
+        whereClauses.add('(${searchClauses.join(' OR ')})');
+      }
+      
+      if (filters != null && filters.isNotEmpty) {
+        for (int i = 0; i < filters.length; i++) {
+          final filter = filters[i];
+          whereClauses.add('${_quoteIdentifier(filter.column)} ${filter.operator} :filter$i');
+          queryParams['filter$i'] = filter.value;
+        }
+      }
+      
+      if (whereClauses.isNotEmpty) {
+        sql += ' WHERE ${whereClauses.join(' AND ')}';
       }
       
       sql += ' ORDER BY ${_quoteIdentifier(structure.orderColumn)} ASC '

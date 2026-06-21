@@ -1,4 +1,3 @@
-import 'package:path/path.dart' as p;
 import 'package:sqflite_common/sqlite_api.dart';
 
 import '../../domain/entities/workspace_query.dart';
@@ -9,6 +8,7 @@ class QueryRepositoryImpl implements QueryRepository {
 
   final Database _database;
 
+  // ignore: prefer_initializing_formals
   QueryRepositoryImpl({required Database database}) : _database = database;
 
   @override

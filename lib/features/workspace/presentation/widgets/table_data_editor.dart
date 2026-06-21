@@ -1213,8 +1213,247 @@ class _TableActionBarState extends State<_TableActionBar> {
               clearable: (value) => value.text.isNotEmpty,
             ),
           ),
+          const SizedBox(width: 8),
+          FTooltip(
+            tipBuilder: (context, controller) => const Text('Filters'),
+            child: FButton.icon(
+              variant: widget.session.filters.isNotEmpty ? FButtonVariant.primary : FButtonVariant.outline,
+              size: FButtonSizeVariant.sm,
+              onPress: () => _showFilterSheet(context),
+              child: const Icon(Icons.filter_list, size: 16),
+            ),
+          ),
         ],
       ),
     );
   }
+
+  void _showFilterSheet(BuildContext context) {
+    final cubit = context.read<TableDataCubit>();
+    final session = widget.session;
+    final operators = cubit.supportedOperators(widget.tableKey);
+    
+    showFSheet(
+      context: context,
+      side: FLayout.rtl,
+      builder: (sheetContext) => _FilterSheet(
+        columns: session.structure?.columns ?? [],
+        operators: operators,
+        initialFilters: session.filters,
+        onApply: (filters) {
+          Navigator.of(sheetContext).pop();
+          cubit.setFilters(widget.tableKey, filters);
+        },
+      ),
+    );
+  }
+}
+
+class _FilterSheet extends StatefulWidget {
+  final List<TableDataColumn> columns;
+  final List<String> operators;
+  final List<TableFilter> initialFilters;
+  final ValueChanged<List<TableFilter>> onApply;
+
+  const _FilterSheet({
+    required this.columns,
+    required this.operators,
+    required this.initialFilters,
+    required this.onApply,
+  });
+
+  @override
+  State<_FilterSheet> createState() => _FilterSheetState();
+}
+
+class _FilterSheetState extends State<_FilterSheet> {
+  late List<_FilterFormRow> _rows;
+
+  @override
+  void initState() {
+    super.initState();
+    _rows = widget.initialFilters.map((f) => _FilterFormRow(
+      column: f.column,
+      operator: f.operator,
+      valueController: TextEditingController(text: f.value),
+    )).toList();
+  }
+
+  @override
+  void dispose() {
+    for (var row in _rows) {
+      row.valueController.dispose();
+    }
+    super.dispose();
+  }
+
+  void _addFilter() {
+    setState(() {
+      _rows.add(_FilterFormRow(
+        column: widget.columns.isNotEmpty ? widget.columns.first.name : '',
+        operator: widget.operators.isNotEmpty ? widget.operators.first : '=',
+        valueController: TextEditingController(),
+      ));
+    });
+  }
+
+  void _removeFilter(int index) {
+    setState(() {
+      final removed = _rows.removeAt(index);
+      removed.valueController.dispose();
+    });
+  }
+
+  void _applyFilters() {
+    final filters = _rows.where((row) => row.column.isNotEmpty && row.operator.isNotEmpty).map((row) => TableFilter(
+      column: row.column,
+      operator: row.operator,
+      value: row.valueController.text,
+    )).toList();
+    widget.onApply(filters);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = context.theme;
+    return Container(
+      width: 400,
+      height: double.infinity,
+      decoration: BoxDecoration(
+        color: theme.colors.background,
+        border: Border(left: BorderSide(color: theme.colors.border, width: 1)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              border: Border(bottom: BorderSide(color: theme.colors.border, width: 1)),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Filters',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: theme.colors.foreground,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  padding: EdgeInsets.zero,
+                  splashRadius: 20,
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: Icon(Icons.close, size: 20, color: theme.colors.mutedForeground),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: _rows.isEmpty
+                ? Center(
+                    child: Text(
+                      'No filters applied.',
+                      style: TextStyle(color: theme.colors.mutedForeground),
+                    ),
+                  )
+                : ListView.separated(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: _rows.length,
+                    separatorBuilder: (context, index) => const SizedBox(height: 12),
+                    itemBuilder: (context, index) {
+                      final row = _rows[index];
+                      return Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Expanded(
+                            flex: 2,
+                            child: FSelect<String>(
+                              items: { for (var c in widget.columns) c.name : c.name },
+                              control: FSelectControl.lifted(
+                                value: row.column,
+                                onChange: (val) {
+                                  if (val != null) setState(() => row.column = val);
+                                },
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            flex: 1,
+                            child: FSelect<String>(
+                              items: { for (var op in widget.operators) op : op },
+                              control: FSelectControl.lifted(
+                                value: row.operator,
+                                onChange: (val) {
+                                  if (val != null) setState(() => row.operator = val);
+                                },
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            flex: 2,
+                            child: FTextField(
+                              control: FTextFieldControl.managed(
+                                controller: row.valueController,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          FButton.icon(
+                            variant: FButtonVariant.outline,
+                            onPress: () => _removeFilter(index),
+                            child: const Icon(Icons.delete_outline, size: 16),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+          ),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              border: Border(top: BorderSide(color: theme.colors.border, width: 1)),
+            ),
+            child: Row(
+              children: [
+                FButton(
+                  variant: FButtonVariant.outline,
+                  onPress: _addFilter,
+                  child: const Text('Add more'),
+                ),
+                const Spacer(),
+                FButton(
+                  variant: FButtonVariant.outline,
+                  onPress: () => Navigator.of(context).pop(),
+                  child: const Text('Cancel'),
+                ),
+                const SizedBox(width: 8),
+                FButton(
+                  onPress: _applyFilters,
+                  child: const Text('Filter'),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FilterFormRow {
+  String column;
+  String operator;
+  TextEditingController valueController;
+
+  _FilterFormRow({
+    required this.column,
+    required this.operator,
+    required this.valueController,
+  });
 }

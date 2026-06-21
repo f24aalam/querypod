@@ -2,6 +2,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:mysql_client_plus/exception.dart';
 
 import '../../../connections/domain/entities/connection.dart';
+import '../../../../core/database/database_driver_factory.dart';
 import '../../domain/entities/table_data.dart';
 import '../../domain/repositories/table_data_repository.dart';
 import 'editor_tabs_state.dart';
@@ -57,6 +58,38 @@ class TableDataCubit extends Cubit<TableDataState> {
       ),
     );
     await _loadInitial(key);
+  }
+
+  Future<void> setFilters(TableTabKey key, List<TableFilter> filters) async {
+    final session = state.session(key);
+    if (session == null) return;
+    
+    // Check if filters changed
+    if (session.filters.length == filters.length) {
+      bool changed = false;
+      for (int i = 0; i < filters.length; i++) {
+        if (session.filters[i] != filters[i]) {
+          changed = true;
+          break;
+        }
+      }
+      if (!changed) return;
+    }
+
+    _setSession(
+      _clearTransientState(
+        session.copyWith(filters: filters, pageIndex: 0),
+        clearError: false,
+      ),
+    );
+    await _loadInitial(key);
+  }
+
+  List<String> supportedOperators(TableTabKey key) {
+    final connection = _connections[key];
+    if (connection == null) return ['=', '!=', '>', '<', 'LIKE'];
+    final driver = DatabaseDriverFactory.getDriver(connection.type);
+    return driver.supportedOperators;
   }
 
   Future<void> refresh(TableTabKey key) async {
@@ -383,6 +416,7 @@ class TableDataCubit extends Cubit<TableDataState> {
         key.tableName,
         structure: structure,
         searchQuery: current.searchQuery,
+        filters: current.filters,
       );
       if (!_isCurrent(key, generation)) return;
 
@@ -398,6 +432,7 @@ class TableDataCubit extends Cubit<TableDataState> {
         offset: pageIndex * latest.pageSize,
         limit: latest.pageSize,
         searchQuery: current.searchQuery,
+        filters: current.filters,
       );
       if (!_isCurrent(key, generation)) return;
 
@@ -440,6 +475,7 @@ class TableDataCubit extends Cubit<TableDataState> {
         offset: pageIndex * current.pageSize,
         limit: current.pageSize,
         searchQuery: current.searchQuery,
+        filters: current.filters,
       );
       if (!_isCurrent(key, generation)) return;
 

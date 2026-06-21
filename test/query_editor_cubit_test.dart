@@ -217,8 +217,11 @@ class _MockTableDataRepository implements TableDataRepository {
   Future<int> countRows(
     Connection connection,
     String database,
-    String table,
-  ) async => 0;
+    String table, {
+    required TableStructure structure,
+    String? searchQuery,
+    List<TableFilter>? filters,
+  }) async => 0;
 
   @override
   Future<List<QueryResult>> executeQuery(
@@ -237,6 +240,8 @@ class _MockTableDataRepository implements TableDataRepository {
     required TableStructure structure,
     required int offset,
     required int limit,
+    String? searchQuery,
+    List<TableFilter>? filters,
   }) async => TableRowsPage(
     rows: [],
     queryDuration: Duration.zero,

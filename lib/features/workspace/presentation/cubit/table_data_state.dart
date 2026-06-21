@@ -20,6 +20,7 @@ class TableDataSession {
   final TableDataStatus status;
   final String? errorMessage;
   final String? searchQuery;
+  final List<TableFilter> filters;
   final int feedbackNonce;
 
   TableDataSession({
@@ -39,8 +40,10 @@ class TableDataSession {
     this.status = TableDataStatus.initialLoading,
     this.errorMessage,
     this.searchQuery,
+    List<TableFilter> filters = const [],
     this.feedbackNonce = 0,
   }) : rows = List.unmodifiable(rows),
+       filters = List.unmodifiable(filters),
        selectedRowIndexes = Set.unmodifiable(selectedRowIndexes),
        stagedCellEdits = Map.unmodifiable(stagedCellEdits),
        stagedDeletedRowIndexes = Set.unmodifiable(stagedDeletedRowIndexes);
@@ -79,6 +82,7 @@ class TableDataSession {
     TableDataStatus? status,
     String? Function()? errorMessage,
     String? Function()? searchQuery,
+    List<TableFilter>? filters,
     int? feedbackNonce,
   }) {
     return TableDataSession(
@@ -103,6 +107,7 @@ class TableDataSession {
       status: status ?? this.status,
       errorMessage: errorMessage != null ? errorMessage() : this.errorMessage,
       searchQuery: searchQuery != null ? searchQuery() : this.searchQuery,
+      filters: filters ?? this.filters,
       feedbackNonce: feedbackNonce ?? this.feedbackNonce,
     );
   }

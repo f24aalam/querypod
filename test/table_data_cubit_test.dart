@@ -331,8 +331,11 @@ class _FakeTableDataRepository implements TableDataRepository {
   Future<int> countRows(
     Connection connection,
     String database,
-    String table,
-  ) async {
+    String table, {
+    required TableStructure structure,
+    String? searchQuery,
+    List<TableFilter>? filters,
+  }) async {
     countCalls++;
     return total;
   }
@@ -345,6 +348,8 @@ class _FakeTableDataRepository implements TableDataRepository {
     required TableStructure structure,
     required int offset,
     required int limit,
+    String? searchQuery,
+    List<TableFilter>? filters,
   }) async {
     requests.add(_PageRequest(offset: offset, limit: limit));
     if (failNextPage) {
@@ -398,8 +403,11 @@ class _ControlledPageRepository implements TableDataRepository {
   Future<int> countRows(
     Connection connection,
     String database,
-    String table,
-  ) async => 120;
+    String table, {
+    required TableStructure structure,
+    String? searchQuery,
+    List<TableFilter>? filters,
+  }) async => 120;
 
   @override
   Future<TableRowsPage> fetchRows(
@@ -409,6 +417,8 @@ class _ControlledPageRepository implements TableDataRepository {
     required TableStructure structure,
     required int offset,
     required int limit,
+    String? searchQuery,
+    List<TableFilter>? filters,
   }) {
     final request = _PageRequest(offset: offset, limit: limit);
     return (requests[request] ??= Completer<TableRowsPage>()).future;

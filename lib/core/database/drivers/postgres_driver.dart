@@ -13,6 +13,9 @@ import '../../../features/workspace/domain/entities/workspace_table.dart';
 import '../database_driver.dart';
 
 class PostgresDriver implements DatabaseDriver {
+  @override
+  List<String> get supportedOperators => ['=', '!=', '>', '<', '>=', '<=', 'ILIKE', 'NOT ILIKE', 'LIKE', 'NOT LIKE'];
+
   String _asString(dynamic value) {
     if (value == null) return '';
     if (value is String) return value;
@@ -193,6 +196,7 @@ class PostgresDriver implements DatabaseDriver {
     String table, {
     required TableStructure structure,
     String? searchQuery,
+    List<TableFilter>? filters,
     void Function(QueryHistory)? onHistory,
   }) async {
     final conn = await _connect(connection, database: database);
@@ -200,11 +204,26 @@ class PostgresDriver implements DatabaseDriver {
       var sql = 'SELECT COUNT(*) AS total FROM ${_quoteIdentifier(table)}';
       
       final parameters = <String, dynamic>{};
+      final whereClauses = <String>[];
+      
       if (searchQuery != null && searchQuery.isNotEmpty) {
         final searchClauses = structure.columns.map((col) => 'CAST(${_quoteIdentifier(col.name)} AS TEXT) ILIKE @search').join(' OR ');
-        sql += ' WHERE $searchClauses';
+        whereClauses.add('($searchClauses)');
         parameters['search'] = '%$searchQuery%';
       }
+      
+      if (filters != null && filters.isNotEmpty) {
+        for (int i = 0; i < filters.length; i++) {
+          final filter = filters[i];
+          whereClauses.add('${_quoteIdentifier(filter.column)} ${filter.operator} @filter$i');
+          parameters['filter$i'] = filter.value;
+        }
+      }
+      
+      if (whereClauses.isNotEmpty) {
+        sql += ' WHERE ${whereClauses.join(' AND ')}';
+      }
+      
       final startMs = DateTime.now().millisecondsSinceEpoch;
       final result = await conn.execute(pg.Sql.named(sql), parameters: parameters);
       final execMs = DateTime.now().millisecondsSinceEpoch - startMs;
@@ -238,6 +257,7 @@ class PostgresDriver implements DatabaseDriver {
     required int offset,
     required int limit,
     String? searchQuery,
+    List<TableFilter>? filters,
     void Function(QueryHistory)? onHistory,
   }) async {
     final conn = await _connect(connection, database: database);
@@ -246,10 +266,24 @@ class PostgresDriver implements DatabaseDriver {
       var sql = 'SELECT * FROM ${_quoteIdentifier(table)}';
       
       final parameters = <String, dynamic>{};
+      final whereClauses = <String>[];
+      
       if (searchQuery != null && searchQuery.isNotEmpty) {
         final searchClauses = structure.columns.map((col) => 'CAST(${_quoteIdentifier(col.name)} AS TEXT) ILIKE @search').join(' OR ');
-        sql += ' WHERE $searchClauses';
+        whereClauses.add('($searchClauses)');
         parameters['search'] = '%$searchQuery%';
+      }
+      
+      if (filters != null && filters.isNotEmpty) {
+        for (int i = 0; i < filters.length; i++) {
+          final filter = filters[i];
+          whereClauses.add('${_quoteIdentifier(filter.column)} ${filter.operator} @filter$i');
+          parameters['filter$i'] = filter.value;
+        }
+      }
+      
+      if (whereClauses.isNotEmpty) {
+        sql += ' WHERE ${whereClauses.join(' AND ')}';
       }
       
       sql += ' ORDER BY ${_quoteIdentifier(structure.orderColumn)} ASC '

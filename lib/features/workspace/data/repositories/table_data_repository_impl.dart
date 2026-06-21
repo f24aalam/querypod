@@ -10,6 +10,7 @@ import '../../domain/repositories/table_data_repository.dart';
 class TableDataRepositoryImpl implements TableDataRepository {
   final QueryHistoryRepository _historyRepository;
 
+  // ignore: prefer_initializing_formals
   TableDataRepositoryImpl({required QueryHistoryRepository historyRepository})
     : _historyRepository = historyRepository;
 
@@ -35,6 +36,7 @@ class TableDataRepositoryImpl implements TableDataRepository {
     String table, {
     required TableStructure structure,
     String? searchQuery,
+    List<TableFilter>? filters,
   }) async {
     final driver = DatabaseDriverFactory.getDriver(connection.type);
     return await driver.countRows(
@@ -43,6 +45,7 @@ class TableDataRepositoryImpl implements TableDataRepository {
       table,
       structure: structure,
       searchQuery: searchQuery,
+      filters: filters,
       onHistory: _historyRepository.save,
     );
   }
@@ -56,6 +59,7 @@ class TableDataRepositoryImpl implements TableDataRepository {
     required int offset,
     required int limit,
     String? searchQuery,
+    List<TableFilter>? filters,
   }) async {
     final driver = DatabaseDriverFactory.getDriver(connection.type);
     return await driver.fetchRows(
@@ -66,6 +70,7 @@ class TableDataRepositoryImpl implements TableDataRepository {
       offset: offset,
       limit: limit,
       searchQuery: searchQuery,
+      filters: filters,
       onHistory: _historyRepository.save,
     );
   }

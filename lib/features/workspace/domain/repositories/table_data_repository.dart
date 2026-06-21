@@ -15,6 +15,7 @@ abstract class TableDataRepository {
     String table, {
     required TableStructure structure,
     String? searchQuery,
+    List<TableFilter>? filters,
   });
 
   Future<TableRowsPage> fetchRows(
@@ -25,6 +26,7 @@ abstract class TableDataRepository {
     required int offset,
     required int limit,
     String? searchQuery,
+    List<TableFilter>? filters,
   });
 
   Future<void> commitChanges(

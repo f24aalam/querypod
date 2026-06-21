@@ -134,3 +134,25 @@ class TableRowsPage {
   TableRowsPage({required List<TableDataRow> rows, required this.queryDuration})
     : rows = List.unmodifiable(rows);
 }
+
+class TableFilter {
+  final String column;
+  final String operator;
+  final String value;
+
+  const TableFilter({
+    required this.column,
+    required this.operator,
+    required this.value,
+  });
+
+  @override
+  bool operator ==(Object other) =>
+      other is TableFilter &&
+      column == other.column &&
+      operator == other.operator &&
+      value == other.value;
+
+  @override
+  int get hashCode => Object.hash(column, operator, value);
+}

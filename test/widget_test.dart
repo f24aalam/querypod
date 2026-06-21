@@ -344,8 +344,11 @@ class _WidgetTableRepository implements TableDataRepository {
   Future<int> countRows(
     Connection connection,
     String database,
-    String table,
-  ) async => 2;
+    String table, {
+    required TableStructure structure,
+    String? searchQuery,
+    List<TableFilter>? filters,
+  }) async => 2;
 
   @override
   Future<TableRowsPage> fetchRows(
@@ -355,6 +358,8 @@ class _WidgetTableRepository implements TableDataRepository {
     required TableStructure structure,
     required int offset,
     required int limit,
+    String? searchQuery,
+    List<TableFilter>? filters,
   }) async => TableRowsPage(
     rows: [
       TableDataRow(const [

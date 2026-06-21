@@ -13,6 +13,9 @@ import '../../../features/workspace/domain/entities/workspace_table.dart';
 import '../database_driver.dart';
 
 class SQLiteDriver implements DatabaseDriver {
+  @override
+  List<String> get supportedOperators => ['=', '!=', '>', '<', '>=', '<=', 'LIKE', 'NOT LIKE'];
+
   Future<Database> _connect(Connection connection) async {
     // For SQLite, the 'database' field stores the file path
     final path = connection.database;
@@ -139,16 +142,30 @@ class SQLiteDriver implements DatabaseDriver {
     String table, {
     required TableStructure structure,
     String? searchQuery,
+    List<TableFilter>? filters,
     void Function(QueryHistory)? onHistory,
   }) async {
     final db = await _connect(connection);
     try {
       var sql = 'SELECT COUNT(*) AS total FROM ${_quoteIdentifier(table)}';
       final queryParams = <Object?>[];
+      final whereClauses = <String>[];
+      
       if (searchQuery != null && searchQuery.isNotEmpty) {
         final searchClauses = structure.columns.map((col) => '${_quoteIdentifier(col.name)} LIKE ?').join(' OR ');
-        sql += ' WHERE $searchClauses';
+        whereClauses.add('($searchClauses)');
         queryParams.addAll(List.filled(structure.columns.length, '%$searchQuery%'));
+      }
+      
+      if (filters != null && filters.isNotEmpty) {
+        for (final filter in filters) {
+          whereClauses.add('${_quoteIdentifier(filter.column)} ${filter.operator} ?');
+          queryParams.add(filter.value);
+        }
+      }
+      
+      if (whereClauses.isNotEmpty) {
+        sql += ' WHERE ${whereClauses.join(' AND ')}';
       }
       final startMs = DateTime.now().millisecondsSinceEpoch;
       final result = await db.rawQuery(sql, queryParams);
@@ -183,6 +200,7 @@ class SQLiteDriver implements DatabaseDriver {
     required int offset,
     required int limit,
     String? searchQuery,
+    List<TableFilter>? filters,
     void Function(QueryHistory)? onHistory,
   }) async {
     final db = await _connect(connection);
@@ -191,10 +209,23 @@ class SQLiteDriver implements DatabaseDriver {
       var sql = 'SELECT * FROM ${_quoteIdentifier(table)}';
       
       final queryParams = <Object?>[];
+      final whereClauses = <String>[];
+      
       if (searchQuery != null && searchQuery.isNotEmpty) {
         final searchClauses = structure.columns.map((col) => '${_quoteIdentifier(col.name)} LIKE ?').join(' OR ');
-        sql += ' WHERE $searchClauses';
+        whereClauses.add('($searchClauses)');
         queryParams.addAll(List.filled(structure.columns.length, '%$searchQuery%'));
+      }
+      
+      if (filters != null && filters.isNotEmpty) {
+        for (final filter in filters) {
+          whereClauses.add('${_quoteIdentifier(filter.column)} ${filter.operator} ?');
+          queryParams.add(filter.value);
+        }
+      }
+      
+      if (whereClauses.isNotEmpty) {
+        sql += ' WHERE ${whereClauses.join(' AND ')}';
       }
       
       sql += ' ORDER BY ${_quoteIdentifier(structure.orderColumn)} ASC '

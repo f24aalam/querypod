@@ -6,6 +6,8 @@ import '../../../features/workspace/domain/entities/workspace_database.dart';
 import '../../../features/workspace/domain/entities/workspace_table.dart';
 
 abstract class DatabaseDriver {
+  List<String> get supportedOperators;
+
   Future<void> testConnection(Connection connection);
 
   Future<List<WorkspaceDatabase>> listDatabases(Connection connection);
@@ -28,6 +30,7 @@ abstract class DatabaseDriver {
     String table, {
     required TableStructure structure,
     String? searchQuery,
+    List<TableFilter>? filters,
     void Function(QueryHistory)? onHistory,
   });
 
@@ -39,6 +42,7 @@ abstract class DatabaseDriver {
     required int offset,
     required int limit,
     String? searchQuery,
+    List<TableFilter>? filters,
     void Function(QueryHistory)? onHistory,
   });
 

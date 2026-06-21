@@ -251,10 +251,7 @@ class _GridRow extends StatelessWidget {
       child: Row(
         children: [
           for (var index = 0; index < row.cells.length; index++)
-            _GridCell(
-              value: row.cells[index],
-              width: widths[index],
-            ),
+            _GridCell(value: row.cells[index], width: widths[index]),
         ],
       ),
     );

@@ -35,8 +35,9 @@ class _WorkspacePageState extends State<WorkspacePage> {
   @override
   void initState() {
     super.initState();
-    _queryEditorEffectsSub =
-        context.read<QueryEditorCubit>().effects.listen((effect) {
+    _queryEditorEffectsSub = context.read<QueryEditorCubit>().effects.listen((
+      effect,
+    ) {
       if (!mounted) return;
       if (effect is QueryExecutionError) {
         showFToast(

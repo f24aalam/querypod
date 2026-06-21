@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:querypod/app/database.dart';
 import 'package:querypod/features/workspace/data/repositories/query_repository_impl.dart';
 import 'package:querypod/features/workspace/domain/entities/workspace_query.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -18,9 +19,8 @@ void main() {
       final originalPath = await factory.getDatabasesPath();
       await factory.setDatabasesPath(tempDir.path);
 
-      final repository = await QueryRepositoryImpl.open(
-        databaseFactory: factory,
-      );
+      final database = await openAppDatabase(databaseFactory: factory);
+      final repository = QueryRepositoryImpl(database: database);
 
       final first = _query(id: 'q1', connectionId: 'conn-1', title: 'demo');
       final second = _query(id: 'q2', connectionId: 'conn-2', title: 'other');

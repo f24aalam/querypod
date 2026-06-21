@@ -9,6 +9,8 @@ import '../../domain/entities/workspace_query.dart';
 import '../../domain/repositories/query_repository.dart';
 import '../../domain/repositories/table_data_repository.dart';
 import '../../../connections/domain/repositories/connection_repository.dart';
+import '../../domain/entities/query_history.dart';
+import '../../domain/repositories/query_history_repository.dart';
 import 'query_editor_effects.dart';
 import 'query_editor_state.dart';
 
@@ -18,6 +20,7 @@ class QueryEditorCubit extends Cubit<QueryEditorState> {
       '-- Write your query here\nSELECT *\nFROM users\nLIMIT 100;';
 
   final QueryRepository _repository;
+  final QueryHistoryRepository _historyRepository;
   final ConnectionRepository _connectionRepository;
   final TableDataRepository _tableDataRepository;
   final _uuid = const Uuid();
@@ -29,12 +32,14 @@ class QueryEditorCubit extends Cubit<QueryEditorState> {
 
   QueryEditorCubit({
     required QueryRepository repository,
+    required QueryHistoryRepository historyRepository,
     required ConnectionRepository connectionRepository,
     required TableDataRepository tableDataRepository,
-  })  : _repository = repository,
-        _connectionRepository = connectionRepository,
-        _tableDataRepository = tableDataRepository,
-        super(QueryEditorState());
+  }) : _repository = repository,
+       _historyRepository = historyRepository,
+       _connectionRepository = connectionRepository,
+       _tableDataRepository = tableDataRepository,
+       super(QueryEditorState());
 
   Stream<QueryEditorEffect> get effects => _effects.stream;
 
@@ -55,7 +60,9 @@ class QueryEditorCubit extends Cubit<QueryEditorState> {
       // Ignore if database is unavailable.
     }
 
-    final queries = savedQueries.map(_documentFromEntity).toList(growable: false);
+    final queries = savedQueries
+        .map(_documentFromEntity)
+        .toList(growable: false);
     for (final query in queries) {
       _attachAutosave(query);
     }
@@ -190,16 +197,41 @@ class QueryEditorCubit extends Cubit<QueryEditorState> {
     }
 
     final databaseToUse = query.database ?? connection.database;
+    final startMs = DateTime.now().millisecondsSinceEpoch;
     final results = await _tableDataRepository.executeQuery(
       connection,
       databaseToUse,
       sql,
     );
+    final executionTimeMs = DateTime.now().millisecondsSinceEpoch - startMs;
+
+    String status = 'success';
+    String? errorMessage;
 
     for (final result in results) {
       if (result.errorMessage != null) {
+        status = 'error';
+        errorMessage = result.errorMessage;
         _effects.add(QueryExecutionError(errorMessage: result.errorMessage!));
       }
+    }
+
+    try {
+      await _historyRepository.save(
+        QueryHistory(
+          id: const Uuid().v4(),
+          connectionId: connectionId,
+          sourceType: 'query',
+          sourceId: queryId,
+          sql: sql,
+          executionTimeMs: executionTimeMs,
+          status: status,
+          errorMessage: errorMessage,
+          createdAt: DateTime.now(),
+        ),
+      );
+    } catch (e) {
+      // Ignored
     }
 
     final updatedQuery = state.queryById(queryId);

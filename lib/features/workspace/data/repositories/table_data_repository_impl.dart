@@ -3,12 +3,20 @@ import 'dart:typed_data';
 
 import 'package:mysql_client_plus/mysql_client_plus.dart';
 
+import 'package:uuid/uuid.dart';
+
 import '../../../connections/domain/entities/connection.dart';
+import '../../domain/entities/query_history.dart';
 import '../../domain/entities/query_result.dart';
 import '../../domain/entities/table_data.dart';
+import '../../domain/repositories/query_history_repository.dart';
 import '../../domain/repositories/table_data_repository.dart';
 
 class TableDataRepositoryImpl implements TableDataRepository {
+  final QueryHistoryRepository _historyRepository;
+
+  TableDataRepositoryImpl({required QueryHistoryRepository historyRepository})
+    : _historyRepository = historyRepository;
   Future<MySQLConnection> _connect(
     Connection connection,
     String database,
@@ -35,9 +43,25 @@ class TableDataRepositoryImpl implements TableDataRepository {
     try {
       final quotedDatabase = _quoteIdentifier(database);
       final quotedTable = _quoteIdentifier(table);
-      final schema = await conn.execute(
-        'SHOW COLUMNS FROM $quotedDatabase.$quotedTable',
-      );
+      final sql = 'SHOW COLUMNS FROM $quotedDatabase.$quotedTable';
+      final startMs = DateTime.now().millisecondsSinceEpoch;
+      final schema = await conn.execute(sql);
+      final execMs = DateTime.now().millisecondsSinceEpoch - startMs;
+
+      try {
+        await _historyRepository.save(
+          QueryHistory(
+            id: const Uuid().v4(),
+            connectionId: connection.id,
+            sourceType: 'table',
+            sourceId: table,
+            sql: sql,
+            executionTimeMs: execMs,
+            status: 'success',
+            createdAt: DateTime.now(),
+          ),
+        );
+      } catch (_) {}
       final primaryKeys = <String>{};
       final types = <String, String>{};
 
@@ -49,9 +73,26 @@ class TableDataRepositoryImpl implements TableDataRepository {
         }
       }
 
-      final sample = await conn.execute(
-        'SELECT * FROM $quotedDatabase.$quotedTable LIMIT 0',
-      );
+      final sampleSql = 'SELECT * FROM $quotedDatabase.$quotedTable LIMIT 0';
+      final startSampleMs = DateTime.now().millisecondsSinceEpoch;
+      final sample = await conn.execute(sampleSql);
+      final execSampleMs =
+          DateTime.now().millisecondsSinceEpoch - startSampleMs;
+
+      try {
+        await _historyRepository.save(
+          QueryHistory(
+            id: const Uuid().v4(),
+            connectionId: connection.id,
+            sourceType: 'table',
+            sourceId: table,
+            sql: sampleSql,
+            executionTimeMs: execSampleMs,
+            status: 'success',
+            createdAt: DateTime.now(),
+          ),
+        );
+      } catch (_) {}
       final columns = sample.cols
           .map(
             (column) => TableDataColumn(
@@ -86,10 +127,27 @@ class TableDataRepositoryImpl implements TableDataRepository {
   ) async {
     final conn = await _connect(connection, database);
     try {
-      final result = await conn.execute(
-        'SELECT COUNT(*) AS total FROM '
-        '${_quoteIdentifier(database)}.${_quoteIdentifier(table)}',
-      );
+      final sql =
+          'SELECT COUNT(*) AS total FROM '
+          '${_quoteIdentifier(database)}.${_quoteIdentifier(table)}';
+      final startMs = DateTime.now().millisecondsSinceEpoch;
+      final result = await conn.execute(sql);
+      final execMs = DateTime.now().millisecondsSinceEpoch - startMs;
+
+      try {
+        await _historyRepository.save(
+          QueryHistory(
+            id: const Uuid().v4(),
+            connectionId: connection.id,
+            sourceType: 'table',
+            sourceId: table,
+            sql: sql,
+            executionTimeMs: execMs,
+            status: 'success',
+            createdAt: DateTime.now(),
+          ),
+        );
+      } catch (_) {}
       final value = result.rows.first.colByName('total');
       return int.tryParse(_asString(value)) ?? 0;
     } finally {
@@ -109,11 +167,28 @@ class TableDataRepositoryImpl implements TableDataRepository {
     final conn = await _connect(connection, database);
     final stopwatch = Stopwatch()..start();
     try {
-      final result = await conn.execute(
-        'SELECT * FROM ${_quoteIdentifier(database)}.${_quoteIdentifier(table)} '
-        'ORDER BY ${_quoteIdentifier(structure.orderColumn)} ASC '
-        'LIMIT $limit OFFSET $offset',
-      );
+      final sql =
+          'SELECT * FROM ${_quoteIdentifier(database)}.${_quoteIdentifier(table)} '
+          'ORDER BY ${_quoteIdentifier(structure.orderColumn)} ASC '
+          'LIMIT $limit OFFSET $offset';
+      final startMs = DateTime.now().millisecondsSinceEpoch;
+      final result = await conn.execute(sql);
+      final execMs = DateTime.now().millisecondsSinceEpoch - startMs;
+
+      try {
+        await _historyRepository.save(
+          QueryHistory(
+            id: const Uuid().v4(),
+            connectionId: connection.id,
+            sourceType: 'table',
+            sourceId: table,
+            sql: sql,
+            executionTimeMs: execMs,
+            status: 'success',
+            createdAt: DateTime.now(),
+          ),
+        );
+      } catch (_) {}
       final rows = result.rows
           .map(
             (row) => TableDataRow([
@@ -152,6 +227,7 @@ class TableDataRepositoryImpl implements TableDataRepository {
       await conn.transactional((txn) async {
         for (final change in cellChanges) {
           await _executeUpdate(
+            connection.id,
             txn,
             database,
             table,
@@ -162,6 +238,7 @@ class TableDataRepositoryImpl implements TableDataRepository {
         }
         for (final row in deletedRows) {
           await _executeDelete(
+            connection.id,
             txn,
             database,
             table,
@@ -177,6 +254,7 @@ class TableDataRepositoryImpl implements TableDataRepository {
   }
 
   Future<void> _executeUpdate(
+    String connectionId,
     MySQLConnection conn,
     String database,
     String table,
@@ -186,25 +264,43 @@ class TableDataRepositoryImpl implements TableDataRepository {
   ) async {
     final column = structure.columns[change.columnIndex];
     final where = _primaryKeyWhere(structure, primaryKeyIndexes);
-    final statement = await conn.prepare(
-      'UPDATE ${_quoteIdentifier(database)}.${_quoteIdentifier(table)} '
-      'SET ${_quoteIdentifier(column.name)} = ? WHERE $where LIMIT 1',
-    );
+    final sql =
+        'UPDATE ${_quoteIdentifier(database)}.${_quoteIdentifier(table)} '
+        'SET ${_quoteIdentifier(column.name)} = ? WHERE $where LIMIT 1';
+    final statement = await conn.prepare(sql);
     try {
       final updatedValue =
           change.row.cells[change.columnIndex].kind == TableCellKind.binary
           ? _decodeHex(change.value)
           : change.value;
+      final startMs = DateTime.now().millisecondsSinceEpoch;
       await statement.execute([
         updatedValue,
         for (final index in primaryKeyIndexes) change.row.cells[index].rawValue,
       ]);
+      final execMs = DateTime.now().millisecondsSinceEpoch - startMs;
+
+      try {
+        await _historyRepository.save(
+          QueryHistory(
+            id: const Uuid().v4(),
+            connectionId: connectionId,
+            sourceType: 'table',
+            sourceId: table,
+            sql: sql,
+            executionTimeMs: execMs,
+            status: 'success',
+            createdAt: DateTime.now(),
+          ),
+        );
+      } catch (_) {}
     } finally {
       await statement.deallocate();
     }
   }
 
   Future<void> _executeDelete(
+    String connectionId,
     MySQLConnection conn,
     String database,
     String table,
@@ -213,14 +309,31 @@ class TableDataRepositoryImpl implements TableDataRepository {
     TableDataRow row,
   ) async {
     final where = _primaryKeyWhere(structure, primaryKeyIndexes);
-    final statement = await conn.prepare(
-      'DELETE FROM ${_quoteIdentifier(database)}.${_quoteIdentifier(table)} '
-      'WHERE $where LIMIT 1',
-    );
+    final sql =
+        'DELETE FROM ${_quoteIdentifier(database)}.${_quoteIdentifier(table)} '
+        'WHERE $where LIMIT 1';
+    final statement = await conn.prepare(sql);
     try {
+      final startMs = DateTime.now().millisecondsSinceEpoch;
       await statement.execute([
         for (final index in primaryKeyIndexes) row.cells[index].rawValue,
       ]);
+      final execMs = DateTime.now().millisecondsSinceEpoch - startMs;
+
+      try {
+        await _historyRepository.save(
+          QueryHistory(
+            id: const Uuid().v4(),
+            connectionId: connectionId,
+            sourceType: 'table',
+            sourceId: table,
+            sql: sql,
+            executionTimeMs: execMs,
+            status: 'success',
+            createdAt: DateTime.now(),
+          ),
+        );
+      } catch (_) {}
     } finally {
       await statement.deallocate();
     }
@@ -321,7 +434,9 @@ class TableDataRepositoryImpl implements TableDataRepository {
 
           final structure = columns.isNotEmpty
               ? TableStructure(
-                  columns: columns, orderColumn: columns.first.name)
+                  columns: columns,
+                  orderColumn: columns.first.name,
+                )
               : null;
 
           final rows = resultSet.rows
@@ -333,30 +448,29 @@ class TableDataRepositoryImpl implements TableDataRepository {
               )
               .toList();
 
-          results.add(QueryResult(
-            structure: structure,
-            rows: rows,
-            queryDuration: stmtWatch.elapsed,
-          ));
+          results.add(
+            QueryResult(
+              structure: structure,
+              rows: rows,
+              queryDuration: stmtWatch.elapsed,
+            ),
+          );
         } catch (e) {
           stmtWatch.stop();
-          results.add(QueryResult(
-            queryDuration: stmtWatch.elapsed,
-            errorMessage: e.toString(),
-            rows: const [],
-          ));
+          results.add(
+            QueryResult(
+              queryDuration: stmtWatch.elapsed,
+              errorMessage: e.toString(),
+              rows: const [],
+            ),
+          );
         }
       }
 
       return results;
     } catch (e) {
       // Connection-level failure (e.g. bad credentials).
-      return [
-        QueryResult(
-          errorMessage: e.toString(),
-          rows: const [],
-        )
-      ];
+      return [QueryResult(errorMessage: e.toString(), rows: const [])];
     } finally {
       await conn?.close();
     }

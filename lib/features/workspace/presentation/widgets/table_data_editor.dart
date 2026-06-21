@@ -623,9 +623,9 @@ class _GridRow extends StatelessWidget {
                   ? () {
                       controller.hide();
                       context.read<TableDataCubit>().stageDeleteForRow(
-                            tableKey,
-                            rowIndex,
-                          );
+                        tableKey,
+                        rowIndex,
+                      );
                     }
                   : null,
             ),

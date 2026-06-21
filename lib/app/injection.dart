@@ -3,12 +3,15 @@ import 'package:get_it/get_it.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite_common/sqlite_api.dart';
 
+import '../app/database.dart';
 import '../features/connections/data/repositories/connection_repository_impl.dart';
 import '../features/connections/domain/repositories/connection_repository.dart';
 import '../features/connections/presentation/cubit/connection_cubit.dart';
+import '../features/workspace/data/repositories/query_history_repository_impl.dart';
 import '../features/workspace/data/repositories/query_repository_impl.dart';
 import '../features/workspace/data/repositories/workspace_metadata_repository_impl.dart';
 import '../features/workspace/data/repositories/table_data_repository_impl.dart';
+import '../features/workspace/domain/repositories/query_history_repository.dart';
 import '../features/workspace/domain/repositories/query_repository.dart';
 import '../features/workspace/domain/repositories/table_data_repository.dart';
 import '../features/workspace/domain/repositories/workspace_metadata_repository.dart';
@@ -23,19 +26,22 @@ Future<void> configureDependencies({
 }) async {
   final prefs = await SharedPreferences.getInstance();
   const secureStorage = FlutterSecureStorage();
-  final queryRepository = await QueryRepositoryImpl.open(
-    databaseFactory: databaseFactory,
-  );
+  final database = await openAppDatabase(databaseFactory: databaseFactory);
 
   getIt.registerLazySingleton<ConnectionRepository>(
     () => ConnectionRepositoryImpl(secureStorage: secureStorage, prefs: prefs),
   );
-  getIt.registerLazySingleton<QueryRepository>(() => queryRepository);
+  getIt.registerLazySingleton<QueryRepository>(
+    () => QueryRepositoryImpl(database: database),
+  );
+  getIt.registerLazySingleton<QueryHistoryRepository>(
+    () => QueryHistoryRepositoryImpl(database: database),
+  );
   getIt.registerLazySingleton<WorkspaceMetadataRepository>(
     () => WorkspaceMetadataRepositoryImpl(),
   );
   getIt.registerLazySingleton<TableDataRepository>(
-    () => TableDataRepositoryImpl(),
+    () => TableDataRepositoryImpl(historyRepository: getIt()),
   );
   getIt.registerFactory(
     () => ConnectionCubit(repository: getIt(), queryRepository: getIt()),
@@ -43,6 +49,7 @@ Future<void> configureDependencies({
   getIt.registerFactory(
     () => QueryEditorCubit(
       repository: getIt(),
+      historyRepository: getIt(),
       connectionRepository: getIt(),
       tableDataRepository: getIt(),
     ),

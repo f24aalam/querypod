@@ -48,7 +48,9 @@ class QueryCodeEditor extends StatelessWidget {
                     fontSize: 14,
                     height: 1.55,
                     fontFamily: 'monospace',
-                    color: isDark ? const Color(0xFFF8F8F2) : theme.colors.foreground,
+                    color: isDark
+                        ? const Color(0xFFF8F8F2)
+                        : theme.colors.foreground,
                   ),
                   background: theme.colors.background,
                   gutterStyle: GutterStyle(

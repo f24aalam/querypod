@@ -16,6 +16,7 @@ class ConnectionEditorTabKey extends EditorTabKey {
   int get hashCode => 0x434f4e4e;
 }
 
+
 class TableTabKey extends EditorTabKey {
   final String connectionId;
   final String database;

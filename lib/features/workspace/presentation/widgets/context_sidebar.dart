@@ -8,6 +8,7 @@ import '../cubit/editor_tabs_cubit.dart';
 import '../cubit/editor_tabs_state.dart';
 import '../cubit/query_editor_cubit.dart';
 import '../cubit/query_editor_state.dart';
+import 'history_list_panel.dart';
 import 'table_list_panel.dart';
 
 class ContextSidebar extends StatelessWidget {
@@ -20,10 +21,7 @@ class ContextSidebar extends StatelessWidget {
         return switch (activity) {
           WorkbenchActivity.connections => const ConnectionListPanel(),
           WorkbenchActivity.tables => const TableListPanel(),
-          WorkbenchActivity.history => const _SidebarPlaceholder(
-            title: 'HISTORY',
-            message: 'Query history coming soon',
-          ),
+          WorkbenchActivity.history => const _HistorySidebarPanel(),
           WorkbenchActivity.query => const _QuerySidebarPanel(),
           WorkbenchActivity.settings => const _SidebarPlaceholder(
             title: 'SETTINGS',
@@ -93,6 +91,30 @@ class _QuerySidebarPanel extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _HistorySidebarPanel extends StatelessWidget {
+  const _HistorySidebarPanel();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = context.theme;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: theme.colors.background,
+        border: Border(right: BorderSide(color: theme.colors.border, width: 1)),
+      ),
+      child: const Column(
+        children: [
+          _SidebarHeader(title: 'HISTORY'),
+          Expanded(
+            child: HistoryListPanel(),
+          ),
+        ],
       ),
     );
   }
@@ -195,9 +217,7 @@ class _QueryListItem extends StatelessWidget {
             variant: FButtonVariant.destructive,
             onPress: () async {
               Navigator.of(context).pop();
-              await context.read<QueryEditorCubit>().deleteQuery(
-                query.id,
-              );
+              await context.read<QueryEditorCubit>().deleteQuery(query.id);
               if (!context.mounted) return;
               context.read<EditorTabsCubit>().closeQueryTab(query.id);
             },
@@ -241,9 +261,10 @@ class _QueryListItem extends StatelessWidget {
                     ? null
                     : () async {
                         Navigator.of(dialogContext).pop();
-                        await context
-                            .read<QueryEditorCubit>()
-                            .renameQuery(query.id, trimmed);
+                        await context.read<QueryEditorCubit>().renameQuery(
+                          query.id,
+                          trimmed,
+                        );
                         if (!context.mounted) return;
                         context.read<EditorTabsCubit>().renameQueryTab(
                           queryId: query.id,

@@ -6,6 +6,8 @@ import 'package:querypod/features/connections/domain/repositories/connection_rep
 import 'package:querypod/features/workspace/domain/entities/query_result.dart';
 import 'package:querypod/features/workspace/domain/entities/table_data.dart';
 import 'package:querypod/features/workspace/domain/repositories/table_data_repository.dart';
+import 'package:querypod/features/workspace/domain/entities/query_history.dart';
+import 'package:querypod/features/workspace/domain/repositories/query_history_repository.dart';
 import 'package:querypod/features/workspace/presentation/cubit/query_editor_cubit.dart';
 
 void main() {
@@ -18,10 +20,12 @@ void main() {
           _query(id: 'q2', connectionId: 'conn-2', title: 'other'),
         ],
       );
+      final historyRepository = _MockHistoryRepository();
       final connectionRepository = _MockConnectionRepository();
       final tableDataRepository = _MockTableDataRepository();
       final cubit = QueryEditorCubit(
         repository: repository,
+        historyRepository: historyRepository,
         connectionRepository: connectionRepository,
         tableDataRepository: tableDataRepository,
       );
@@ -39,10 +43,12 @@ void main() {
     'createQuery persists a new demo query for the active connection',
     () async {
       final repository = _InMemoryQueryRepository();
+      final historyRepository = _MockHistoryRepository();
       final connectionRepository = _MockConnectionRepository();
       final tableDataRepository = _MockTableDataRepository();
       final cubit = QueryEditorCubit(
         repository: repository,
+        historyRepository: historyRepository,
         connectionRepository: connectionRepository,
         tableDataRepository: tableDataRepository,
       );
@@ -61,10 +67,12 @@ void main() {
   test('renameQuery persists the new title', () async {
     final existing = _query(id: 'q1', connectionId: 'conn-1', title: 'demo');
     final repository = _InMemoryQueryRepository(seeded: [existing]);
+    final historyRepository = _MockHistoryRepository();
     final connectionRepository = _MockConnectionRepository();
     final tableDataRepository = _MockTableDataRepository();
     final cubit = QueryEditorCubit(
       repository: repository,
+      historyRepository: historyRepository,
       connectionRepository: connectionRepository,
       tableDataRepository: tableDataRepository,
     );
@@ -81,10 +89,12 @@ void main() {
     final repository = _InMemoryQueryRepository(
       seeded: [_query(id: 'q1', connectionId: 'conn-1', title: 'demo')],
     );
+    final historyRepository = _MockHistoryRepository();
     final connectionRepository = _MockConnectionRepository();
     final tableDataRepository = _MockTableDataRepository();
     final cubit = QueryEditorCubit(
       repository: repository,
+      historyRepository: historyRepository,
       connectionRepository: connectionRepository,
       tableDataRepository: tableDataRepository,
     );
@@ -101,10 +111,12 @@ void main() {
     final repository = _InMemoryQueryRepository(
       seeded: [_query(id: 'q1', connectionId: 'conn-1', title: 'demo')],
     );
+    final historyRepository = _MockHistoryRepository();
     final connectionRepository = _MockConnectionRepository();
     final tableDataRepository = _MockTableDataRepository();
     final cubit = QueryEditorCubit(
       repository: repository,
+      historyRepository: historyRepository,
       connectionRepository: connectionRepository,
       tableDataRepository: tableDataRepository,
     );
@@ -236,4 +248,15 @@ class _MockTableDataRepository implements TableDataRepository {
     String database,
     String table,
   ) async => TableStructure(columns: [], orderColumn: '');
+}
+
+class _MockHistoryRepository implements QueryHistoryRepository {
+  @override
+  Future<void> clearHistory(String connectionId) async {}
+
+  @override
+  Future<List<QueryHistory>> getAllForConnection(String connectionId) async => [];
+
+  @override
+  Future<QueryHistory> save(QueryHistory history) async => history;
 }

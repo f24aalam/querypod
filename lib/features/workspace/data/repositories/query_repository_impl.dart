@@ -5,48 +5,11 @@ import '../../domain/entities/workspace_query.dart';
 import '../../domain/repositories/query_repository.dart';
 
 class QueryRepositoryImpl implements QueryRepository {
-  static const databaseName = 'querypod.db';
   static const tableName = 'queries';
 
   final Database _database;
 
-  QueryRepositoryImpl._(this._database);
-
-  static Future<QueryRepositoryImpl> open({
-    required DatabaseFactory databaseFactory,
-  }) async {
-    final databasesPath = await databaseFactory.getDatabasesPath();
-    final database = await databaseFactory.openDatabase(
-      p.join(databasesPath, databaseName),
-      options: OpenDatabaseOptions(
-        version: 2,
-        onCreate: (db, version) async {
-          await db.execute('''
-            CREATE TABLE $tableName (
-              id TEXT PRIMARY KEY,
-              connection_id TEXT NOT NULL,
-              title TEXT NOT NULL,
-              sql TEXT NOT NULL,
-              database TEXT,
-              created_at INTEGER NOT NULL,
-              updated_at INTEGER NOT NULL
-            )
-          ''');
-          await db.execute(
-            'CREATE INDEX idx_queries_connection_id ON $tableName(connection_id)',
-          );
-        },
-        onUpgrade: (db, oldVersion, newVersion) async {
-          if (oldVersion < 2) {
-            await db.execute(
-              'ALTER TABLE $tableName ADD COLUMN database TEXT',
-            );
-          }
-        },
-      ),
-    );
-    return QueryRepositoryImpl._(database);
-  }
+  QueryRepositoryImpl({required Database database}) : _database = database;
 
   @override
   Future<List<WorkspaceQuery>> getAllForConnection(String connectionId) async {

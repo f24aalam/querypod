@@ -818,6 +818,14 @@ class _HeaderRow extends StatelessWidget {
                     ),
                     const SizedBox(width: 5),
                   ],
+                  if (columns[index].foreignKey != null) ...[
+                    Icon(
+                      Icons.link,
+                      size: 12,
+                      color: theme.colors.mutedForeground,
+                    ),
+                    const SizedBox(width: 5),
+                  ],
                   Expanded(
                     child: Text(
                       columns[index].name,

@@ -7,6 +7,7 @@ class QueryDocument {
   final String id;
   final String connectionId;
   final String title;
+  final String? database;
   final CodeController controller;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -17,6 +18,7 @@ class QueryDocument {
     required this.id,
     required this.connectionId,
     required this.title,
+    this.database,
     required this.controller,
     required this.createdAt,
     required this.updatedAt,
@@ -27,6 +29,7 @@ class QueryDocument {
   QueryDocument copyWith({
     String? title,
     String? connectionId,
+    String? Function()? database,
     DateTime? updatedAt,
     CodeController? controller,
     bool? isRunning,
@@ -36,6 +39,7 @@ class QueryDocument {
       id: id,
       connectionId: connectionId ?? this.connectionId,
       title: title ?? this.title,
+      database: database != null ? database() : this.database,
       controller: controller ?? this.controller,
       createdAt: createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -49,6 +53,7 @@ class QueryDocument {
     required String connectionId,
     required String title,
     required String sql,
+    String? database,
     required DateTime createdAt,
     required DateTime updatedAt,
   }) {
@@ -56,6 +61,7 @@ class QueryDocument {
       id: id,
       connectionId: connectionId,
       title: title,
+      database: database,
       controller: CodeController(text: sql, language: highlight.sql),
       createdAt: createdAt,
       updatedAt: updatedAt,
@@ -66,6 +72,7 @@ class QueryDocument {
     required String id,
     required String connectionId,
     required String title,
+    String? database,
     String initialText =
         '-- Write your query here\nSELECT *\nFROM users\nLIMIT 100;',
   }) {
@@ -74,6 +81,7 @@ class QueryDocument {
       id: id,
       connectionId: connectionId,
       title: title,
+      database: database,
       controller: CodeController(text: initialText, language: highlight.sql),
       createdAt: now,
       updatedAt: now,
@@ -118,8 +126,11 @@ bool _listEquals(List<QueryDocument> a, List<QueryDocument> b) {
     final right = b[i];
     if (left.id != right.id ||
         left.title != right.title ||
+        left.database != right.database ||
         left.isRunning != right.isRunning ||
-        !identical(left.results, right.results)) return false;
+        !identical(left.results, right.results)) {
+      return false;
+    }
   }
   return true;
 }

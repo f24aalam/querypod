@@ -209,11 +209,13 @@ class _MockTableDataRepository implements TableDataRepository {
   ) async => 0;
 
   @override
-  Future<QueryResult> executeQuery(
+  Future<List<QueryResult>> executeQuery(
     Connection connection,
     String database,
-    String sql,
-  ) async => const QueryResult();
+    String query,
+  ) async {
+    return [const QueryResult()];
+  }
 
   @override
   Future<TableRowsPage> fetchRows(

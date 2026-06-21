@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:forui/forui.dart';
 
+import '../../../connections/presentation/cubit/connection_cubit.dart';
 import '../../../connections/presentation/cubit/connection_editor_cubit.dart';
 import '../../../connections/presentation/widgets/connection_draft_guard.dart';
 import '../../../connections/presentation/widgets/connection_form.dart';
@@ -9,6 +10,7 @@ import '../../domain/entities/workspace_table.dart';
 import '../cubit/editor_tabs_cubit.dart';
 import '../cubit/editor_tabs_state.dart';
 import '../cubit/query_editor_cubit.dart';
+import '../cubit/workspace_metadata_cubit.dart';
 import 'query_code_editor.dart';
 import 'query_result_viewer.dart';
 import 'table_data_editor.dart';
@@ -347,9 +349,22 @@ class _QueryEditorTab extends StatelessWidget {
       return const Center(child: Text('Query not found'));
     }
 
+    final databases = context.select(
+      (WorkspaceMetadataCubit cubit) =>
+          cubit.state.databases.map((db) => db.name).toList(),
+    );
+
+    final connection = context.select(
+      (ConnectionCubit cubit) => cubit.state.activeConnection,
+    );
+
     final editor = QueryCodeEditor(
       controller: query.controller,
       isRunning: query.isRunning,
+      databases: databases,
+      selectedDatabase: query.database ?? connection?.database,
+      onDatabaseChanged:
+          (db) => context.read<QueryEditorCubit>().setQueryDatabase(query.id, db),
       onRun: () => context.read<QueryEditorCubit>().runQuery(query.id),
     );
 

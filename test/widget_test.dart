@@ -303,12 +303,12 @@ class _WidgetTableRepository implements TableDataRepository {
   bool deleted = false;
 
   @override
-  Future<QueryResult> executeQuery(
+  Future<List<QueryResult>> executeQuery(
     Connection connection,
     String database,
     String sql,
   ) async {
-    return const QueryResult();
+    return [const QueryResult()];
   }
 
   @override

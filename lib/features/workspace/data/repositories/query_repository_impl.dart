@@ -19,7 +19,7 @@ class QueryRepositoryImpl implements QueryRepository {
     final database = await databaseFactory.openDatabase(
       p.join(databasesPath, databaseName),
       options: OpenDatabaseOptions(
-        version: 1,
+        version: 2,
         onCreate: (db, version) async {
           await db.execute('''
             CREATE TABLE $tableName (
@@ -27,6 +27,7 @@ class QueryRepositoryImpl implements QueryRepository {
               connection_id TEXT NOT NULL,
               title TEXT NOT NULL,
               sql TEXT NOT NULL,
+              database TEXT,
               created_at INTEGER NOT NULL,
               updated_at INTEGER NOT NULL
             )
@@ -34,6 +35,13 @@ class QueryRepositoryImpl implements QueryRepository {
           await db.execute(
             'CREATE INDEX idx_queries_connection_id ON $tableName(connection_id)',
           );
+        },
+        onUpgrade: (db, oldVersion, newVersion) async {
+          if (oldVersion < 2) {
+            await db.execute(
+              'ALTER TABLE $tableName ADD COLUMN database TEXT',
+            );
+          }
         },
       ),
     );
@@ -58,6 +66,7 @@ class QueryRepositoryImpl implements QueryRepository {
       'connection_id': query.connectionId,
       'title': query.title,
       'sql': query.sql,
+      'database': query.database,
       'created_at': query.createdAt.millisecondsSinceEpoch,
       'updated_at': query.updatedAt.millisecondsSinceEpoch,
     }, conflictAlgorithm: ConflictAlgorithm.replace);
@@ -84,6 +93,7 @@ class QueryRepositoryImpl implements QueryRepository {
       connectionId: row['connection_id']! as String,
       title: row['title']! as String,
       sql: row['sql']! as String,
+      database: row['database'] as String?,
       createdAt: DateTime.fromMillisecondsSinceEpoch(row['created_at']! as int),
       updatedAt: DateTime.fromMillisecondsSinceEpoch(row['updated_at']! as int),
     );

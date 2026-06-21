@@ -8,11 +8,17 @@ class QueryCodeEditor extends StatelessWidget {
   final CodeController controller;
   final bool isRunning;
   final VoidCallback? onRun;
+  final List<String> databases;
+  final String? selectedDatabase;
+  final ValueChanged<String?>? onDatabaseChanged;
 
   const QueryCodeEditor({
     required this.controller,
     this.isRunning = false,
     this.onRun,
+    this.databases = const [],
+    this.selectedDatabase,
+    this.onDatabaseChanged,
     super.key,
   });
 
@@ -60,16 +66,61 @@ class QueryCodeEditor extends StatelessWidget {
           Positioned(
             bottom: 16,
             right: 16,
-            child: FButton(
-              onPress: isRunning ? null : onRun,
-              size: FButtonSizeVariant.sm,
-              child: isRunning
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Text('Run'),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (databases.isNotEmpty) ...[
+                  SizedBox(
+                    width: 140,
+                    child: FSelect<String>.search(
+                      items: {for (final db in databases) db: db},
+                      size: FTextFieldSizeVariant.sm,
+                      hint: 'Select database',
+                      clearable: false,
+                      searchFieldProperties: const FSelectSearchFieldProperties(
+                        hint: 'Search databases...',
+                      ),
+                      contentConstraints: const FAutoWidthPortalConstraints(
+                        maxHeight: 300,
+                      ),
+                      prefixBuilder: (context, fieldStyle, widget) => Padding(
+                        padding: const EdgeInsets.only(left: 8),
+                        child: Icon(
+                          Icons.storage_outlined,
+                          size: 14,
+                          color: theme.colors.mutedForeground,
+                        ),
+                      ),
+                      suffixBuilder: (context, fieldStyle, widget) => Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: Icon(
+                          Icons.arrow_drop_down,
+                          size: 14,
+                          color: theme.colors.mutedForeground,
+                        ),
+                      ),
+                      control: FSelectControl.lifted(
+                        value: databases.contains(selectedDatabase)
+                            ? selectedDatabase
+                            : null,
+                        onChange: onDatabaseChanged ?? (_) {},
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                ],
+                FButton(
+                  onPress: isRunning ? null : onRun,
+                  size: FButtonSizeVariant.sm,
+                  child: isRunning
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('Run'),
+                ),
+              ],
             ),
           ),
         ],

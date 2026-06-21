@@ -319,12 +319,12 @@ class _FakeTableDataRepository implements TableDataRepository {
   ) async => structure;
 
   @override
-  Future<QueryResult> executeQuery(
+  Future<List<QueryResult>> executeQuery(
     Connection connection,
     String database,
     String sql,
   ) async {
-    return const QueryResult();
+    return [const QueryResult()];
   }
 
   @override
@@ -379,12 +379,12 @@ class _ControlledPageRepository implements TableDataRepository {
   final requests = <_PageRequest, Completer<TableRowsPage>>{};
 
   @override
-  Future<QueryResult> executeQuery(
+  Future<List<QueryResult>> executeQuery(
     Connection connection,
     String database,
     String sql,
   ) async {
-    return const QueryResult();
+    return [const QueryResult()];
   }
 
   @override

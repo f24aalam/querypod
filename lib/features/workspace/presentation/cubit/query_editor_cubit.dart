@@ -113,6 +113,27 @@ class QueryEditorCubit extends Cubit<QueryEditorState> {
     _effects.add(QueryRenamed(queryId: id, title: trimmed));
   }
 
+  Future<void> setQueryDatabase(String id, String? database) async {
+    final query = state.queryById(id);
+    if (query == null || query.database == database) return;
+
+    final updated = query.copyWith(
+      database: () => database,
+      updatedAt: DateTime.now(),
+    );
+    try {
+      await _repository.save(_entityFromDocument(updated));
+    } catch (e) {
+      // Ignored if database is unavailable
+    }
+    emit(
+      QueryEditorState(
+        connectionId: state.connectionId,
+        queries: _replaceQuery(updated),
+      ),
+    );
+  }
+
   Future<void> deleteQuery(String id) async {
     final query = state.queryById(id);
     if (query == null) return;
@@ -168,9 +189,10 @@ class QueryEditorCubit extends Cubit<QueryEditorState> {
       return;
     }
 
+    final databaseToUse = query.database ?? connection.database;
     final results = await _tableDataRepository.executeQuery(
       connection,
-      connection.database,
+      databaseToUse,
       sql,
     );
 
@@ -221,6 +243,7 @@ class QueryEditorCubit extends Cubit<QueryEditorState> {
       id: query.id,
       connectionId: query.connectionId,
       title: query.title,
+      database: query.database,
       sql: query.sql,
       createdAt: query.createdAt,
       updatedAt: query.updatedAt,
@@ -233,6 +256,7 @@ class QueryEditorCubit extends Cubit<QueryEditorState> {
       connectionId: query.connectionId,
       title: query.title,
       sql: query.controller.fullText,
+      database: query.database,
       createdAt: query.createdAt,
       updatedAt: query.updatedAt,
     );

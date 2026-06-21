@@ -171,6 +171,7 @@ class TableDataCubit extends Cubit<TableDataState> {
         selectedRowIndexes: {rowIndex},
         selectionAnchorRowIndex: () => rowIndex,
         activeCellEdit: () => null,
+        isShowingStructure: false,
       ),
     );
   }
@@ -187,6 +188,7 @@ class TableDataCubit extends Cubit<TableDataState> {
         selectedRowIndexes: selected,
         selectionAnchorRowIndex: () => rowIndex,
         activeCellEdit: () => null,
+        isShowingStructure: false,
       ),
     );
   }
@@ -204,6 +206,7 @@ class TableDataCubit extends Cubit<TableDataState> {
         },
         selectionAnchorRowIndex: () => anchor,
         activeCellEdit: () => null,
+        isShowingStructure: false,
       ),
     );
   }

@@ -65,6 +65,7 @@ class _TableBrowser extends StatelessWidget {
 
     return Column(
       children: [
+        _TableActionBar(tableKey: tableKey, session: session),
         if (session.status == TableDataStatus.error)
           _ErrorBanner(tableKey: tableKey, message: session.errorMessage),
         Expanded(
@@ -1140,6 +1141,91 @@ class _NoRows extends StatelessWidget {
           fontSize: 13,
           color: context.theme.colors.mutedForeground,
         ),
+      ),
+    );
+  }
+}
+
+class _TableActionBar extends StatefulWidget {
+  final TableTabKey tableKey;
+  final TableDataSession session;
+
+  const _TableActionBar({required this.tableKey, required this.session});
+
+  @override
+  State<_TableActionBar> createState() => _TableActionBarState();
+}
+
+class _TableActionBarState extends State<_TableActionBar> {
+  late final TextEditingController _searchController;
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController = TextEditingController(text: widget.session.searchQuery);
+  }
+
+  @override
+  void didUpdateWidget(covariant _TableActionBar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.session.searchQuery != _searchController.text) {
+      _searchController.text = widget.session.searchQuery ?? '';
+    }
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = context.theme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: theme.colors.background,
+        border: Border(bottom: BorderSide(color: theme.colors.border, width: 1)),
+      ),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 250,
+            child: FTextField(
+              control: FTextFieldControl.managed(
+                controller: _searchController,
+              ),
+              hint: 'Search all columns...',
+              maxLines: 1,
+              size: FTextFieldSizeVariant.sm,
+              onSubmit: (value) {
+                context.read<TableDataCubit>().setSearchQuery(widget.tableKey, value);
+              },
+            ),
+          ),
+          const SizedBox(width: 8),
+          FButton(
+            size: FButtonSizeVariant.sm,
+            variant: FButtonVariant.outline,
+            onPress: () {
+              context.read<TableDataCubit>().setSearchQuery(widget.tableKey, _searchController.text);
+            },
+            child: const Text('Search'),
+          ),
+          if (widget.session.searchQuery?.isNotEmpty == true) ...[
+            const SizedBox(width: 8),
+            FButton(
+              size: FButtonSizeVariant.sm,
+              variant: FButtonVariant.ghost,
+              onPress: () {
+                _searchController.clear();
+                context.read<TableDataCubit>().setSearchQuery(widget.tableKey, '');
+              },
+              child: const Text('Clear'),
+            ),
+          ],
+        ],
       ),
     );
   }

@@ -47,6 +47,18 @@ class TableDataCubit extends Cubit<TableDataState> {
     await _loadPage(key, 0);
   }
 
+  Future<void> setSearchQuery(TableTabKey key, String query) async {
+    final session = state.session(key);
+    if (session == null || session.searchQuery == query) return;
+    _setSession(
+      _clearTransientState(
+        session.copyWith(searchQuery: () => query, pageIndex: 0),
+        clearError: false,
+      ),
+    );
+    await _loadInitial(key);
+  }
+
   Future<void> refresh(TableTabKey key) async {
     if (!state.sessions.containsKey(key)) return;
     await _loadInitial(key, refreshing: true);
@@ -369,6 +381,8 @@ class TableDataCubit extends Cubit<TableDataState> {
         connection,
         key.database,
         key.tableName,
+        structure: structure,
+        searchQuery: current.searchQuery,
       );
       if (!_isCurrent(key, generation)) return;
 
@@ -383,6 +397,7 @@ class TableDataCubit extends Cubit<TableDataState> {
         structure: structure,
         offset: pageIndex * latest.pageSize,
         limit: latest.pageSize,
+        searchQuery: current.searchQuery,
       );
       if (!_isCurrent(key, generation)) return;
 
@@ -424,6 +439,7 @@ class TableDataCubit extends Cubit<TableDataState> {
         structure: structure,
         offset: pageIndex * current.pageSize,
         limit: current.pageSize,
+        searchQuery: current.searchQuery,
       );
       if (!_isCurrent(key, generation)) return;
 

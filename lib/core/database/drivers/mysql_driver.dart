@@ -201,15 +201,27 @@ class MySQLDriver implements DatabaseDriver {
     Connection connection,
     String database,
     String table, {
+    required TableStructure structure,
+    String? searchQuery,
     void Function(QueryHistory)? onHistory,
   }) async {
     final conn = await _connect(connection, database: database);
     try {
-      final sql =
+      var sql =
           'SELECT COUNT(*) AS total FROM '
           '${_quoteIdentifier(database)}.${_quoteIdentifier(table)}';
+      
+      final queryParams = <String, dynamic>{};
+      if (searchQuery != null && searchQuery.isNotEmpty) {
+        final clauses = <String>[];
+        for (int i = 0; i < structure.columns.length; i++) {
+          clauses.add('${_quoteIdentifier(structure.columns[i].name)} LIKE :search$i');
+          queryParams['search$i'] = '%$searchQuery%';
+        }
+        sql += ' WHERE ${clauses.join(' OR ')}';
+      }
       final startMs = DateTime.now().millisecondsSinceEpoch;
-      final result = await conn.execute(sql);
+      final result = await conn.execute(sql, queryParams);
       final execMs = DateTime.now().millisecondsSinceEpoch - startMs;
 
       onHistory?.call(
@@ -240,17 +252,29 @@ class MySQLDriver implements DatabaseDriver {
     required TableStructure structure,
     required int offset,
     required int limit,
+    String? searchQuery,
     void Function(QueryHistory)? onHistory,
   }) async {
     final conn = await _connect(connection, database: database);
     final stopwatch = Stopwatch()..start();
     try {
-      final sql =
-          'SELECT * FROM ${_quoteIdentifier(database)}.${_quoteIdentifier(table)} '
-          'ORDER BY ${_quoteIdentifier(structure.orderColumn)} ASC '
+      var sql = 'SELECT * FROM ${_quoteIdentifier(database)}.${_quoteIdentifier(table)}';
+      
+      final queryParams = <String, dynamic>{};
+      if (searchQuery != null && searchQuery.isNotEmpty) {
+        final clauses = <String>[];
+        for (int i = 0; i < structure.columns.length; i++) {
+          clauses.add('${_quoteIdentifier(structure.columns[i].name)} LIKE :search$i');
+          queryParams['search$i'] = '%$searchQuery%';
+        }
+        sql += ' WHERE ${clauses.join(' OR ')}';
+      }
+      
+      sql += ' ORDER BY ${_quoteIdentifier(structure.orderColumn)} ASC '
           'LIMIT $limit OFFSET $offset';
+          
       final startMs = DateTime.now().millisecondsSinceEpoch;
-      final result = await conn.execute(sql);
+      final result = await conn.execute(sql, queryParams);
       final execMs = DateTime.now().millisecondsSinceEpoch - startMs;
 
       onHistory?.call(

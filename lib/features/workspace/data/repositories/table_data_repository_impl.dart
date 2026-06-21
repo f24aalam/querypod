@@ -32,13 +32,17 @@ class TableDataRepositoryImpl implements TableDataRepository {
   Future<int> countRows(
     Connection connection,
     String database,
-    String table,
-  ) async {
+    String table, {
+    required TableStructure structure,
+    String? searchQuery,
+  }) async {
     final driver = DatabaseDriverFactory.getDriver(connection.type);
     return await driver.countRows(
       connection,
       database,
       table,
+      structure: structure,
+      searchQuery: searchQuery,
       onHistory: _historyRepository.save,
     );
   }
@@ -51,6 +55,7 @@ class TableDataRepositoryImpl implements TableDataRepository {
     required TableStructure structure,
     required int offset,
     required int limit,
+    String? searchQuery,
   }) async {
     final driver = DatabaseDriverFactory.getDriver(connection.type);
     return await driver.fetchRows(
@@ -60,6 +65,7 @@ class TableDataRepositoryImpl implements TableDataRepository {
       structure: structure,
       offset: offset,
       limit: limit,
+      searchQuery: searchQuery,
       onHistory: _historyRepository.save,
     );
   }

@@ -137,13 +137,21 @@ class SQLiteDriver implements DatabaseDriver {
     Connection connection,
     String database,
     String table, {
+    required TableStructure structure,
+    String? searchQuery,
     void Function(QueryHistory)? onHistory,
   }) async {
     final db = await _connect(connection);
     try {
-      final sql = 'SELECT COUNT(*) AS total FROM ${_quoteIdentifier(table)}';
+      var sql = 'SELECT COUNT(*) AS total FROM ${_quoteIdentifier(table)}';
+      final queryParams = <Object?>[];
+      if (searchQuery != null && searchQuery.isNotEmpty) {
+        final searchClauses = structure.columns.map((col) => '${_quoteIdentifier(col.name)} LIKE ?').join(' OR ');
+        sql += ' WHERE $searchClauses';
+        queryParams.addAll(List.filled(structure.columns.length, '%$searchQuery%'));
+      }
       final startMs = DateTime.now().millisecondsSinceEpoch;
-      final result = await db.rawQuery(sql);
+      final result = await db.rawQuery(sql, queryParams);
       final execMs = DateTime.now().millisecondsSinceEpoch - startMs;
 
       onHistory?.call(
@@ -174,17 +182,25 @@ class SQLiteDriver implements DatabaseDriver {
     required TableStructure structure,
     required int offset,
     required int limit,
+    String? searchQuery,
     void Function(QueryHistory)? onHistory,
   }) async {
     final db = await _connect(connection);
     final stopwatch = Stopwatch()..start();
     try {
-      final sql =
-          'SELECT * FROM ${_quoteIdentifier(table)} '
-          'ORDER BY ${_quoteIdentifier(structure.orderColumn)} ASC '
+      var sql = 'SELECT * FROM ${_quoteIdentifier(table)}';
+      
+      final queryParams = <Object?>[];
+      if (searchQuery != null && searchQuery.isNotEmpty) {
+        final searchClauses = structure.columns.map((col) => '${_quoteIdentifier(col.name)} LIKE ?').join(' OR ');
+        sql += ' WHERE $searchClauses';
+        queryParams.addAll(List.filled(structure.columns.length, '%$searchQuery%'));
+      }
+      
+      sql += ' ORDER BY ${_quoteIdentifier(structure.orderColumn)} ASC '
           'LIMIT $limit OFFSET $offset';
       final startMs = DateTime.now().millisecondsSinceEpoch;
-      final result = await db.rawQuery(sql);
+      final result = await db.rawQuery(sql, queryParams);
       final execMs = DateTime.now().millisecondsSinceEpoch - startMs;
 
       onHistory?.call(

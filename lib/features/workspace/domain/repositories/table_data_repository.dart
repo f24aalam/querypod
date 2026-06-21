@@ -9,7 +9,13 @@ abstract class TableDataRepository {
     String table,
   );
 
-  Future<int> countRows(Connection connection, String database, String table);
+  Future<int> countRows(
+    Connection connection,
+    String database,
+    String table, {
+    required TableStructure structure,
+    String? searchQuery,
+  });
 
   Future<TableRowsPage> fetchRows(
     Connection connection,
@@ -18,6 +24,7 @@ abstract class TableDataRepository {
     required TableStructure structure,
     required int offset,
     required int limit,
+    String? searchQuery,
   });
 
   Future<void> commitChanges(

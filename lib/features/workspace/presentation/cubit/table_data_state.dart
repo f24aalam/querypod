@@ -19,6 +19,7 @@ class TableDataSession {
   final Duration queryDuration;
   final TableDataStatus status;
   final String? errorMessage;
+  final String? searchQuery;
   final int feedbackNonce;
 
   TableDataSession({
@@ -37,6 +38,7 @@ class TableDataSession {
     this.queryDuration = Duration.zero,
     this.status = TableDataStatus.initialLoading,
     this.errorMessage,
+    this.searchQuery,
     this.feedbackNonce = 0,
   }) : rows = List.unmodifiable(rows),
        selectedRowIndexes = Set.unmodifiable(selectedRowIndexes),
@@ -76,6 +78,7 @@ class TableDataSession {
     Duration? queryDuration,
     TableDataStatus? status,
     String? Function()? errorMessage,
+    String? Function()? searchQuery,
     int? feedbackNonce,
   }) {
     return TableDataSession(
@@ -99,6 +102,7 @@ class TableDataSession {
       queryDuration: queryDuration ?? this.queryDuration,
       status: status ?? this.status,
       errorMessage: errorMessage != null ? errorMessage() : this.errorMessage,
+      searchQuery: searchQuery != null ? searchQuery() : this.searchQuery,
       feedbackNonce: feedbackNonce ?? this.feedbackNonce,
     );
   }

@@ -26,6 +26,8 @@ abstract class DatabaseDriver {
     Connection connection,
     String database,
     String table, {
+    required TableStructure structure,
+    String? searchQuery,
     void Function(QueryHistory)? onHistory,
   });
 
@@ -36,6 +38,7 @@ abstract class DatabaseDriver {
     required TableStructure structure,
     required int offset,
     required int limit,
+    String? searchQuery,
     void Function(QueryHistory)? onHistory,
   });
 

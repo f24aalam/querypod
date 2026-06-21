@@ -191,13 +191,22 @@ class PostgresDriver implements DatabaseDriver {
     covariant Connection connection,
     String database,
     String table, {
+    required TableStructure structure,
+    String? searchQuery,
     void Function(QueryHistory)? onHistory,
   }) async {
     final conn = await _connect(connection, database: database);
     try {
-      final sql = 'SELECT COUNT(*) AS total FROM ${_quoteIdentifier(table)}';
+      var sql = 'SELECT COUNT(*) AS total FROM ${_quoteIdentifier(table)}';
+      
+      final parameters = <String, dynamic>{};
+      if (searchQuery != null && searchQuery.isNotEmpty) {
+        final searchClauses = structure.columns.map((col) => 'CAST(${_quoteIdentifier(col.name)} AS TEXT) ILIKE @search').join(' OR ');
+        sql += ' WHERE $searchClauses';
+        parameters['search'] = '%$searchQuery%';
+      }
       final startMs = DateTime.now().millisecondsSinceEpoch;
-      final result = await conn.execute(sql);
+      final result = await conn.execute(pg.Sql.named(sql), parameters: parameters);
       final execMs = DateTime.now().millisecondsSinceEpoch - startMs;
 
       onHistory?.call(
@@ -228,17 +237,25 @@ class PostgresDriver implements DatabaseDriver {
     required TableStructure structure,
     required int offset,
     required int limit,
+    String? searchQuery,
     void Function(QueryHistory)? onHistory,
   }) async {
     final conn = await _connect(connection, database: database);
     final stopwatch = Stopwatch()..start();
     try {
-      final sql =
-          'SELECT * FROM ${_quoteIdentifier(table)} '
-          'ORDER BY ${_quoteIdentifier(structure.orderColumn)} ASC '
+      var sql = 'SELECT * FROM ${_quoteIdentifier(table)}';
+      
+      final parameters = <String, dynamic>{};
+      if (searchQuery != null && searchQuery.isNotEmpty) {
+        final searchClauses = structure.columns.map((col) => 'CAST(${_quoteIdentifier(col.name)} AS TEXT) ILIKE @search').join(' OR ');
+        sql += ' WHERE $searchClauses';
+        parameters['search'] = '%$searchQuery%';
+      }
+      
+      sql += ' ORDER BY ${_quoteIdentifier(structure.orderColumn)} ASC '
           'LIMIT $limit OFFSET $offset';
       final startMs = DateTime.now().millisecondsSinceEpoch;
-      final result = await conn.execute(sql);
+      final result = await conn.execute(pg.Sql.named(sql), parameters: parameters);
       final execMs = DateTime.now().millisecondsSinceEpoch - startMs;
 
       onHistory?.call(

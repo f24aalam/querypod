@@ -11,8 +11,8 @@ class QueryHistoryRepositoryImpl implements QueryHistoryRepository {
   final Database _database;
   final _controller = StreamController<String>.broadcast();
 
-  // ignore: prefer_initializing_formals
   QueryHistoryRepositoryImpl({required Database database})
+    // ignore: prefer_initializing_formals
     : _database = database;
 
   @override

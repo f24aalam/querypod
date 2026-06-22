@@ -47,7 +47,7 @@ class StatusBar extends StatelessWidget {
                       : 'No Database');
 
             return Container(
-              height: 24,
+              height: 34,
               color: bgColor,
               padding: const EdgeInsets.symmetric(horizontal: 8),
               child: Row(

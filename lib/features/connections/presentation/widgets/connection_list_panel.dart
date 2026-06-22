@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:forui/forui.dart';
 
 import '../../../workspace/presentation/cubit/editor_tabs_cubit.dart';
+import '../../../workspace/presentation/widgets/sidebar_header.dart';
 import '../cubit/connection_cubit.dart';
 import '../cubit/connection_editor_cubit.dart';
 import '../cubit/connection_state.dart';
@@ -27,35 +28,14 @@ class ConnectionListPanel extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                height: 32,
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                decoration: BoxDecoration(
-                  border: Border(
-                    bottom: BorderSide(color: theme.colors.border, width: 1),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        'CONNECTIONS',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 0.8,
-                          color: theme.colors.mutedForeground,
-                        ),
-                      ),
-                    ),
-                    FButton(
-                      variant: FButtonVariant.outline,
-                      size: FButtonSizeVariant.xs,
-                      mainAxisSize: MainAxisSize.min,
-                      onPress: () => _openNewConnection(context),
-                      child: const Text('New'),
-                    ),
-                  ],
+              SidebarHeader(
+                title: 'CONNECTIONS',
+                trailing: FButton(
+                  variant: FButtonVariant.outline,
+                  size: FButtonSizeVariant.xs,
+                  mainAxisSize: MainAxisSize.min,
+                  onPress: () => _openNewConnection(context),
+                  child: const Text('New'),
                 ),
               ),
               Padding(

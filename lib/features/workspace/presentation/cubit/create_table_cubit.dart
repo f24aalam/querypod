@@ -11,7 +11,9 @@ class CreateTableCubit extends Cubit<CreateTableState> {
   CreateTableCubit({
     required ConnectionCubit connectionCubit,
     required WorkspaceMetadataCubit workspaceMetadataCubit,
+    // ignore: prefer_initializing_formals
   })  : _connectionCubit = connectionCubit,
+        // ignore: prefer_initializing_formals
         _workspaceMetadataCubit = workspaceMetadataCubit,
         super(const CreateTableState());
 

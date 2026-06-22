@@ -13,6 +13,7 @@ import '../cubit/table_data_cubit.dart';
 import '../cubit/workspace_metadata_cubit.dart';
 import '../cubit/workspace_metadata_state.dart';
 import 'create_database_dialog.dart';
+import 'sidebar_header.dart';
 
 class TableListPanel extends StatefulWidget {
   const TableListPanel({super.key});
@@ -56,26 +57,11 @@ class _TableListPanelState extends State<TableListPanel> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  height: 32,
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  decoration: BoxDecoration(
-                    border: Border(
-                      bottom: BorderSide(color: theme.colors.border, width: 1),
-                    ),
-                  ),
-                  child: Row(
+                SidebarHeader(
+                  title: 'TABLES',
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(
-                        'TABLES',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 0.8,
-                          color: theme.colors.mutedForeground,
-                        ),
-                      ),
-                      const Spacer(),
                       FButton.icon(
                         onPress: () {
                           final selectedConnection = context

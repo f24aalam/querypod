@@ -16,8 +16,10 @@ void main() async {
   );
 
   for (final result in resultSets) {
+    // ignore: avoid_print
     print("Result set columns: \${result.cols.map((c) => c.name).toList()}");
     for (final row in result.rows) {
+      // ignore: avoid_print
       print(row.assoc());
     }
   }

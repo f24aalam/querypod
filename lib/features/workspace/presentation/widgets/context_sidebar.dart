@@ -9,6 +9,7 @@ import '../cubit/editor_tabs_state.dart';
 import '../cubit/query_editor_cubit.dart';
 import '../cubit/query_editor_state.dart';
 import 'history_list_panel.dart';
+import 'sidebar_header.dart';
 import 'table_list_panel.dart';
 
 class ContextSidebar extends StatelessWidget {
@@ -44,7 +45,7 @@ class _QuerySidebarPanel extends StatelessWidget {
       child: BlocBuilder<QueryEditorCubit, QueryEditorState>(
         builder: (context, state) => Column(
           children: [
-            _SidebarHeader(
+            SidebarHeader(
               title: 'QUERY',
               trailing: IconButton(
                 padding: EdgeInsets.zero,
@@ -106,7 +107,7 @@ class _HistorySidebarPanel extends StatelessWidget {
       ),
       child: const Column(
         children: [
-          _SidebarHeader(title: 'HISTORY'),
+          SidebarHeader(title: 'HISTORY'),
           Expanded(
             child: HistoryListPanel(),
           ),
@@ -282,41 +283,3 @@ class _QueryListItem extends StatelessWidget {
   }
 }
 
-
-class _SidebarHeader extends StatelessWidget {
-  final String title;
-  final Widget? trailing;
-
-  const _SidebarHeader({required this.title, this.trailing});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = context.theme;
-
-    return Container(
-      height: 32,
-      padding: const EdgeInsets.only(left: 12, right: 6),
-      decoration: BoxDecoration(
-        border: Border(
-          bottom: BorderSide(color: theme.colors.border, width: 1),
-        ),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              title,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.8,
-                color: theme.colors.mutedForeground,
-              ),
-            ),
-          ),
-          if (trailing != null) ...[trailing!],
-        ],
-      ),
-    );
-  }
-}

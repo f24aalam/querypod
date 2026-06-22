@@ -10,8 +10,8 @@ import '../../domain/repositories/table_data_repository.dart';
 class TableDataRepositoryImpl implements TableDataRepository {
   final QueryHistoryRepository _historyRepository;
 
-  // ignore: prefer_initializing_formals
   TableDataRepositoryImpl({required QueryHistoryRepository historyRepository})
+    // ignore: prefer_initializing_formals
     : _historyRepository = historyRepository;
 
   @override

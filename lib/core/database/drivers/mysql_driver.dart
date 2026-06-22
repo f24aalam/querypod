@@ -692,4 +692,26 @@ class MySQLDriver implements DatabaseDriver {
       await conn?.close();
     }
   }
+
+  @override
+  Future<void> createDatabase(
+    Connection connection,
+    String name, {
+    String? charset,
+    String? collation,
+  }) async {
+    final conn = await _connect(connection, database: '');
+    try {
+      var sql = 'CREATE DATABASE `${name.replaceAll('`', '``')}`';
+      if (charset != null && charset.isNotEmpty) {
+        sql += ' CHARACTER SET $charset';
+      }
+      if (collation != null && collation.isNotEmpty) {
+        sql += ' COLLATE $collation';
+      }
+      await conn.execute(sql);
+    } finally {
+      await conn.close();
+    }
+  }
 }

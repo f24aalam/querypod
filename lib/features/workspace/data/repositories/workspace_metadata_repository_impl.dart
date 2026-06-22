@@ -21,4 +21,20 @@ class WorkspaceMetadataRepositoryImpl implements WorkspaceMetadataRepository {
     final driver = DatabaseDriverFactory.getDriver(connection.type);
     return await driver.listTables(connection, database);
   }
+
+  @override
+  Future<void> createDatabase(
+    Connection connection,
+    String name, {
+    String? charset,
+    String? collation,
+  }) async {
+    final driver = DatabaseDriverFactory.getDriver(connection.type);
+    await driver.createDatabase(
+      connection,
+      name,
+      charset: charset,
+      collation: collation,
+    );
+  }
 }

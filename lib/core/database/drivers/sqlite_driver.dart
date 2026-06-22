@@ -604,4 +604,14 @@ class SQLiteDriver implements DatabaseDriver {
       await db?.close();
     }
   }
+
+  @override
+  Future<void> createDatabase(
+    Connection connection,
+    String name, {
+    String? charset,
+    String? collation,
+  }) async {
+    throw UnsupportedError('SQLite does not support creating multiple databases');
+  }
 }

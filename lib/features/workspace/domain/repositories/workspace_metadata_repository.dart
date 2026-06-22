@@ -8,4 +8,10 @@ abstract class WorkspaceMetadataRepository {
     Connection connection,
     String database,
   );
+  Future<void> createDatabase(
+    Connection connection,
+    String name, {
+    String? charset,
+    String? collation,
+  });
 }

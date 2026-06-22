@@ -682,4 +682,28 @@ class PostgresDriver implements DatabaseDriver {
       await conn?.close();
     }
   }
+
+  @override
+  Future<void> createDatabase(
+    covariant Connection connection,
+    String name, {
+    String? charset,
+    String? collation,
+  }) async {
+    final conn = await _connect(connection, database: 'postgres');
+    try {
+      var sql = 'CREATE DATABASE "$name"';
+      // Postgres encoding/collation are usually ENCODING and LC_COLLATE.
+      // We will only use them if provided.
+      if (charset != null && charset.isNotEmpty) {
+        sql += " ENCODING '$charset'";
+      }
+      if (collation != null && collation.isNotEmpty) {
+        sql += " LC_COLLATE '$collation' LC_CTYPE '$collation'";
+      }
+      await conn.execute(sql);
+    } finally {
+      await conn.close();
+    }
+  }
 }

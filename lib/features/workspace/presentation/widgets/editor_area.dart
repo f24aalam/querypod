@@ -363,6 +363,7 @@ class _QueryEditorTab extends StatelessWidget {
       isRunning: query.isRunning,
       databases: databases,
       selectedDatabase: query.database ?? connection?.database,
+      connection: connection,
       onDatabaseChanged: (db) =>
           context.read<QueryEditorCubit>().setQueryDatabase(query.id, db),
       onRun: () => context.read<QueryEditorCubit>().runQuery(query.id),

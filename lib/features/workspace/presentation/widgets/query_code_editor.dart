@@ -4,6 +4,9 @@ import 'package:flutter_highlight/themes/github.dart';
 import 'package:flutter_highlight/themes/monokai-sublime.dart';
 import 'package:forui/forui.dart';
 
+import '../../../connections/domain/entities/connection.dart';
+import 'create_database_dialog.dart';
+
 class QueryCodeEditor extends StatelessWidget {
   final CodeController controller;
   final bool isRunning;
@@ -11,6 +14,7 @@ class QueryCodeEditor extends StatelessWidget {
   final List<String> databases;
   final String? selectedDatabase;
   final ValueChanged<String?>? onDatabaseChanged;
+  final Connection? connection;
 
   const QueryCodeEditor({
     required this.controller,
@@ -19,6 +23,7 @@ class QueryCodeEditor extends StatelessWidget {
     this.databases = const [],
     this.selectedDatabase,
     this.onDatabaseChanged,
+    this.connection,
     super.key,
   });
 
@@ -72,42 +77,61 @@ class QueryCodeEditor extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 if (databases.isNotEmpty) ...[
-                  SizedBox(
-                    width: 140,
-                    child: FSelect<String>.search(
-                      items: {for (final db in databases) db: db},
-                      size: FTextFieldSizeVariant.sm,
-                      hint: 'Select database',
-                      clearable: false,
-                      searchFieldProperties: const FSelectSearchFieldProperties(
-                        hint: 'Search databases...',
-                      ),
-                      contentConstraints: const FAutoWidthPortalConstraints(
-                        maxHeight: 300,
-                      ),
-                      prefixBuilder: (context, fieldStyle, widget) => Padding(
-                        padding: const EdgeInsets.only(left: 8),
-                        child: Icon(
-                          Icons.storage_outlined,
-                          size: 14,
-                          color: theme.colors.mutedForeground,
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SizedBox(
+                        width: 140,
+                        child: FSelect<String>.search(
+                          items: {for (final db in databases) db: db},
+                          size: FTextFieldSizeVariant.sm,
+                          hint: 'Select database',
+                          clearable: false,
+                          searchFieldProperties: const FSelectSearchFieldProperties(
+                            hint: 'Search databases...',
+                          ),
+                          contentConstraints: const FAutoWidthPortalConstraints(
+                            maxHeight: 300,
+                          ),
+                          prefixBuilder: (context, fieldStyle, widget) => Padding(
+                            padding: const EdgeInsets.only(left: 8),
+                            child: Icon(
+                              Icons.storage_outlined,
+                              size: 14,
+                              color: theme.colors.mutedForeground,
+                            ),
+                          ),
+                          suffixBuilder: (context, fieldStyle, widget) => Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: Icon(
+                              Icons.arrow_drop_down,
+                              size: 14,
+                              color: theme.colors.mutedForeground,
+                            ),
+                          ),
+                          control: FSelectControl.lifted(
+                            value: databases.contains(selectedDatabase)
+                                ? selectedDatabase
+                                : null,
+                            onChange: onDatabaseChanged ?? (_) {},
+                          ),
                         ),
                       ),
-                      suffixBuilder: (context, fieldStyle, widget) => Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: Icon(
-                          Icons.arrow_drop_down,
-                          size: 14,
-                          color: theme.colors.mutedForeground,
+                      if (connection != null && connection!.type != ConnectionType.sqlite) ...[
+                        const SizedBox(width: 8),
+                        FButton.icon(
+                          onPress: () {
+                            CreateDatabaseDialog.show(
+                              context,
+                              connection!,
+                            );
+                          },
+                          size: FButtonSizeVariant.sm,
+                          variant: FButtonVariant.outline,
+                          child: const Icon(Icons.add, size: 16),
                         ),
-                      ),
-                      control: FSelectControl.lifted(
-                        value: databases.contains(selectedDatabase)
-                            ? selectedDatabase
-                            : null,
-                        onChange: onDatabaseChanged ?? (_) {},
-                      ),
-                    ),
+                      ],
+                    ],
                   ),
                   const SizedBox(width: 8),
                 ],

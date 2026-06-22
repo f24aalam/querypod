@@ -164,6 +164,46 @@ class WorkspaceMetadataCubit extends Cubit<WorkspaceMetadataState> {
     emit(const WorkspaceMetadataState());
   }
 
+  Future<void> createDatabase(
+    Connection connection,
+    String name, {
+    String? charset,
+    String? collation,
+  }) async {
+    try {
+      await _repository.createDatabase(
+        connection,
+        name,
+        charset: charset,
+        collation: collation,
+      );
+
+      // Refresh databases
+      final databases = await _repository.listDatabases(connection);
+      final session = connection.sessionIdentity;
+      
+      if (state.connectionSession != session) return;
+
+      emit(state.copyWith(databases: databases));
+
+      // Select the newly created database
+      await selectDatabase(connection, name);
+    } catch (e) {
+      emit(
+        _feedback(
+          _metadataErrorMessage(
+            e,
+            fallback: 'Failed to create database $name',
+          ),
+          isError: true,
+          status: state.status, // Preserve current status
+        ),
+      );
+      // Re-throw if the UI wants to catch it
+      rethrow;
+    }
+  }
+
   Future<void> _loadTables(
     Connection connection,
     String database, {

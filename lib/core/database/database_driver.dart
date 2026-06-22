@@ -61,4 +61,11 @@ abstract class DatabaseDriver {
     String database,
     String sql,
   );
+
+  Future<void> createDatabase(
+    Connection connection,
+    String name, {
+    String? charset,
+    String? collation,
+  });
 }

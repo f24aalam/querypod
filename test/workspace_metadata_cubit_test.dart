@@ -118,6 +118,14 @@ class _ControlledRepository implements WorkspaceMetadataRepository {
   ) {
     return (tables[database] ??= Completer<List<WorkspaceTable>>()).future;
   }
+
+  @override
+  Future<void> createDatabase(
+    Connection connection,
+    String name, {
+    String? charset,
+    String? collation,
+  }) async {}
 }
 
 class _DatabaseSwitchRepository implements WorkspaceMetadataRepository {
@@ -138,4 +146,12 @@ class _DatabaseSwitchRepository implements WorkspaceMetadataRepository {
   ) {
     return (tables[database] ??= Completer<List<WorkspaceTable>>()).future;
   }
+
+  @override
+  Future<void> createDatabase(
+    Connection connection,
+    String name, {
+    String? charset,
+    String? collation,
+  }) async {}
 }

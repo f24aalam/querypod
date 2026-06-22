@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:forui/forui.dart';
 
+import '../../../connections/domain/entities/connection.dart';
 import '../../../connections/presentation/cubit/connection_cubit.dart';
 import '../../domain/entities/workspace_table.dart';
 import '../cubit/editor_tabs_cubit.dart';
@@ -11,6 +12,7 @@ import '../cubit/editor_tabs_state.dart';
 import '../cubit/table_data_cubit.dart';
 import '../cubit/workspace_metadata_cubit.dart';
 import '../cubit/workspace_metadata_state.dart';
+import 'create_database_dialog.dart';
 
 class TableListPanel extends StatefulWidget {
   const TableListPanel({super.key});
@@ -255,46 +257,67 @@ class _DatabasePicker extends StatelessWidget {
                   ],
                 ),
               )
-            : FSelect<String>.search(
-                items: items,
-                size: FTextFieldSizeVariant.sm,
-                hint: 'Select database',
-                enabled: selectedConnection != null && items.isNotEmpty,
-                clearable: false,
-                searchFieldProperties: const FSelectSearchFieldProperties(
-                  hint: 'Search databases...',
-                ),
-                contentConstraints: const FAutoWidthPortalConstraints(
-                  maxHeight: 300,
-                ),
-                prefixBuilder: (context, fieldStyle, widget) => Padding(
-                  padding: const EdgeInsets.only(left: 8),
-                  child: Icon(
-                    Icons.storage_outlined,
-                    size: 14,
-                    color: theme.colors.mutedForeground,
+            : Row(
+                children: [
+                  Expanded(
+                    child: FSelect<String>.search(
+                      items: items,
+                      size: FTextFieldSizeVariant.sm,
+                      hint: 'Select database',
+                      enabled: selectedConnection != null && items.isNotEmpty,
+                      clearable: false,
+                      searchFieldProperties: const FSelectSearchFieldProperties(
+                        hint: 'Search databases...',
+                      ),
+                      contentConstraints: const FAutoWidthPortalConstraints(
+                        maxHeight: 300,
+                      ),
+                      prefixBuilder: (context, fieldStyle, widget) => Padding(
+                        padding: const EdgeInsets.only(left: 8),
+                        child: Icon(
+                          Icons.storage_outlined,
+                          size: 14,
+                          color: theme.colors.mutedForeground,
+                        ),
+                      ),
+                      suffixBuilder: (context, fieldStyle, widget) => Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: Icon(
+                          Icons.arrow_drop_down,
+                          size: 14,
+                          color: theme.colors.mutedForeground,
+                        ),
+                      ),
+                      control: FSelectControl.lifted(
+                        value: state.selectedDatabase,
+                        onChange: (value) {
+                          if (value == null || selectedConnection == null) {
+                            return;
+                          }
+                          context.read<WorkspaceMetadataCubit>().selectDatabase(
+                            selectedConnection,
+                            value,
+                          );
+                        },
+                      ),
+                    ),
                   ),
-                ),
-                suffixBuilder: (context, fieldStyle, widget) => Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: Icon(
-                    Icons.arrow_drop_down,
-                    size: 14,
-                    color: theme.colors.mutedForeground,
-                  ),
-                ),
-                control: FSelectControl.lifted(
-                  value: state.selectedDatabase,
-                  onChange: (value) {
-                    if (value == null || selectedConnection == null) {
-                      return;
-                    }
-                    context.read<WorkspaceMetadataCubit>().selectDatabase(
-                      selectedConnection,
-                      value,
-                    );
-                  },
-                ),
+                  if (selectedConnection != null &&
+                      selectedConnection.type != ConnectionType.sqlite) ...[
+                    const SizedBox(width: 8),
+                    FButton.icon(
+                      onPress: () {
+                        CreateDatabaseDialog.show(
+                          context,
+                          selectedConnection,
+                        );
+                      },
+                      size: FButtonSizeVariant.sm,
+                      variant: FButtonVariant.outline,
+                      child: const Icon(Icons.add, size: 16),
+                    ),
+                  ],
+                ],
               ),
       ),
     );

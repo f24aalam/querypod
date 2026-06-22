@@ -354,30 +354,55 @@ class _TableItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () => _open(context, pin: false),
-      onDoubleTap: () => _open(context, pin: true),
-      child: Container(
-        color: isSelected ? theme.colors.secondary : Colors.transparent,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        child: Row(
+    return FContextMenu(
+      menuBuilder: (context, controller, menu) => [
+        FItemGroup(
           children: [
-            Icon(
-              table.type == WorkspaceTableType.view
-                  ? Icons.visibility_outlined
-                  : Icons.table_chart_outlined,
-              size: 14,
-              color: theme.colors.mutedForeground,
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                table.name,
-                style: TextStyle(fontSize: 13, color: theme.colors.foreground),
-                overflow: TextOverflow.ellipsis,
-              ),
+            FItem(
+              title: const Text('Edit'),
+              prefix: const Icon(Icons.edit_outlined, size: 14),
+              onPress: () {
+                controller.hide();
+                final metadata = context.read<WorkspaceMetadataCubit>();
+                final connection = context.read<ConnectionCubit>().state.activeConnection;
+                final database = metadata.state.selectedDatabase;
+                if (connection == null || database == null) return;
+                
+                context.read<EditorTabsCubit>().openCreateTableTab(
+                  connectionId: connection.id,
+                  database: database,
+                  tableToEdit: table.name,
+                );
+              },
             ),
           ],
+        ),
+      ],
+      child: GestureDetector(
+        onTap: () => _open(context, pin: false),
+        onDoubleTap: () => _open(context, pin: true),
+        child: Container(
+          color: isSelected ? theme.colors.secondary : Colors.transparent,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          child: Row(
+            children: [
+              Icon(
+                table.type == WorkspaceTableType.view
+                    ? Icons.visibility_outlined
+                    : Icons.table_chart_outlined,
+                size: 14,
+                color: theme.colors.mutedForeground,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  table.name,
+                  style: TextStyle(fontSize: 13, color: theme.colors.foreground),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

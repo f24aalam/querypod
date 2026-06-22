@@ -771,4 +771,150 @@ class MySQLDriver implements DatabaseDriver {
       await conn.close();
     }
   }
+
+  @override
+  Future<List<TableColumnDefinition>> getTableSchema(
+    Connection connection,
+    String database,
+    String table,
+  ) async {
+    final conn = await _connect(connection, database: database);
+    try {
+      final quotedDatabase = _quoteIdentifier(database);
+      final quotedTable = _quoteIdentifier(table);
+      final schema = await conn.execute('SHOW COLUMNS FROM $quotedDatabase.$quotedTable');
+      
+      final columns = <TableColumnDefinition>[];
+      for (final row in schema.rows) {
+        final name = _asString(row.colByName('Field'));
+        var typeRaw = _asString(row.colByName('Type'));
+        final isNullable = _asString(row.colByName('Null')).toUpperCase() == 'YES';
+        final isPk = _asString(row.colByName('Key')).toUpperCase() == 'PRI';
+        final defaultValue = _asString(row.colByName('Default'));
+        final extra = _asString(row.colByName('Extra')).toUpperCase();
+        
+        final isAutoIncrement = extra.contains('AUTO_INCREMENT');
+        
+        int? length;
+        var type = typeRaw;
+        
+        final lengthMatch = RegExp(r'\((\d+)\)').firstMatch(typeRaw);
+        if (lengthMatch != null) {
+          length = int.tryParse(lengthMatch.group(1)!);
+          type = typeRaw.replaceAll(lengthMatch.group(0)!, '');
+        }
+        
+        type = type.split(' ')[0].toUpperCase();
+
+        columns.add(TableColumnDefinition(
+          name: name,
+          originalName: name,
+          type: type,
+          length: length,
+          isPrimaryKey: isPk,
+          isNullable: isNullable,
+          isAutoIncrement: isAutoIncrement,
+          defaultValue: defaultValue.isNotEmpty ? defaultValue : null,
+        ));
+      }
+      return columns;
+    } finally {
+      await conn.close();
+    }
+  }
+
+  @override
+  Future<void> alterTable(
+    Connection connection,
+    String database,
+    String oldTableName,
+    String newTableName,
+    List<TableColumnDefinition> oldColumns,
+    List<TableColumnDefinition> newColumns,
+  ) async {
+    final conn = await _connect(connection, database: database);
+    try {
+      final actions = <String>[];
+      final oldMap = {for (final c in oldColumns) c.name: c};
+      final processedOldNames = <String>{};
+      
+      for (final newCol in newColumns) {
+        final origName = newCol.originalName;
+        if (origName != null && oldMap.containsKey(origName)) {
+           final oldCol = oldMap[origName]!;
+           processedOldNames.add(origName);
+           
+           final typeDef = _buildColumnDefinition(newCol);
+           
+           if (newCol.name != oldCol.name) {
+              actions.add('CHANGE COLUMN ${_quoteIdentifier(oldCol.name)} ${_quoteIdentifier(newCol.name)} $typeDef');
+           } else {
+              if (oldCol.type != newCol.type || oldCol.length != newCol.length || 
+                  oldCol.isNullable != newCol.isNullable || oldCol.isAutoIncrement != newCol.isAutoIncrement ||
+                  oldCol.defaultValue != newCol.defaultValue) {
+                 actions.add('MODIFY COLUMN ${_quoteIdentifier(newCol.name)} $typeDef');
+              }
+           }
+        } else {
+           final typeDef = _buildColumnDefinition(newCol);
+           actions.add('ADD COLUMN ${_quoteIdentifier(newCol.name)} $typeDef');
+        }
+      }
+      
+      for (final oldCol in oldColumns) {
+         if (!processedOldNames.contains(oldCol.name)) {
+            actions.add('DROP COLUMN ${_quoteIdentifier(oldCol.name)}');
+         }
+      }
+      
+      final oldPks = oldColumns.where((c) => c.isPrimaryKey).map((c) => c.name).toSet();
+      final newPks = newColumns.where((c) => c.isPrimaryKey).map((c) => c.name).toSet();
+      
+      final oldPkOrig = oldColumns.where((c) => c.isPrimaryKey).map((c) => c.name).toSet();
+      final newPkOrig = newColumns.where((c) => c.isPrimaryKey).map((c) => c.originalName ?? c.name).toSet();
+      
+      if (oldPkOrig.length != newPkOrig.length || oldPkOrig.intersection(newPkOrig).length != oldPkOrig.length) {
+         if (oldPks.isNotEmpty) {
+            actions.add('DROP PRIMARY KEY');
+         }
+         if (newPks.isNotEmpty) {
+            final pkCols = newPks.map((n) => _quoteIdentifier(n)).join(', ');
+            actions.add('ADD PRIMARY KEY ($pkCols)');
+         }
+      }
+      
+      if (actions.isNotEmpty) {
+         final sql = 'ALTER TABLE ${_quoteIdentifier(oldTableName)} \n  ${actions.join(',\n  ')}';
+         await conn.execute(sql);
+      }
+      
+      if (oldTableName != newTableName) {
+         await conn.execute('RENAME TABLE ${_quoteIdentifier(oldTableName)} TO ${_quoteIdentifier(newTableName)}');
+      }
+      
+    } finally {
+      await conn.close();
+    }
+  }
+
+  String _buildColumnDefinition(TableColumnDefinition col) {
+    var def = col.type;
+    if (col.length != null) {
+      def += '(${col.length})';
+    }
+    if (!col.isNullable) {
+      def += ' NOT NULL';
+    }
+    if (col.isAutoIncrement) {
+      def += ' AUTO_INCREMENT';
+    }
+    if (col.defaultValue != null && col.defaultValue!.isNotEmpty) {
+      if (col.defaultValue!.toUpperCase() == 'CURRENT_TIMESTAMP') {
+         def += ' DEFAULT CURRENT_TIMESTAMP';
+      } else {
+         def += " DEFAULT '${col.defaultValue!.replaceAll("'", "''")}'";
+      }
+    }
+    return def;
+  }
 }

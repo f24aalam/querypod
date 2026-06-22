@@ -107,10 +107,41 @@ class CreateTableCubit extends Cubit<CreateTableState> {
     emit(state.copyWith(isSubmitting: true, errorMessage: null));
 
     try {
-      await _workspaceMetadataCubit.createTable(connection, database, state.tableName, state.columns);
+      if (state.originalTableName != null && state.originalColumns != null) {
+        await _workspaceMetadataCubit.alterTable(
+          connection,
+          database,
+          state.originalTableName!,
+          state.tableName,
+          state.originalColumns!,
+          state.columns,
+        );
+      } else {
+        await _workspaceMetadataCubit.createTable(connection, database, state.tableName, state.columns);
+      }
       emit(state.copyWith(isSubmitting: false, isSuccess: true));
     } catch (e) {
       emit(state.copyWith(isSubmitting: false, errorMessage: e.toString()));
+    }
+  }
+
+  Future<void> loadTableSchema(String database, String table) async {
+    final connection = _connectionCubit.state.activeConnection;
+    if (connection == null) return;
+
+    emit(state.copyWith(isLoading: true, errorMessage: null));
+
+    try {
+      final columns = await _workspaceMetadataCubit.getTableSchema(connection, database, table);
+      emit(state.copyWith(
+        isLoading: false,
+        tableName: table,
+        originalTableName: table,
+        columns: columns,
+        originalColumns: columns,
+      ));
+    } catch (e) {
+      emit(state.copyWith(isLoading: false, errorMessage: e.toString()));
     }
   }
 }

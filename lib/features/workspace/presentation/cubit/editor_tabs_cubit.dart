@@ -286,17 +286,19 @@ class EditorTabsCubit extends Cubit<EditorTabsState> {
   void openCreateTableTab({
     required String connectionId,
     required String database,
+    String? tableToEdit,
   }) {
     final key = CreateTableTabKey(
       connectionId: connectionId,
       database: database,
+      tableToEdit: tableToEdit,
     );
     final index = state.tabs.indexWhere((tab) => tab.key == key);
     final tabs = List<EditorTab>.from(state.tabs);
     final tab = EditorTab(
       key: key,
       type: EditorTabType.createTable,
-      title: 'Create Table',
+      title: tableToEdit != null ? 'Edit $tableToEdit' : 'Create Table',
       connectionId: connectionId,
       database: database,
     );

@@ -769,4 +769,204 @@ class PostgresDriver implements DatabaseDriver {
       await conn.close();
     }
   }
+
+  @override
+  Future<List<TableColumnDefinition>> getTableSchema(
+    covariant Connection connection,
+    String database,
+    String table,
+  ) async {
+    final conn = await _connect(connection, database: database);
+    try {
+      final quotedTable = _quoteIdentifier(table);
+      final sql = "SELECT column_name, data_type, character_maximum_length, is_nullable, column_default, is_identity FROM information_schema.columns WHERE table_schema = 'public' AND table_name = '$table' ORDER BY ordinal_position;";
+      final schema = await conn.execute(sql);
+      
+      final pkeySql = '''
+        SELECT a.attname
+        FROM pg_index i
+        JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)
+        WHERE i.indrelid = '$quotedTable'::regclass AND i.indisprimary;
+      ''';
+      
+      final pkeyResults = await conn.execute(pkeySql);
+      final primaryKeys = pkeyResults.map((row) => _asString(row[0])).toSet();
+
+      final columns = <TableColumnDefinition>[];
+      for (final row in schema) {
+        final name = _asString(row[0]);
+        final typeRaw = _asString(row[1]);
+        final lengthStr = row[2]?.toString();
+        final length = lengthStr != null ? int.tryParse(lengthStr) : null;
+        final isNullable = _asString(row[3]).toUpperCase() == 'YES';
+        final defaultValue = row[4] != null ? _asString(row[4]) : null;
+        final isIdentity = _asString(row[5]).toUpperCase() == 'YES';
+        
+        final isPk = primaryKeys.contains(name);
+        
+        var isAutoIncrement = isIdentity;
+        var type = typeRaw;
+        var cleanDefault = defaultValue;
+        
+        if (defaultValue != null && defaultValue.startsWith('nextval(')) {
+          isAutoIncrement = true;
+          cleanDefault = null;
+        } else if (defaultValue != null && defaultValue.contains('::')) {
+          cleanDefault = defaultValue.split('::')[0].replaceAll("'", "");
+        }
+
+        if (type == 'character varying') {
+          type = 'VARCHAR';
+        } else if (type == 'integer') {
+          type = 'INTEGER';
+        } else if (type == 'boolean') {
+          type = 'BOOLEAN';
+        } else if (type == 'timestamp without time zone') {
+          type = 'TIMESTAMP';
+        }
+
+        columns.add(TableColumnDefinition(
+          name: name,
+          originalName: name,
+          type: type.toUpperCase(),
+          length: length,
+          isPrimaryKey: isPk,
+          isNullable: isNullable,
+          isAutoIncrement: isAutoIncrement,
+          defaultValue: cleanDefault,
+        ));
+      }
+      return columns;
+    } finally {
+      await conn.close();
+    }
+  }
+
+  @override
+  Future<void> alterTable(
+    covariant Connection connection,
+    String database,
+    String oldTableName,
+    String newTableName,
+    List<TableColumnDefinition> oldColumns,
+    List<TableColumnDefinition> newColumns,
+  ) async {
+    final conn = await _connect(connection, database: database);
+    try {
+      final actions = <String>[];
+      final oldMap = {for (final c in oldColumns) c.name: c};
+      final processedOldNames = <String>{};
+      
+      for (final newCol in newColumns) {
+        final origName = newCol.originalName;
+        if (origName != null && oldMap.containsKey(origName)) {
+           final oldCol = oldMap[origName]!;
+           processedOldNames.add(origName);
+           
+           if (newCol.name != oldCol.name) {
+              await conn.execute('ALTER TABLE ${_quoteIdentifier(oldTableName)} RENAME COLUMN ${_quoteIdentifier(oldCol.name)} TO ${_quoteIdentifier(newCol.name)}');
+           }
+           
+           if (oldCol.type != newCol.type || oldCol.length != newCol.length) {
+              var typeStr = newCol.type;
+              if (newCol.length != null) typeStr += '(${newCol.length})';
+              actions.add('ALTER COLUMN ${_quoteIdentifier(newCol.name)} TYPE $typeStr USING ${_quoteIdentifier(newCol.name)}::$typeStr');
+           }
+           
+           if (oldCol.isNullable != newCol.isNullable) {
+              actions.add('ALTER COLUMN ${_quoteIdentifier(newCol.name)} ${newCol.isNullable ? 'DROP NOT NULL' : 'SET NOT NULL'}');
+           }
+           
+           if (oldCol.defaultValue != newCol.defaultValue) {
+              if (newCol.defaultValue == null || newCol.defaultValue!.isEmpty) {
+                 actions.add('ALTER COLUMN ${_quoteIdentifier(newCol.name)} DROP DEFAULT');
+              } else {
+                 final defVal = newCol.defaultValue!.toUpperCase() == 'CURRENT_TIMESTAMP' 
+                     ? 'CURRENT_TIMESTAMP' 
+                     : "'${newCol.defaultValue!.replaceAll("'", "''")}'";
+                 actions.add('ALTER COLUMN ${_quoteIdentifier(newCol.name)} SET DEFAULT $defVal');
+              }
+           }
+           
+           if (oldCol.isAutoIncrement != newCol.isAutoIncrement) {
+               if (newCol.isAutoIncrement) {
+                   actions.add('ALTER COLUMN ${_quoteIdentifier(newCol.name)} ADD GENERATED ALWAYS AS IDENTITY');
+               } else {
+                   actions.add('ALTER COLUMN ${_quoteIdentifier(newCol.name)} DROP IDENTITY IF EXISTS');
+               }
+           }
+        } else {
+           final typeDef = _buildColumnDefinition(newCol);
+           actions.add('ADD COLUMN ${_quoteIdentifier(newCol.name)} $typeDef');
+        }
+      }
+      
+      for (final oldCol in oldColumns) {
+         if (!processedOldNames.contains(oldCol.name)) {
+            actions.add('DROP COLUMN ${_quoteIdentifier(oldCol.name)}');
+         }
+      }
+      
+      final oldPks = oldColumns.where((c) => c.isPrimaryKey).map((c) => c.name).toSet();
+      final newPks = newColumns.where((c) => c.isPrimaryKey).map((c) => c.name).toSet();
+      
+      final oldPkOrig = oldColumns.where((c) => c.isPrimaryKey).map((c) => c.name).toSet();
+      final newPkOrig = newColumns.where((c) => c.isPrimaryKey).map((c) => c.originalName ?? c.name).toSet();
+      
+      if (oldPkOrig.length != newPkOrig.length || oldPkOrig.intersection(newPkOrig).length != oldPkOrig.length) {
+         if (oldPks.isNotEmpty) {
+            actions.add('DROP CONSTRAINT IF EXISTS ${_quoteIdentifier('${oldTableName}_pkey')}');
+         }
+         if (newPks.isNotEmpty) {
+            final pkCols = newPks.map((n) => _quoteIdentifier(n)).join(', ');
+            actions.add('ADD PRIMARY KEY ($pkCols)');
+         }
+      }
+      
+      if (actions.isNotEmpty) {
+         final sql = 'ALTER TABLE ${_quoteIdentifier(oldTableName)} \n  ${actions.join(',\n  ')}';
+         await conn.execute(sql);
+      }
+      
+      if (oldTableName != newTableName) {
+         await conn.execute('ALTER TABLE ${_quoteIdentifier(oldTableName)} RENAME TO ${_quoteIdentifier(newTableName)}');
+      }
+      
+    } finally {
+      await conn.close();
+    }
+  }
+
+  String _buildColumnDefinition(TableColumnDefinition col) {
+    var def = '';
+    if (col.isAutoIncrement) {
+      if (col.type.toUpperCase() == 'INTEGER' || col.type.toUpperCase() == 'INT') {
+        def += 'SERIAL';
+      } else if (col.type.toUpperCase() == 'BIGINT') {
+        def += 'BIGSERIAL';
+      } else if (col.type.toUpperCase() == 'SMALLINT') {
+        def += 'SMALLSERIAL';
+      } else {
+        def += '${col.type} GENERATED ALWAYS AS IDENTITY';
+      }
+    } else {
+      def += col.type;
+      if (col.length != null) {
+        def += '(${col.length})';
+      }
+    }
+    
+    if (!col.isNullable) {
+      def += ' NOT NULL';
+    }
+    
+    if (col.defaultValue != null && col.defaultValue!.isNotEmpty) {
+      if (col.defaultValue!.toUpperCase() == 'CURRENT_TIMESTAMP') {
+         def += ' DEFAULT CURRENT_TIMESTAMP';
+      } else {
+         def += " DEFAULT '${col.defaultValue!.replaceAll("'", "''")}'";
+      }
+    }
+    return def;
+  }
 }

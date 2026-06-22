@@ -19,10 +19,12 @@ class ConnectionEditorTabKey extends EditorTabKey {
 class CreateTableTabKey extends EditorTabKey {
   final String connectionId;
   final String database;
+  final String? tableToEdit;
 
   const CreateTableTabKey({
     required this.connectionId,
     required this.database,
+    this.tableToEdit,
   });
 
   @override
@@ -30,10 +32,11 @@ class CreateTableTabKey extends EditorTabKey {
       identical(this, other) ||
       other is CreateTableTabKey &&
           connectionId == other.connectionId &&
-          database == other.database;
+          database == other.database &&
+          tableToEdit == other.tableToEdit;
 
   @override
-  int get hashCode => Object.hash(connectionId, database);
+  int get hashCode => Object.hash(connectionId, database, tableToEdit);
 }
 
 

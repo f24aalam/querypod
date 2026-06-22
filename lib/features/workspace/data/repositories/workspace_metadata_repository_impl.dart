@@ -49,4 +49,27 @@ class WorkspaceMetadataRepositoryImpl implements WorkspaceMetadataRepository {
     final driver = DatabaseDriverFactory.getDriver(connection.type);
     await driver.createTable(connection, database, tableName, columns);
   }
+
+  @override
+  Future<List<TableColumnDefinition>> getTableSchema(
+    Connection connection,
+    String database,
+    String table,
+  ) async {
+    final driver = DatabaseDriverFactory.getDriver(connection.type);
+    return await driver.getTableSchema(connection, database, table);
+  }
+
+  @override
+  Future<void> alterTable(
+    Connection connection,
+    String database,
+    String oldTableName,
+    String newTableName,
+    List<TableColumnDefinition> oldColumns,
+    List<TableColumnDefinition> newColumns,
+  ) async {
+    final driver = DatabaseDriverFactory.getDriver(connection.type);
+    await driver.alterTable(connection, database, oldTableName, newTableName, oldColumns, newColumns);
+  }
 }

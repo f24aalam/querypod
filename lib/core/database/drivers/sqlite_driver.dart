@@ -668,4 +668,154 @@ class SQLiteDriver implements DatabaseDriver {
       await db.close();
     }
   }
+
+  @override
+  Future<List<TableColumnDefinition>> getTableSchema(
+    Connection connection,
+    String database,
+    String table,
+  ) async {
+    final db = await _connect(connection);
+    try {
+      final quotedTable = _quoteIdentifier(table);
+      final sql = 'PRAGMA table_info($quotedTable)';
+      final schema = await db.rawQuery(sql);
+
+      final masterSql = "SELECT sql FROM sqlite_master WHERE type='table' AND name=?";
+      final masterRes = await db.rawQuery(masterSql, [table]);
+      final createSql = masterRes.isNotEmpty ? masterRes.first['sql'] as String? ?? '' : '';
+
+      final columns = schema.map((row) {
+        final name = _asString(row['name']);
+        final typeRaw = _asString(row['type']);
+        final isPk = row['pk'] != 0;
+        final isNullable = row['notnull'] == 0;
+        final defaultValue = row['dflt_value'] != null ? _asString(row['dflt_value']) : null;
+        
+        bool isAutoIncrement = false;
+        if (isPk) {
+           final aiRegex = RegExp('${RegExp.escape(name)}[^,]+AUTOINCREMENT', caseSensitive: false);
+           if (aiRegex.hasMatch(createSql)) {
+              isAutoIncrement = true;
+           }
+        }
+        
+        int? length;
+        var type = typeRaw;
+        
+        final lengthMatch = RegExp(r'\((\d+)\)').firstMatch(typeRaw);
+        if (lengthMatch != null) {
+          length = int.tryParse(lengthMatch.group(1)!);
+          type = typeRaw.replaceAll(lengthMatch.group(0)!, '');
+        }
+        
+        type = type.split(' ')[0].toUpperCase();
+
+        var cleanDefault = defaultValue;
+        if (cleanDefault != null) {
+           if (cleanDefault.startsWith("'") && cleanDefault.endsWith("'")) {
+               cleanDefault = cleanDefault.substring(1, cleanDefault.length - 1);
+           }
+        }
+
+        return TableColumnDefinition(
+          name: name,
+          originalName: name,
+          type: type,
+          length: length,
+          isPrimaryKey: isPk,
+          isNullable: isNullable,
+          isAutoIncrement: isAutoIncrement,
+          defaultValue: cleanDefault,
+        );
+      }).toList();
+      return columns;
+    } finally {
+      await db.close();
+    }
+  }
+
+  @override
+  Future<void> alterTable(
+    Connection connection,
+    String database,
+    String oldTableName,
+    String newTableName,
+    List<TableColumnDefinition> oldColumns,
+    List<TableColumnDefinition> newColumns,
+  ) async {
+    final db = await _connect(connection);
+    try {
+      await db.execute('PRAGMA foreign_keys=OFF;');
+      
+      await db.transaction((txn) async {
+         final tmpTable = '${oldTableName}_tmp_${DateTime.now().millisecondsSinceEpoch}';
+         
+         final columnDefs = <String>[];
+         final primaryKeys = <String>[];
+         bool hasAutoIncrement = false;
+
+         for (final col in newColumns) {
+           var def = '"${col.name.replaceAll('"', '""')}" ${col.type}';
+           
+           if (col.isPrimaryKey) {
+             if (col.isAutoIncrement) {
+               def += ' PRIMARY KEY AUTOINCREMENT';
+               hasAutoIncrement = true;
+             } else {
+               primaryKeys.add('"${col.name.replaceAll('"', '""')}"');
+             }
+           } else if (col.isAutoIncrement) {
+             throw ArgumentError('AUTOINCREMENT is only allowed on an INTEGER PRIMARY KEY in SQLite.');
+           }
+           
+           if (!col.isNullable && !col.isPrimaryKey) {
+             def += ' NOT NULL';
+           }
+           
+           if (col.defaultValue != null && col.defaultValue!.isNotEmpty) {
+             if (col.defaultValue!.toUpperCase() == 'CURRENT_TIMESTAMP') {
+                def += ' DEFAULT CURRENT_TIMESTAMP';
+             } else {
+                def += " DEFAULT '${col.defaultValue!.replaceAll("'", "''")}'";
+             }
+           }
+
+           columnDefs.add(def);
+         }
+
+         if (primaryKeys.isNotEmpty && !hasAutoIncrement) {
+           columnDefs.add('PRIMARY KEY (${primaryKeys.join(', ')})');
+         }
+
+         final createSql = 'CREATE TABLE "${tmpTable.replaceAll('"', '""')}" (\n  ${columnDefs.join(',\n  ')}\n)';
+         await txn.execute(createSql);
+         
+         final oldNames = <String>[];
+         final newNames = <String>[];
+         
+         final oldMap = {for (final c in oldColumns) c.name: c};
+         for (final newCol in newColumns) {
+            final origName = newCol.originalName;
+            if (origName != null && oldMap.containsKey(origName)) {
+               oldNames.add('"${origName.replaceAll('"', '""')}"');
+               newNames.add('"${newCol.name.replaceAll('"', '""')}"');
+            }
+         }
+         
+         if (oldNames.isNotEmpty) {
+            final insertSql = 'INSERT INTO "${tmpTable.replaceAll('"', '""')}" (${newNames.join(', ')}) SELECT ${oldNames.join(', ')} FROM "${oldTableName.replaceAll('"', '""')}"';
+            await txn.execute(insertSql);
+         }
+         
+         await txn.execute('DROP TABLE "${oldTableName.replaceAll('"', '""')}"');
+         
+         await txn.execute('ALTER TABLE "${tmpTable.replaceAll('"', '""')}" RENAME TO "${newTableName.replaceAll('"', '""')}"');
+      });
+      
+      await db.execute('PRAGMA foreign_keys=ON;');
+    } finally {
+      await db.close();
+    }
+  }
 }

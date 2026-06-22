@@ -21,4 +21,17 @@ abstract class WorkspaceMetadataRepository {
     String tableName,
     List<TableColumnDefinition> columns,
   );
+  Future<List<TableColumnDefinition>> getTableSchema(
+    Connection connection,
+    String database,
+    String table,
+  );
+  Future<void> alterTable(
+    Connection connection,
+    String database,
+    String oldTableName,
+    String newTableName,
+    List<TableColumnDefinition> oldColumns,
+    List<TableColumnDefinition> newColumns,
+  );
 }

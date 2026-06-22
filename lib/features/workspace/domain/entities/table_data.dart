@@ -64,6 +64,7 @@ class TableIndex {
 
 class TableColumnDefinition {
   final String name;
+  final String? originalName;
   final String type;
   final int? length;
   final bool isPrimaryKey;
@@ -73,6 +74,7 @@ class TableColumnDefinition {
 
   const TableColumnDefinition({
     required this.name,
+    this.originalName,
     required this.type,
     this.length,
     this.isPrimaryKey = false,
@@ -83,6 +85,7 @@ class TableColumnDefinition {
 
   TableColumnDefinition copyWith({
     String? name,
+    String? originalName,
     String? type,
     int? length,
     bool? isPrimaryKey,
@@ -92,6 +95,7 @@ class TableColumnDefinition {
   }) {
     return TableColumnDefinition(
       name: name ?? this.name,
+      originalName: originalName ?? this.originalName,
       type: type ?? this.type,
       length: length ?? this.length,
       isPrimaryKey: isPrimaryKey ?? this.isPrimaryKey,

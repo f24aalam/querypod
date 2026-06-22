@@ -41,6 +41,15 @@ class _CreateTableEditorContentState extends State<_CreateTableEditorContent> {
   final _tableNameController = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+    final key = widget.tab.key as CreateTableTabKey;
+    if (key.tableToEdit != null) {
+      context.read<CreateTableCubit>().loadTableSchema(key.database, key.tableToEdit!);
+    }
+  }
+
+  @override
   void dispose() {
     _tableNameController.dispose();
     super.dispose();
@@ -56,8 +65,11 @@ class _CreateTableEditorContentState extends State<_CreateTableEditorContent> {
     final theme = context.theme;
 
     return BlocConsumer<CreateTableCubit, CreateTableState>(
-      listenWhen: (prev, curr) => prev.isSuccess != curr.isSuccess || prev.errorMessage != curr.errorMessage,
+      listenWhen: (prev, curr) => prev.isSuccess != curr.isSuccess || prev.errorMessage != curr.errorMessage || prev.tableName != curr.tableName,
       listener: (context, state) {
+        if (state.tableName.isNotEmpty && _tableNameController.text != state.tableName && state.originalTableName != null) {
+           _tableNameController.text = state.tableName;
+        }
         if (state.isSuccess) {
           _handleSuccess(context);
         } else if (state.errorMessage != null) {
@@ -65,6 +77,19 @@ class _CreateTableEditorContentState extends State<_CreateTableEditorContent> {
         }
       },
       builder: (context, state) {
+        if (state.isLoading) {
+          return Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(color: theme.colors.primary),
+                const SizedBox(height: 16),
+                Text('Loading table schema...', style: TextStyle(color: theme.colors.mutedForeground)),
+              ],
+            ),
+          );
+        }
+
         return Container(
           color: theme.colors.background,
           padding: const EdgeInsets.all(24),
@@ -72,7 +97,7 @@ class _CreateTableEditorContentState extends State<_CreateTableEditorContent> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Create Table',
+                state.originalTableName != null ? 'Edit Table' : 'Create Table',
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.w600,
@@ -166,7 +191,7 @@ class _CreateTableEditorContentState extends State<_CreateTableEditorContent> {
                             height: 16,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : const Text('Create Table'),
+                        : Text(state.originalTableName != null ? 'Save Changes' : 'Create Table'),
                   ),
                 ],
               ),

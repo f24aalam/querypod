@@ -231,6 +231,55 @@ class WorkspaceMetadataCubit extends Cubit<WorkspaceMetadataState> {
     }
   }
 
+  Future<List<TableColumnDefinition>> getTableSchema(
+    Connection connection,
+    String database,
+    String table,
+  ) async {
+    try {
+      return await _repository.getTableSchema(connection, database, table);
+    } catch (e) {
+      emit(
+        _feedback(
+          _metadataErrorMessage(
+            e,
+            fallback: 'Failed to get schema for table $table',
+          ),
+          isError: true,
+          status: state.status,
+        ),
+      );
+      rethrow;
+    }
+  }
+
+  Future<void> alterTable(
+    Connection connection,
+    String database,
+    String oldTableName,
+    String newTableName,
+    List<TableColumnDefinition> oldColumns,
+    List<TableColumnDefinition> newColumns,
+  ) async {
+    try {
+      await _repository.alterTable(connection, database, oldTableName, newTableName, oldColumns, newColumns);
+      
+      await selectDatabase(connection, database);
+    } catch (e) {
+      emit(
+        _feedback(
+          _metadataErrorMessage(
+            e,
+            fallback: 'Failed to alter table $oldTableName',
+          ),
+          isError: true,
+          status: state.status,
+        ),
+      );
+      rethrow;
+    }
+  }
+
   Future<void> _loadTables(
     Connection connection,
     String database, {

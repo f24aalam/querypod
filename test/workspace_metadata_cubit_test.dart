@@ -135,6 +135,25 @@ class _ControlledRepository implements WorkspaceMetadataRepository {
     String tableName,
     List<TableColumnDefinition> columns,
   ) async {}
+
+  @override
+  Future<List<TableColumnDefinition>> getTableSchema(
+    Connection connection,
+    String database,
+    String table,
+  ) async {
+    return [];
+  }
+
+  @override
+  Future<void> alterTable(
+    Connection connection,
+    String database,
+    String oldTableName,
+    String newTableName,
+    List<TableColumnDefinition> oldColumns,
+    List<TableColumnDefinition> newColumns,
+  ) async {}
 }
 
 class _DatabaseSwitchRepository implements WorkspaceMetadataRepository {
@@ -170,5 +189,24 @@ class _DatabaseSwitchRepository implements WorkspaceMetadataRepository {
     String database,
     String tableName,
     List<TableColumnDefinition> columns,
+  ) async {}
+
+  @override
+  Future<List<TableColumnDefinition>> getTableSchema(
+    Connection connection,
+    String database,
+    String table,
+  ) async {
+    return [];
+  }
+
+  @override
+  Future<void> alterTable(
+    Connection connection,
+    String database,
+    String oldTableName,
+    String newTableName,
+    List<TableColumnDefinition> oldColumns,
+    List<TableColumnDefinition> newColumns,
   ) async {}
 }

@@ -706,4 +706,67 @@ class PostgresDriver implements DatabaseDriver {
       await conn.close();
     }
   }
+
+  @override
+  Future<void> createTable(
+    covariant Connection connection,
+    String database,
+    String tableName,
+    List<TableColumnDefinition> columns,
+  ) async {
+    final conn = await _connect(connection, database: database);
+    try {
+      final columnDefs = <String>[];
+      final primaryKeys = <String>[];
+
+      for (final col in columns) {
+        var def = '"${col.name.replaceAll('"', '""')}"';
+        
+        if (col.isAutoIncrement) {
+          if (col.type.toUpperCase() == 'INTEGER' || col.type.toUpperCase() == 'INT') {
+            def += ' SERIAL';
+          } else if (col.type.toUpperCase() == 'BIGINT') {
+            def += ' BIGSERIAL';
+          } else if (col.type.toUpperCase() == 'SMALLINT') {
+            def += ' SMALLSERIAL';
+          } else {
+            // Postgres 10+ standard way
+            def += ' ${col.type} GENERATED ALWAYS AS IDENTITY';
+          }
+        } else {
+          def += ' ${col.type}';
+          if (col.length != null) {
+            def += '(${col.length})';
+          }
+        }
+        
+        if (!col.isNullable) {
+          def += ' NOT NULL';
+        }
+        
+        if (col.defaultValue != null && col.defaultValue!.isNotEmpty) {
+          if (col.defaultValue!.toUpperCase() == 'CURRENT_TIMESTAMP') {
+             def += ' DEFAULT CURRENT_TIMESTAMP';
+          } else {
+             def += " DEFAULT '${col.defaultValue!.replaceAll("'", "''")}'";
+          }
+        }
+
+        if (col.isPrimaryKey) {
+          primaryKeys.add('"${col.name.replaceAll('"', '""')}"');
+        }
+
+        columnDefs.add(def);
+      }
+
+      if (primaryKeys.isNotEmpty) {
+        columnDefs.add('PRIMARY KEY (${primaryKeys.join(', ')})');
+      }
+
+      final sql = 'CREATE TABLE "${tableName.replaceAll('"', '""')}" (\n  ${columnDefs.join(',\n  ')}\n)';
+      await conn.execute(sql);
+    } finally {
+      await conn.close();
+    }
+  }
 }

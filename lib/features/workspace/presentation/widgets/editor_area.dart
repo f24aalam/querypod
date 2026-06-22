@@ -14,6 +14,7 @@ import '../cubit/workspace_metadata_cubit.dart';
 import 'query_code_editor.dart';
 import 'query_result_viewer.dart';
 import 'table_data_editor.dart';
+import 'create_table_editor.dart';
 
 class EditorArea extends StatelessWidget {
   const EditorArea({super.key});
@@ -245,6 +246,8 @@ class _EditorTabBody extends StatelessWidget {
                               ? Icons.storage_outlined
                               : tab.type == EditorTabType.query
                               ? Icons.code_outlined
+                              : tab.type == EditorTabType.createTable
+                              ? Icons.add_box_outlined
                               : (tab.tableType == WorkspaceTableType.view
                                     ? Icons.visibility_outlined
                                     : Icons.table_chart_outlined),
@@ -326,6 +329,8 @@ class _ActiveEditor extends StatelessWidget {
               ? const ConnectionForm()
               : tab.type == EditorTabType.table
               ? TableDataEditor(tab: tab)
+              : tab.type == EditorTabType.createTable
+              ? CreateTableEditor(tab: tab)
               : _QueryEditorTab(tab: tab),
         );
       },

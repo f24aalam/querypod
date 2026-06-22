@@ -282,4 +282,38 @@ class EditorTabsCubit extends Cubit<EditorTabsState> {
       ),
     );
   }
+
+  void openCreateTableTab({
+    required String connectionId,
+    required String database,
+  }) {
+    final key = CreateTableTabKey(
+      connectionId: connectionId,
+      database: database,
+    );
+    final index = state.tabs.indexWhere((tab) => tab.key == key);
+    final tabs = List<EditorTab>.from(state.tabs);
+    final tab = EditorTab(
+      key: key,
+      type: EditorTabType.createTable,
+      title: 'Create Table',
+      connectionId: connectionId,
+      database: database,
+    );
+
+    if (index == -1) {
+      tabs.add(tab);
+    } else {
+      if (state.tabs[index] == tab && state.activeTabKey == key) return;
+      tabs[index] = tab;
+    }
+
+    emit(
+      EditorTabsState(
+        tabs: tabs,
+        activeTabKey: key,
+        previewTabKey: state.previewTabKey,
+      ),
+    );
+  }
 }

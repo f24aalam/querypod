@@ -6,6 +6,7 @@ import 'package:querypod/features/workspace/domain/entities/workspace_database.d
 import 'package:querypod/features/workspace/domain/entities/workspace_table.dart';
 import 'package:querypod/features/workspace/domain/repositories/workspace_metadata_repository.dart';
 import 'package:querypod/features/workspace/presentation/cubit/workspace_metadata_cubit.dart';
+import 'package:querypod/features/workspace/domain/entities/table_data.dart';
 
 void main() {
   const firstConnection = Connection(
@@ -126,6 +127,14 @@ class _ControlledRepository implements WorkspaceMetadataRepository {
     String? charset,
     String? collation,
   }) async {}
+
+  @override
+  Future<void> createTable(
+    Connection connection,
+    String database,
+    String tableName,
+    List<TableColumnDefinition> columns,
+  ) async {}
 }
 
 class _DatabaseSwitchRepository implements WorkspaceMetadataRepository {
@@ -154,4 +163,12 @@ class _DatabaseSwitchRepository implements WorkspaceMetadataRepository {
     String? charset,
     String? collation,
   }) async {}
+
+  @override
+  Future<void> createTable(
+    Connection connection,
+    String database,
+    String tableName,
+    List<TableColumnDefinition> columns,
+  ) async {}
 }

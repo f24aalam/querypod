@@ -614,4 +614,58 @@ class SQLiteDriver implements DatabaseDriver {
   }) async {
     throw UnsupportedError('SQLite does not support creating multiple databases');
   }
+
+  @override
+  Future<void> createTable(
+    Connection connection,
+    String database,
+    String tableName,
+    List<TableColumnDefinition> columns,
+  ) async {
+    final db = await _connect(connection);
+    try {
+      final columnDefs = <String>[];
+      final primaryKeys = <String>[];
+      bool hasAutoIncrement = false;
+
+      for (final col in columns) {
+        var def = '"${col.name.replaceAll('"', '""')}" ${col.type}';
+        
+        if (col.isPrimaryKey) {
+          if (col.isAutoIncrement) {
+            def += ' PRIMARY KEY AUTOINCREMENT';
+            hasAutoIncrement = true;
+          } else {
+            primaryKeys.add('"${col.name.replaceAll('"', '""')}"');
+          }
+        } else if (col.isAutoIncrement) {
+          // SQLite AUTOINCREMENT is only allowed on an INTEGER PRIMARY KEY
+          throw ArgumentError('AUTOINCREMENT is only allowed on an INTEGER PRIMARY KEY in SQLite.');
+        }
+        
+        if (!col.isNullable && !col.isPrimaryKey) {
+          def += ' NOT NULL';
+        }
+        
+        if (col.defaultValue != null && col.defaultValue!.isNotEmpty) {
+          if (col.defaultValue!.toUpperCase() == 'CURRENT_TIMESTAMP') {
+             def += ' DEFAULT CURRENT_TIMESTAMP';
+          } else {
+             def += " DEFAULT '${col.defaultValue!.replaceAll("'", "''")}'";
+          }
+        }
+
+        columnDefs.add(def);
+      }
+
+      if (primaryKeys.isNotEmpty && !hasAutoIncrement) {
+        columnDefs.add('PRIMARY KEY (${primaryKeys.join(', ')})');
+      }
+
+      final sql = 'CREATE TABLE "${tableName.replaceAll('"', '""')}" (\n  ${columnDefs.join(',\n  ')}\n)';
+      await db.execute(sql);
+    } finally {
+      await db.close();
+    }
+  }
 }

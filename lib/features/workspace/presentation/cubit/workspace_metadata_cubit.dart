@@ -3,6 +3,7 @@ import 'package:mysql_client_plus/exception.dart';
 
 import '../../../connections/domain/entities/connection.dart';
 import '../../domain/entities/workspace_table.dart';
+import '../../domain/entities/table_data.dart';
 import '../../domain/repositories/workspace_metadata_repository.dart';
 import 'workspace_metadata_state.dart';
 
@@ -200,6 +201,32 @@ class WorkspaceMetadataCubit extends Cubit<WorkspaceMetadataState> {
         ),
       );
       // Re-throw if the UI wants to catch it
+      rethrow;
+    }
+  }
+
+  Future<void> createTable(
+    Connection connection,
+    String database,
+    String tableName,
+    List<TableColumnDefinition> columns,
+  ) async {
+    try {
+      await _repository.createTable(connection, database, tableName, columns);
+      
+      // Refresh tables
+      await selectDatabase(connection, database);
+    } catch (e) {
+      emit(
+        _feedback(
+          _metadataErrorMessage(
+            e,
+            fallback: 'Failed to create table $tableName',
+          ),
+          isError: true,
+          status: state.status,
+        ),
+      );
       rethrow;
     }
   }

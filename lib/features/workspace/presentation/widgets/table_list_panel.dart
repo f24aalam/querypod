@@ -64,17 +64,34 @@ class _TableListPanelState extends State<TableListPanel> {
                       bottom: BorderSide(color: theme.colors.border, width: 1),
                     ),
                   ),
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      'TABLES',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 0.8,
-                        color: theme.colors.mutedForeground,
+                  child: Row(
+                    children: [
+                      Text(
+                        'TABLES',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.8,
+                          color: theme.colors.mutedForeground,
+                        ),
                       ),
-                    ),
+                      const Spacer(),
+                      FButton.icon(
+                        onPress: () {
+                          final selectedConnection = context.read<ConnectionCubit>().state.activeConnection;
+                          final database = state.selectedDatabase;
+                          if (selectedConnection != null && database != null) {
+                            context.read<EditorTabsCubit>().openCreateTableTab(
+                              connectionId: selectedConnection.id,
+                              database: database,
+                            );
+                          }
+                        },
+                        size: FButtonSizeVariant.sm,
+                        variant: FButtonVariant.ghost,
+                        child: Icon(Icons.add, size: 16, color: theme.colors.mutedForeground),
+                      ),
+                    ],
                   ),
                 ),
                 Padding(

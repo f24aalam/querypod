@@ -62,6 +62,46 @@ class TableIndex {
   });
 }
 
+class TableColumnDefinition {
+  final String name;
+  final String type;
+  final int? length;
+  final bool isPrimaryKey;
+  final bool isNullable;
+  final bool isAutoIncrement;
+  final String? defaultValue;
+
+  const TableColumnDefinition({
+    required this.name,
+    required this.type,
+    this.length,
+    this.isPrimaryKey = false,
+    this.isNullable = true,
+    this.isAutoIncrement = false,
+    this.defaultValue,
+  });
+
+  TableColumnDefinition copyWith({
+    String? name,
+    String? type,
+    int? length,
+    bool? isPrimaryKey,
+    bool? isNullable,
+    bool? isAutoIncrement,
+    String? defaultValue,
+  }) {
+    return TableColumnDefinition(
+      name: name ?? this.name,
+      type: type ?? this.type,
+      length: length ?? this.length,
+      isPrimaryKey: isPrimaryKey ?? this.isPrimaryKey,
+      isNullable: isNullable ?? this.isNullable,
+      isAutoIncrement: isAutoIncrement ?? this.isAutoIncrement,
+      defaultValue: defaultValue ?? this.defaultValue,
+    );
+  }
+}
+
 class TableDataColumn {
   final String name;
   final String databaseType;

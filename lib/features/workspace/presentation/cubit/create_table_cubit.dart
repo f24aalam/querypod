@@ -45,7 +45,7 @@ class CreateTableCubit extends Cubit<CreateTableState> {
 
     if (oldColumn.type != newColumn.type) {
       final type = newColumn.type.toUpperCase();
-      if (type.contains('VARCHAR') || type.contains('CHAR')) {
+      if (type.contains('VARCHAR') || type.contains('CHAR') || type.contains('VARBINARY') || type.contains('BINARY')) {
         if (newColumn.length == null) {
           newColumn = TableColumnDefinition(
             name: newColumn.name,

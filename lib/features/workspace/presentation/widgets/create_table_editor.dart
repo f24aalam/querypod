@@ -237,13 +237,11 @@ class _ColumnEditorRowState extends State<_ColumnEditorRow> {
     final connCubit = context.watch<ConnectionCubit>();
     final connType = connCubit.state.activeConnection?.type ?? ConnectionType.postgresql;
     
-    final types = connType == ConnectionType.postgresql
-        ? ['VARCHAR', 'TEXT', 'INTEGER', 'BIGINT', 'BOOLEAN', 'TIMESTAMP', 'UUID']
+    final categories = connType == ConnectionType.postgresql
+        ? postgresCategories
         : connType == ConnectionType.mysql
-            ? ['VARCHAR', 'TEXT', 'INT', 'BIGINT', 'BOOLEAN', 'DATETIME', 'TIMESTAMP']
-            : ['TEXT', 'INTEGER', 'REAL', 'BLOB'];
-            
-    final typeItems = {for (final t in types) t: t};
+            ? mysqlCategories
+            : sqliteCategories;
 
     final typeUpper = widget.column.type.toUpperCase();
     final supportsLength = typeUpper.contains('VARCHAR') || typeUpper.contains('CHAR');
@@ -266,15 +264,24 @@ class _ColumnEditorRowState extends State<_ColumnEditorRow> {
           const SizedBox(width: 12),
           Expanded(
             flex: 3,
-            child: FSelect<String>(
+            child: FSelect<String>.rich(
               label: const Text('Type'),
-              items: typeItems,
+              format: (s) => s,
               control: FSelectControl.lifted(
                 value: widget.column.type,
                 onChange: (val) {
                   if (val != null) _update(widget.column.copyWith(type: val));
                 },
               ),
+              children: [
+                for (final category in categories)
+                  FSelectSection<String>(
+                    label: Text(category.name),
+                    items: {
+                      for (final t in category.types) t: t,
+                    },
+                  ),
+              ],
             ),
           ),
           const SizedBox(width: 12),
@@ -353,3 +360,37 @@ class _ColumnEditorRowState extends State<_ColumnEditorRow> {
     );
   }
 }
+
+class ColumnTypeCategory {
+  final String name;
+  final List<String> types;
+
+  const ColumnTypeCategory(this.name, this.types);
+}
+
+const postgresCategories = [
+  ColumnTypeCategory('Numeric', ['SMALLINT', 'INTEGER', 'BIGINT', 'DECIMAL', 'NUMERIC', 'REAL', 'DOUBLE PRECISION', 'SERIAL', 'BIGSERIAL']),
+  ColumnTypeCategory('Character', ['VARCHAR', 'CHAR', 'TEXT']),
+  ColumnTypeCategory('Date & Time', ['DATE', 'TIME', 'TIMESTAMP', 'INTERVAL']),
+  ColumnTypeCategory('Boolean', ['BOOLEAN']),
+  ColumnTypeCategory('JSON', ['JSON', 'JSONB']),
+  ColumnTypeCategory('Binary/Other', ['BYTEA', 'UUID', 'XML']),
+];
+
+const mysqlCategories = [
+  ColumnTypeCategory('Numeric', ['TINYINT', 'SMALLINT', 'MEDIUMINT', 'INT', 'BIGINT', 'DECIMAL', 'FLOAT', 'DOUBLE']),
+  ColumnTypeCategory('Character', ['VARCHAR', 'CHAR', 'TINYTEXT', 'TEXT', 'MEDIUMTEXT', 'LONGTEXT']),
+  ColumnTypeCategory('Date & Time', ['DATE', 'TIME', 'DATETIME', 'TIMESTAMP', 'YEAR']),
+  ColumnTypeCategory('Boolean', ['BOOLEAN']),
+  ColumnTypeCategory('JSON', ['JSON']),
+  ColumnTypeCategory('Binary/Other', ['BINARY', 'VARBINARY', 'BLOB']),
+];
+
+const sqliteCategories = [
+  ColumnTypeCategory('Numeric', ['INTEGER', 'REAL', 'NUMERIC']),
+  ColumnTypeCategory('Character', ['TEXT']),
+  ColumnTypeCategory('Date & Time', ['DATETIME', 'DATE', 'TIME']),
+  ColumnTypeCategory('Boolean', ['BOOLEAN']),
+  ColumnTypeCategory('JSON', ['JSON']),
+  ColumnTypeCategory('Binary/Other', ['BLOB']),
+];

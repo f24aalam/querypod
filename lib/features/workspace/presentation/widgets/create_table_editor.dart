@@ -9,6 +9,7 @@ import '../cubit/create_table_cubit.dart';
 import '../cubit/create_table_state.dart';
 import '../cubit/editor_tabs_cubit.dart';
 import '../cubit/editor_tabs_state.dart';
+import '../cubit/table_data_cubit.dart';
 import '../cubit/workspace_metadata_cubit.dart';
 
 class CreateTableEditor extends StatelessWidget {
@@ -57,7 +58,24 @@ class _CreateTableEditorContentState extends State<_CreateTableEditorContent> {
 
   void _handleSuccess(BuildContext context) {
     final key = widget.tab.key as CreateTableTabKey;
+    final state = context.read<CreateTableCubit>().state;
     context.read<EditorTabsCubit>().closeTab(key);
+
+    if (state.originalTableName != null && state.originalTableName != state.tableName) {
+      final oldTableTabKey = TableTabKey(
+        connectionId: key.connectionId,
+        database: key.database,
+        tableName: state.originalTableName!,
+      );
+      context.read<EditorTabsCubit>().closeTab(oldTableTabKey);
+    }
+
+    final tableTabKey = TableTabKey(
+      connectionId: key.connectionId,
+      database: key.database,
+      tableName: state.tableName,
+    );
+    context.read<TableDataCubit>().refresh(tableTabKey);
   }
 
   @override

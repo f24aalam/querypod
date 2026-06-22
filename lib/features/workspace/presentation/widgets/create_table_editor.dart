@@ -245,6 +245,9 @@ class _ColumnEditorRowState extends State<_ColumnEditorRow> {
             
     final typeItems = {for (final t in types) t: t};
 
+    final typeUpper = widget.column.type.toUpperCase();
+    final supportsLength = typeUpper.contains('VARCHAR') || typeUpper.contains('CHAR');
+
     return Padding(
       padding: const EdgeInsets.all(12),
       child: Row(
@@ -277,12 +280,18 @@ class _ColumnEditorRowState extends State<_ColumnEditorRow> {
           const SizedBox(width: 12),
           Expanded(
             flex: 2,
-            child: FTextField(
-              control: FTextFieldControl.managed(
-                controller: _lengthController,
-                onChange: (val) => _update(widget.column.copyWith(length: int.tryParse(val.text))),
+            child: Opacity(
+              opacity: supportsLength ? 1.0 : 0.5,
+              child: IgnorePointer(
+                ignoring: !supportsLength,
+                child: FTextField(
+                  control: FTextFieldControl.managed(
+                    controller: _lengthController,
+                    onChange: (val) => _update(widget.column.copyWith(length: int.tryParse(val.text))),
+                  ),
+                  label: const Text('Length'),
+                ),
               ),
-              label: const Text('Length'),
             ),
           ),
           const SizedBox(width: 12),

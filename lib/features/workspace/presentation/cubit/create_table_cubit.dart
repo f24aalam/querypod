@@ -20,12 +20,17 @@ class CreateTableCubit extends Cubit<CreateTableState> {
   }
 
   void addColumn() {
+    final connType = _connectionCubit.state.activeConnection?.type;
+    final isSqlite = connType != null && connType.name == 'sqlite';
+    final defaultType = isSqlite ? 'TEXT' : 'VARCHAR';
+    final defaultLength = defaultType == 'VARCHAR' ? 255 : null;
+
     final columns = List<TableColumnDefinition>.from(state.columns);
     columns.add(
-      const TableColumnDefinition(
+      TableColumnDefinition(
         name: '',
-        type: 'VARCHAR',
-        length: 255,
+        type: defaultType,
+        length: defaultLength,
       ),
     );
     emit(state.copyWith(columns: columns, errorMessage: null));
@@ -33,8 +38,39 @@ class CreateTableCubit extends Cubit<CreateTableState> {
 
   void updateColumn(int index, TableColumnDefinition column) {
     if (index < 0 || index >= state.columns.length) return;
+    
     final columns = List<TableColumnDefinition>.from(state.columns);
-    columns[index] = column;
+    final oldColumn = columns[index];
+    var newColumn = column;
+
+    if (oldColumn.type != newColumn.type) {
+      final type = newColumn.type.toUpperCase();
+      if (type.contains('VARCHAR') || type.contains('CHAR')) {
+        if (newColumn.length == null) {
+          newColumn = TableColumnDefinition(
+            name: newColumn.name,
+            type: newColumn.type,
+            length: 255,
+            isPrimaryKey: newColumn.isPrimaryKey,
+            isNullable: newColumn.isNullable,
+            isAutoIncrement: newColumn.isAutoIncrement,
+            defaultValue: newColumn.defaultValue,
+          );
+        }
+      } else {
+        newColumn = TableColumnDefinition(
+          name: newColumn.name,
+          type: newColumn.type,
+          length: null,
+          isPrimaryKey: newColumn.isPrimaryKey,
+          isNullable: newColumn.isNullable,
+          isAutoIncrement: newColumn.isAutoIncrement,
+          defaultValue: newColumn.defaultValue,
+        );
+      }
+    }
+
+    columns[index] = newColumn;
     emit(state.copyWith(columns: columns, errorMessage: null));
   }
 

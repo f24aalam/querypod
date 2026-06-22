@@ -140,6 +140,35 @@ class WorkspaceMetadataCubit extends Cubit<WorkspaceMetadataState> {
     }
   }
 
+  Future<void> refreshTables(Connection connection, String database) async {
+    final session = connection.sessionIdentity;
+    if (state.connectionSession != session) return;
+    final request = ++_requestGeneration;
+
+    emit(state.copyWith(status: WorkspaceMetadataStatus.loadingTables));
+
+    try {
+      await _loadTables(
+        connection,
+        database,
+        request: request,
+        session: session,
+      );
+    } catch (e) {
+      if (!_isCurrent(request, session, database: database)) return;
+      emit(
+        _feedback(
+          _metadataErrorMessage(
+            e,
+            fallback: 'Failed to refresh tables for $database',
+          ),
+          isError: true,
+          status: WorkspaceMetadataStatus.error,
+        ),
+      );
+    }
+  }
+
   void search(String query) {
     final filtered = _filter(state.tables, query);
     final selectedTable =
@@ -215,7 +244,7 @@ class WorkspaceMetadataCubit extends Cubit<WorkspaceMetadataState> {
       await _repository.createTable(connection, database, tableName, columns);
       
       // Refresh tables
-      await selectDatabase(connection, database);
+      await refreshTables(connection, database);
     } catch (e) {
       emit(
         _feedback(
@@ -264,7 +293,7 @@ class WorkspaceMetadataCubit extends Cubit<WorkspaceMetadataState> {
     try {
       await _repository.alterTable(connection, database, oldTableName, newTableName, oldColumns, newColumns);
       
-      await selectDatabase(connection, database);
+      await refreshTables(connection, database);
     } catch (e) {
       emit(
         _feedback(

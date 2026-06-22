@@ -78,7 +78,31 @@ class _TableListPanelState extends State<TableListPanel> {
                       const Spacer(),
                       FButton.icon(
                         onPress: () {
-                          final selectedConnection = context.read<ConnectionCubit>().state.activeConnection;
+                          final selectedConnection = context
+                              .read<ConnectionCubit>()
+                              .state
+                              .activeConnection;
+                          final database = state.selectedDatabase;
+                          if (selectedConnection != null && database != null) {
+                            context
+                                .read<WorkspaceMetadataCubit>()
+                                .refreshTables(selectedConnection, database);
+                          }
+                        },
+                        size: FButtonSizeVariant.sm,
+                        variant: FButtonVariant.ghost,
+                        child: Icon(
+                          Icons.refresh,
+                          size: 16,
+                          color: theme.colors.mutedForeground,
+                        ),
+                      ),
+                      FButton.icon(
+                        onPress: () {
+                          final selectedConnection = context
+                              .read<ConnectionCubit>()
+                              .state
+                              .activeConnection;
                           final database = state.selectedDatabase;
                           if (selectedConnection != null && database != null) {
                             context.read<EditorTabsCubit>().openCreateTableTab(
@@ -89,7 +113,11 @@ class _TableListPanelState extends State<TableListPanel> {
                         },
                         size: FButtonSizeVariant.sm,
                         variant: FButtonVariant.ghost,
-                        child: Icon(Icons.add, size: 16, color: theme.colors.mutedForeground),
+                        child: Icon(
+                          Icons.add,
+                          size: 16,
+                          color: theme.colors.mutedForeground,
+                        ),
                       ),
                     ],
                   ),
@@ -324,10 +352,7 @@ class _DatabasePicker extends StatelessWidget {
                     const SizedBox(width: 8),
                     FButton.icon(
                       onPress: () {
-                        CreateDatabaseDialog.show(
-                          context,
-                          selectedConnection,
-                        );
+                        CreateDatabaseDialog.show(context, selectedConnection);
                       },
                       size: FButtonSizeVariant.sm,
                       variant: FButtonVariant.outline,
@@ -364,10 +389,13 @@ class _TableItem extends StatelessWidget {
               onPress: () {
                 controller.hide();
                 final metadata = context.read<WorkspaceMetadataCubit>();
-                final connection = context.read<ConnectionCubit>().state.activeConnection;
+                final connection = context
+                    .read<ConnectionCubit>()
+                    .state
+                    .activeConnection;
                 final database = metadata.state.selectedDatabase;
                 if (connection == null || database == null) return;
-                
+
                 context.read<EditorTabsCubit>().openCreateTableTab(
                   connectionId: connection.id,
                   database: database,
@@ -397,7 +425,10 @@ class _TableItem extends StatelessWidget {
               Expanded(
                 child: Text(
                   table.name,
-                  style: TextStyle(fontSize: 13, color: theme.colors.foreground),
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: theme.colors.foreground,
+                  ),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),

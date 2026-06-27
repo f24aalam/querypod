@@ -74,6 +74,25 @@ set_target_properties(${BINARY_NAME}
 # them to the application.
 include(flutter/generated_plugins.cmake)
 
+foreach(plugin ${FLUTTER_PLUGIN_LIST})
+  set(plugin_target "${plugin}_plugin")
+  if(TARGET ${plugin_target})
+    set_target_properties(${plugin_target}
+      PROPERTIES
+      INSTALL_RPATH "$ORIGIN"
+    )
+  endif()
+endforeach()
+
+foreach(ffi_plugin ${FLUTTER_FFI_PLUGIN_LIST})
+  if(TARGET ${ffi_plugin})
+    set_target_properties(${ffi_plugin}
+      PROPERTIES
+      INSTALL_RPATH "$ORIGIN"
+    )
+  endif()
+endforeach()
+
 
 # === Installation ===
 # By default, "installing" just makes a relocatable bundle in the build
@@ -105,6 +124,18 @@ foreach(bundled_library ${PLUGIN_BUNDLED_LIBRARIES})
     DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
     COMPONENT Runtime)
 endforeach(bundled_library)
+
+foreach(plugin ${FLUTTER_PLUGIN_LIST})
+  set(plugin_target "${plugin}_plugin")
+  if(TARGET ${plugin_target})
+    install(CODE "
+      file(RPATH_CHANGE
+        FILE \"${INSTALL_BUNDLE_LIB_DIR}/lib${plugin_target}.so\"
+        OLD_RPATH \"${CMAKE_CURRENT_SOURCE_DIR}/flutter/ephemeral\"
+        NEW_RPATH \"\\\$ORIGIN\")
+      " COMPONENT Runtime)
+  endif()
+endforeach()
 
 # Copy the native assets provided by the build.dart from all packages.
 set(NATIVE_ASSETS_DIR "${PROJECT_BUILD_DIR}native_assets/linux/")

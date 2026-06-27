@@ -24,4 +24,4 @@ The package installs the launcher as:
 
 and installs icons under:
 
-`/usr/share/icons/hicolor/<size>x<size>/apps/querypod.png`
+`/usr/share/icons/hicolor/<size>x<size>/apps/me.aalam.querypod.png`

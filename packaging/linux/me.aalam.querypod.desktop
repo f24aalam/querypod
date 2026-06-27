@@ -1,10 +1,10 @@
 [Desktop Entry]
 Version=1.0
 Type=Application
-Name=Querypod
+Name=QueryPod
 Comment=Desktop SQL workspace
 Exec=/usr/bin/querypod
-Icon=querypod
+Icon=me.aalam.querypod
 Terminal=false
 Categories=Development;Database;
-StartupWMClass=querypod
+StartupWMClass=me.aalam.querypod

@@ -90,12 +90,12 @@ BEGIN
         BLOCK "040904e4"
         BEGIN
             VALUE "CompanyName", "me.aalam" "\0"
-            VALUE "FileDescription", "querypod" "\0"
+            VALUE "FileDescription", "QueryPod" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
             VALUE "InternalName", "querypod" "\0"
             VALUE "LegalCopyright", "Copyright (C) 2026 me.aalam. All rights reserved." "\0"
             VALUE "OriginalFilename", "querypod.exe" "\0"
-            VALUE "ProductName", "querypod" "\0"
+            VALUE "ProductName", "QueryPod" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

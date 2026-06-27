@@ -3,7 +3,7 @@
 set -euo pipefail
 
 APP_NAME="querypod"
-DISPLAY_NAME="Querypod"
+DISPLAY_NAME="QueryPod"
 APP_ID="me.aalam.querypod"
 ARCH="amd64"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -78,7 +78,7 @@ install -m 644 "${DESKTOP_SOURCE}" "${PACKAGE_DIR}/usr/share/applications/${APP_
 
 for size in "${ICON_SIZES[@]}"; do
   convert "${ICON_SOURCE}" -resize "${size}x${size}" \
-    "${PACKAGE_DIR}/usr/share/icons/hicolor/${size}x${size}/apps/${APP_NAME}.png"
+    "${PACKAGE_DIR}/usr/share/icons/hicolor/${size}x${size}/apps/${APP_ID}.png"
 done
 
 dpkg-deb --build --root-owner-group "${PACKAGE_DIR}" "${OUTPUT_DEB}"

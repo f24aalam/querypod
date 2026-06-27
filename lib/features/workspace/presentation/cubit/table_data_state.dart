@@ -15,6 +15,7 @@ class TableDataSession {
   final TableCellEdit? activeCellEdit;
   final Map<TableCellCoordinate, TableCellEdit> stagedCellEdits;
   final Set<int> stagedDeletedRowIndexes;
+  final Set<int> stagedInsertedRowIndexes;
   final bool isCommittingChanges;
   final Duration queryDuration;
   final TableDataStatus status;
@@ -38,6 +39,7 @@ class TableDataSession {
     this.activeCellEdit,
     Map<TableCellCoordinate, TableCellEdit> stagedCellEdits = const {},
     Set<int> stagedDeletedRowIndexes = const {},
+    Set<int> stagedInsertedRowIndexes = const {},
     this.isCommittingChanges = false,
     this.queryDuration = Duration.zero,
     this.status = TableDataStatus.initialLoading,
@@ -52,7 +54,8 @@ class TableDataSession {
        filters = List.unmodifiable(filters),
        selectedRowIndexes = Set.unmodifiable(selectedRowIndexes),
        stagedCellEdits = Map.unmodifiable(stagedCellEdits),
-       stagedDeletedRowIndexes = Set.unmodifiable(stagedDeletedRowIndexes);
+       stagedDeletedRowIndexes = Set.unmodifiable(stagedDeletedRowIndexes),
+       stagedInsertedRowIndexes = Set.unmodifiable(stagedInsertedRowIndexes);
 
   int get pageCount => totalCount == 0 ? 0 : (totalCount / pageSize).ceil();
   int get rangeStart => rows.isEmpty ? 0 : pageIndex * pageSize + 1;
@@ -70,7 +73,8 @@ class TableDataSession {
       selectionCount == 1 ? selectedRowIndexes.first : null;
   bool get hasPendingEdits => stagedCellEdits.isNotEmpty;
   bool get hasPendingDeletes => stagedDeletedRowIndexes.isNotEmpty;
-  bool get hasPendingChanges => hasPendingEdits || hasPendingDeletes;
+  bool get hasPendingInserts => stagedInsertedRowIndexes.isNotEmpty;
+  bool get hasPendingChanges => hasPendingEdits || hasPendingDeletes || hasPendingInserts;
 
   TableDataSession copyWith({
     TableStructure? Function()? structure,
@@ -83,6 +87,7 @@ class TableDataSession {
     TableCellEdit? Function()? activeCellEdit,
     Map<TableCellCoordinate, TableCellEdit>? stagedCellEdits,
     Set<int>? stagedDeletedRowIndexes,
+    Set<int>? stagedInsertedRowIndexes,
     bool? isCommittingChanges,
     Duration? queryDuration,
     TableDataStatus? status,
@@ -111,6 +116,8 @@ class TableDataSession {
       stagedCellEdits: stagedCellEdits ?? this.stagedCellEdits,
       stagedDeletedRowIndexes:
           stagedDeletedRowIndexes ?? this.stagedDeletedRowIndexes,
+      stagedInsertedRowIndexes:
+          stagedInsertedRowIndexes ?? this.stagedInsertedRowIndexes,
       isCommittingChanges: isCommittingChanges ?? this.isCommittingChanges,
       queryDuration: queryDuration ?? this.queryDuration,
       status: status ?? this.status,

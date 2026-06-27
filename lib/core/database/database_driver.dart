@@ -53,6 +53,7 @@ abstract class DatabaseDriver {
     required TableStructure structure,
     required List<TableCellChange> cellChanges,
     required List<TableDataRow> deletedRows,
+    required List<Map<String, dynamic>> insertedRows,
     void Function(QueryHistory)? onHistory,
   });
 

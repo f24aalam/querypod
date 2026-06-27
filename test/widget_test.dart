@@ -387,6 +387,7 @@ class _WidgetTableRepository implements TableDataRepository {
     required TableStructure structure,
     required List<TableCellChange> cellChanges,
     required List<TableDataRow> deletedRows,
+    required List<Map<String, dynamic>> insertedRows,
   }) async {
     if (cellChanges.isNotEmpty) {
       updatedValue = cellChanges.first.value;

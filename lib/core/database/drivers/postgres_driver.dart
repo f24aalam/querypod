@@ -479,6 +479,7 @@ class PostgresDriver implements DatabaseDriver {
     required TableStructure structure,
     required List<TableCellChange> cellChanges,
     required List<TableDataRow> deletedRows,
+    required List<Map<String, dynamic>> insertedRows,
     void Function(QueryHistory)? onHistory,
   }) async {
     final primaryKeyIndexes = <int>[
@@ -516,10 +517,74 @@ class PostgresDriver implements DatabaseDriver {
             onHistory,
           );
         }
+        for (final row in insertedRows) {
+          await _executeInsert(
+            connection.id,
+            txn,
+            database,
+            table,
+            structure,
+            row,
+            onHistory,
+          );
+        }
       });
     } finally {
       await conn.close();
     }
+  }
+
+  Future<void> _executeInsert(
+    String connectionId,
+    pg.TxSession txn,
+    String database,
+    String table,
+    TableStructure structure,
+    Map<String, dynamic> insertedRow,
+    void Function(QueryHistory)? onHistory,
+  ) async {
+    final columns = <String>[];
+    final placeholders = <String>[];
+    final parameters = <String, dynamic>{};
+
+    int i = 0;
+    for (final entry in insertedRow.entries) {
+      final col = structure.columns.firstWhere((c) => c.name == entry.key);
+      columns.add(_quoteIdentifier(col.name));
+      placeholders.add('@p$i');
+      if (_isBinaryColumn(col.databaseType) && entry.value != null && entry.value.toString().isNotEmpty) {
+        parameters['p$i'] = _decodeHex(entry.value.toString());
+      } else {
+        parameters['p$i'] = entry.value;
+      }
+      i++;
+    }
+
+    String sql;
+    if (columns.isEmpty) {
+      sql = 'INSERT INTO ${_quoteIdentifier(table)} DEFAULT VALUES';
+    } else {
+      sql =
+          'INSERT INTO ${_quoteIdentifier(table)} (${columns.join(', ')}) '
+          'VALUES (${placeholders.join(', ')})';
+    }
+
+    final startMs = DateTime.now().millisecondsSinceEpoch;
+    await txn.execute(pg.Sql.named(sql), parameters: parameters);
+    final execMs = DateTime.now().millisecondsSinceEpoch - startMs;
+
+    onHistory?.call(
+      QueryHistory(
+        id: const Uuid().v4(),
+        connectionId: connectionId,
+        sourceType: 'table',
+        sourceId: table,
+        sql: sql,
+        executionTimeMs: execMs,
+        status: 'success',
+        createdAt: DateTime.now(),
+      ),
+    );
   }
 
   Future<void> _executeUpdate(

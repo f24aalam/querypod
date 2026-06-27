@@ -471,6 +471,7 @@ class MySQLDriver implements DatabaseDriver {
     required TableStructure structure,
     required List<TableCellChange> cellChanges,
     required List<TableDataRow> deletedRows,
+    required List<Map<String, dynamic>> insertedRows,
     void Function(QueryHistory)? onHistory,
   }) async {
     final primaryKeyIndexes = <int>[
@@ -508,10 +509,74 @@ class MySQLDriver implements DatabaseDriver {
             onHistory,
           );
         }
+        for (final row in insertedRows) {
+          await _executeInsert(
+            connection.id,
+            txn,
+            database,
+            table,
+            structure,
+            row,
+            onHistory,
+          );
+        }
       });
     } finally {
       await conn.close();
     }
+  }
+
+  Future<void> _executeInsert(
+    String connectionId,
+    MySQLConnection txn,
+    String database,
+    String table,
+    TableStructure structure,
+    Map<String, dynamic> insertedRow,
+    void Function(QueryHistory)? onHistory,
+  ) async {
+    final columns = <String>[];
+    final placeholders = <String>[];
+    final args = <String, dynamic>{};
+
+    int i = 0;
+    for (final entry in insertedRow.entries) {
+      final col = structure.columns.firstWhere((c) => c.name == entry.key);
+      columns.add(_quoteIdentifier(col.name));
+      placeholders.add(':p$i');
+      if (_isBinaryColumn(col.databaseType) && entry.value != null && entry.value.toString().isNotEmpty) {
+        args['p$i'] = _decodeHex(entry.value.toString());
+      } else {
+        args['p$i'] = entry.value;
+      }
+      i++;
+    }
+
+    String sql;
+    if (columns.isEmpty) {
+      sql = 'INSERT INTO ${_quoteIdentifier(database)}.${_quoteIdentifier(table)} () VALUES ()';
+    } else {
+      sql =
+          'INSERT INTO ${_quoteIdentifier(database)}.${_quoteIdentifier(table)} (${columns.join(', ')}) '
+          'VALUES (${placeholders.join(', ')})';
+    }
+
+    final startMs = DateTime.now().millisecondsSinceEpoch;
+    await txn.execute(sql, args);
+    final execMs = DateTime.now().millisecondsSinceEpoch - startMs;
+
+    onHistory?.call(
+      QueryHistory(
+        id: const Uuid().v4(),
+        connectionId: connectionId,
+        sourceType: 'table',
+        sourceId: table,
+        sql: sql,
+        executionTimeMs: execMs,
+        status: 'success',
+        createdAt: DateTime.now(),
+      ),
+    );
   }
 
   Future<void> _executeUpdate(
@@ -528,35 +593,33 @@ class MySQLDriver implements DatabaseDriver {
     final where = _primaryKeyWhere(structure, primaryKeyIndexes);
     final sql =
         'UPDATE ${_quoteIdentifier(database)}.${_quoteIdentifier(table)} '
-        'SET ${_quoteIdentifier(column.name)} = ? WHERE $where LIMIT 1';
-    final statement = await conn.prepare(sql);
-    try {
-      final updatedValue =
-          change.row.cells[change.columnIndex].kind == TableCellKind.binary
-          ? _decodeHex(change.value)
-          : change.value;
-      final startMs = DateTime.now().millisecondsSinceEpoch;
-      await statement.execute([
-        updatedValue,
-        for (final index in primaryKeyIndexes) change.row.cells[index].rawValue,
-      ]);
-      final execMs = DateTime.now().millisecondsSinceEpoch - startMs;
-
-      onHistory?.call(
-        QueryHistory(
-          id: const Uuid().v4(),
-          connectionId: connectionId,
-          sourceType: 'table',
-          sourceId: table,
-          sql: sql,
-          executionTimeMs: execMs,
-          status: 'success',
-          createdAt: DateTime.now(),
-        ),
-      );
-    } finally {
-      await statement.deallocate();
+        'SET ${_quoteIdentifier(column.name)} = :val WHERE $where LIMIT 1';
+    final updatedValue =
+        change.row.cells[change.columnIndex].kind == TableCellKind.binary
+        ? _decodeHex(change.value)
+        : change.value;
+    final startMs = DateTime.now().millisecondsSinceEpoch;
+    
+    final args = <String, dynamic>{'val': updatedValue};
+    for (final index in primaryKeyIndexes) {
+      args['pk_$index'] = change.row.cells[index].rawValue;
     }
+    
+    await conn.execute(sql, args);
+    final execMs = DateTime.now().millisecondsSinceEpoch - startMs;
+
+    onHistory?.call(
+      QueryHistory(
+        id: const Uuid().v4(),
+        connectionId: connectionId,
+        sourceType: 'table',
+        sourceId: table,
+        sql: sql,
+        executionTimeMs: execMs,
+        status: 'success',
+        createdAt: DateTime.now(),
+      ),
+    );
   }
 
   Future<void> _executeDelete(
@@ -573,29 +636,28 @@ class MySQLDriver implements DatabaseDriver {
     final sql =
         'DELETE FROM ${_quoteIdentifier(database)}.${_quoteIdentifier(table)} '
         'WHERE $where LIMIT 1';
-    final statement = await conn.prepare(sql);
-    try {
-      final startMs = DateTime.now().millisecondsSinceEpoch;
-      await statement.execute([
-        for (final index in primaryKeyIndexes) row.cells[index].rawValue,
-      ]);
-      final execMs = DateTime.now().millisecondsSinceEpoch - startMs;
-
-      onHistory?.call(
-        QueryHistory(
-          id: const Uuid().v4(),
-          connectionId: connectionId,
-          sourceType: 'table',
-          sourceId: table,
-          sql: sql,
-          executionTimeMs: execMs,
-          status: 'success',
-          createdAt: DateTime.now(),
-        ),
-      );
-    } finally {
-      await statement.deallocate();
+    final startMs = DateTime.now().millisecondsSinceEpoch;
+    
+    final args = <String, dynamic>{};
+    for (final index in primaryKeyIndexes) {
+      args['pk_$index'] = row.cells[index].rawValue;
     }
+
+    await conn.execute(sql, args);
+    final execMs = DateTime.now().millisecondsSinceEpoch - startMs;
+
+    onHistory?.call(
+      QueryHistory(
+        id: const Uuid().v4(),
+        connectionId: connectionId,
+        sourceType: 'table',
+        sourceId: table,
+        sql: sql,
+        executionTimeMs: execMs,
+        status: 'success',
+        createdAt: DateTime.now(),
+      ),
+    );
   }
 
   String _primaryKeyWhere(
@@ -604,7 +666,7 @@ class MySQLDriver implements DatabaseDriver {
   ) {
     return primaryKeyIndexes
         .map(
-          (index) => '${_quoteIdentifier(structure.columns[index].name)} = ?',
+          (index) => '${_quoteIdentifier(structure.columns[index].name)} = :pk_$index',
         )
         .join(' AND ');
   }

@@ -691,6 +691,11 @@ class _BatchInspector extends StatelessWidget {
                   label: 'Rows marked for delete',
                   value: session.stagedDeletedRowIndexes.length.toString(),
                 ),
+                const SizedBox(height: 8),
+                _InspectorMetric(
+                  label: 'New rows inserted',
+                  value: session.stagedInsertedRowIndexes.length.toString(),
+                ),
                 const SizedBox(height: 16),
                 FButton(
                   size: FButtonSizeVariant.xs,
@@ -710,11 +715,12 @@ class _BatchInspector extends StatelessWidget {
   String _summary(TableDataSession session) {
     final edits = session.stagedCellEdits.length;
     final deletes = session.stagedDeletedRowIndexes.length;
-    if (edits == 0 && deletes == 0) {
+    final inserts = session.stagedInsertedRowIndexes.length;
+    if (edits == 0 && deletes == 0 && inserts == 0) {
       return 'Use Ctrl/Cmd-click to toggle rows and Shift-click to select a range on this page.';
     }
     return '${session.selectionCount} rows selected, '
-        '$edits staged cell edits, $deletes rows marked for delete.';
+        '$edits staged cell edits, $deletes rows marked for delete, $inserts new rows inserted.';
   }
 }
 
@@ -879,6 +885,8 @@ class _DataGridState extends State<_DataGrid> {
                             stagedEdits: widget.session.stagedCellEdits,
                             stagedDelete: widget.session.stagedDeletedRowIndexes
                                 .contains(index),
+                            stagedInsert: widget.session.stagedInsertedRowIndexes
+                                .contains(index),
                             editable: widget.session.isEditable,
                             columns: columns,
                             onOpenForeignKey: (fk, value) {
@@ -978,6 +986,7 @@ class _GridRow extends StatelessWidget {
   final TableCellEdit? activeEdit;
   final Map<TableCellCoordinate, TableCellEdit> stagedEdits;
   final bool stagedDelete;
+  final bool stagedInsert;
   final bool editable;
   final List<TableDataColumn> columns;
   final void Function(TableForeignKey, TableCellValue)? onOpenForeignKey;
@@ -991,6 +1000,7 @@ class _GridRow extends StatelessWidget {
     required this.activeEdit,
     required this.stagedEdits,
     required this.stagedDelete,
+    required this.stagedInsert,
     required this.editable,
     required this.columns,
     this.onOpenForeignKey,
@@ -1024,6 +1034,8 @@ class _GridRow extends StatelessWidget {
       child: Material(
         color: stagedDelete
             ? theme.colors.destructive.withValues(alpha: 0.18)
+            : stagedInsert
+            ? Colors.green.withValues(alpha: 0.18)
             : selected
             ? theme.colors.secondary
             : Colors.transparent,
@@ -1046,6 +1058,7 @@ class _GridRow extends StatelessWidget {
                       columnIndex: index,
                     )],
                 deleted: stagedDelete,
+                inserted: stagedInsert,
                 onActivate: () {
                   final keyboard = HardwareKeyboard.instance;
                   context.read<TableDataCubit>().activateCell(
@@ -1084,6 +1097,7 @@ class _GridCell extends StatelessWidget {
   final TableCellEdit? activeEdit;
   final TableCellEdit? stagedEdit;
   final bool deleted;
+  final bool inserted;
   final VoidCallback onActivate;
   final ValueChanged<String> onChanged;
   final TableForeignKey? foreignKey;
@@ -1097,6 +1111,7 @@ class _GridCell extends StatelessWidget {
     required this.activeEdit,
     required this.stagedEdit,
     required this.deleted,
+    required this.inserted,
     required this.onActivate,
     required this.onChanged,
     this.foreignKey,
@@ -1171,8 +1186,14 @@ class _GridCell extends StatelessWidget {
               ? Colors.amber.withValues(alpha: 0.16)
               : null,
           border: Border(
-            right: BorderSide(color: theme.colors.border, width: 1),
-            bottom: BorderSide(color: theme.colors.border, width: 0.5),
+            right: BorderSide(
+              color: inserted ? Colors.green : theme.colors.border, 
+              width: 1
+            ),
+            bottom: BorderSide(
+              color: inserted ? Colors.green : theme.colors.border, 
+              width: inserted ? 1 : 0.5
+            ),
           ),
         ),
         child: activeEdit != null
@@ -1429,6 +1450,20 @@ class _PaginationBar extends StatelessWidget {
                               context.read<TableDataCubit>().nextPage(tableKey)
                         : null,
                     child: const Text('Next'),
+                  ),
+                  const SizedBox(width: 6),
+                  FTooltip(
+                    tipBuilder: (context, controller) => const Text('Insert Row'),
+                    child: FButton.icon(
+                      size: FButtonSizeVariant.xs,
+                      variant: FButtonVariant.outline,
+                      onPress: disabled
+                          ? null
+                          : () => context.read<TableDataCubit>().stageInsert(
+                              tableKey,
+                            ),
+                      child: const Icon(Icons.add, size: 14),
+                    ),
                   ),
                   const SizedBox(width: 6),
                   FTooltip(

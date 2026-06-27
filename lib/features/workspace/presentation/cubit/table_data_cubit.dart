@@ -335,13 +335,8 @@ class TableDataCubit extends Cubit<TableDataState> {
           draftText: value.editText,
         );
 
-    final selectedRows = session.selectedRowIndexes.contains(rowIndex)
-        ? session.selectedRowIndexes
-        : {rowIndex};
-
     _setSession(
       session.copyWith(
-        selectedRowIndexes: selectedRows,
         selectionAnchorRowIndex: () => rowIndex,
         activeCellEdit: () => activeEdit,
       ),
@@ -377,11 +372,103 @@ class TableDataCubit extends Cubit<TableDataState> {
     _setSession(session.copyWith(activeCellEdit: () => null));
   }
 
+  void stageInsert(TableTabKey key) {
+    final session = state.session(key);
+    if (session == null || !session.isEditable || session.structure == null) return;
+
+    final newRow = TableDataRow([
+      for (var _ in session.structure!.columns) const TableCellValue.nullValue(),
+    ]);
+
+    final newRows = List<TableDataRow>.from(session.rows)..insert(0, newRow);
+    const newIndex = 0;
+
+    final shiftedInserts = <int>{newIndex};
+    for (final i in session.stagedInsertedRowIndexes) {
+      shiftedInserts.add(i + 1);
+    }
+
+    final shiftedDeletes = <int>{};
+    for (final i in session.stagedDeletedRowIndexes) {
+      shiftedDeletes.add(i + 1);
+    }
+
+    final shiftedEdits = <TableCellCoordinate, TableCellEdit>{};
+    for (final edit in session.stagedCellEdits.values) {
+      final newEditRowIndex = edit.rowIndex + 1;
+      final newCoord = TableCellCoordinate(rowIndex: newEditRowIndex, columnIndex: edit.columnIndex);
+      shiftedEdits[newCoord] = edit.copyWith(rowIndex: newEditRowIndex);
+    }
+
+    final activeEdit = session.activeCellEdit?.copyWith(
+      rowIndex: session.activeCellEdit!.rowIndex + 1,
+    );
+
+    _setSession(
+      session.copyWith(
+        rows: newRows,
+        stagedInsertedRowIndexes: shiftedInserts,
+        stagedDeletedRowIndexes: shiftedDeletes,
+        stagedCellEdits: shiftedEdits,
+        selectedRowIndexes: <int>{},
+        selectionAnchorRowIndex: () => null,
+        activeCellEdit: () => activeEdit,
+        isShowingStructure: false,
+        foreignRowPreview: () => null,
+      ),
+    );
+    
+    // Automatically start editing the first cell
+    beginCellEdit(key, newIndex, 0);
+  }
+
   void stageDeleteForRow(TableTabKey key, int rowIndex) {
     final session = state.session(key);
     if (session == null ||
         !session.isEditable ||
         !_isValidRow(session, rowIndex)) {
+      return;
+    }
+
+    if (session.stagedInsertedRowIndexes.contains(rowIndex)) {
+      final newRows = List<TableDataRow>.from(session.rows)..removeAt(rowIndex);
+      final newInserts = Set<int>.from(session.stagedInsertedRowIndexes)..remove(rowIndex);
+      
+      final shiftedInserts = <int>{};
+      for (final i in newInserts) {
+        shiftedInserts.add(i > rowIndex ? i - 1 : i);
+      }
+      
+      final shiftedDeletes = <int>{};
+      for (final i in session.stagedDeletedRowIndexes) {
+        shiftedDeletes.add(i > rowIndex ? i - 1 : i);
+      }
+      
+      final shiftedEdits = <TableCellCoordinate, TableCellEdit>{};
+      for (final edit in session.stagedCellEdits.values) {
+        if (edit.rowIndex == rowIndex) continue;
+        final newEditRowIndex = edit.rowIndex > rowIndex ? edit.rowIndex - 1 : edit.rowIndex;
+        final newCoord = TableCellCoordinate(rowIndex: newEditRowIndex, columnIndex: edit.columnIndex);
+        shiftedEdits[newCoord] = edit.copyWith(rowIndex: newEditRowIndex);
+      }
+      
+      final shiftedSelected = <int>{};
+      for (final i in session.selectedRowIndexes) {
+        if (i == rowIndex) continue;
+        shiftedSelected.add(i > rowIndex ? i - 1 : i);
+      }
+
+      _setSession(
+        session.copyWith(
+          rows: newRows,
+          stagedInsertedRowIndexes: shiftedInserts,
+          stagedDeletedRowIndexes: shiftedDeletes,
+          stagedCellEdits: shiftedEdits,
+          selectedRowIndexes: shiftedSelected,
+          selectionAnchorRowIndex: () => null,
+          activeCellEdit: () => null,
+        ),
+      );
       return;
     }
 
@@ -404,13 +491,7 @@ class TableDataCubit extends Cubit<TableDataState> {
   void clearPendingChanges(TableTabKey key) {
     final session = state.session(key);
     if (session == null || !session.hasPendingChanges) return;
-    _setSession(
-      session.copyWith(
-        activeCellEdit: () => null,
-        stagedCellEdits: const {},
-        stagedDeletedRowIndexes: const {},
-      ),
-    );
+    _setSession(_clearTransientState(session, clearError: false));
   }
 
   Future<void> commitPendingChanges(TableTabKey key) async {
@@ -425,6 +506,20 @@ class TableDataCubit extends Cubit<TableDataState> {
       return;
     }
 
+    final insertedIndexes = session.stagedInsertedRowIndexes.toList()..sort();
+    final insertedRows = <Map<String, dynamic>>[];
+    for (final rowIndex in insertedIndexes) {
+      final rowMap = <String, dynamic>{};
+      for (int c = 0; c < structure.columns.length; c++) {
+        final coord = TableCellCoordinate(rowIndex: rowIndex, columnIndex: c);
+        final edit = session.stagedCellEdits[coord];
+        if (edit != null) {
+          rowMap[structure.columns[c].name] = edit.draftText;
+        }
+      }
+      insertedRows.add(rowMap);
+    }
+
     final deletedIndexes = session.stagedDeletedRowIndexes.toList()..sort();
     final deletedRows = [
       for (final rowIndex in deletedIndexes) session.rows[rowIndex],
@@ -434,7 +529,8 @@ class TableDataCubit extends Cubit<TableDataState> {
         session.stagedCellEdits.values
             .where(
               (edit) =>
-                  !session.stagedDeletedRowIndexes.contains(edit.rowIndex),
+                  !session.stagedDeletedRowIndexes.contains(edit.rowIndex) &&
+                  !session.stagedInsertedRowIndexes.contains(edit.rowIndex),
             )
             .toList()
           ..sort((a, b) {
@@ -459,6 +555,7 @@ class TableDataCubit extends Cubit<TableDataState> {
             ),
         ],
         deletedRows: deletedRows,
+        insertedRows: insertedRows,
       );
       final latest = state.session(key);
       if (latest == null) return;
@@ -621,12 +718,25 @@ class TableDataCubit extends Cubit<TableDataState> {
     TableDataSession session, {
     bool clearError = true,
   }) {
+    List<TableDataRow> finalRows = session.rows;
+    if (session.stagedInsertedRowIndexes.isNotEmpty) {
+      final validRows = <TableDataRow>[];
+      for (int i = 0; i < session.rows.length; i++) {
+        if (!session.stagedInsertedRowIndexes.contains(i)) {
+          validRows.add(session.rows[i]);
+        }
+      }
+      finalRows = validRows;
+    }
+
     return session.copyWith(
+      rows: finalRows,
       selectedRowIndexes: const {},
       selectionAnchorRowIndex: () => null,
       activeCellEdit: () => null,
       stagedCellEdits: const {},
       stagedDeletedRowIndexes: const {},
+      stagedInsertedRowIndexes: const {},
       isCommittingChanges: false,
       errorMessage: clearError ? () => null : null,
     );

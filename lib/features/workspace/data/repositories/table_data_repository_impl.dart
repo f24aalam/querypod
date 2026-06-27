@@ -83,6 +83,7 @@ class TableDataRepositoryImpl implements TableDataRepository {
     required TableStructure structure,
     required List<TableCellChange> cellChanges,
     required List<TableDataRow> deletedRows,
+    required List<Map<String, dynamic>> insertedRows,
   }) async {
     final driver = DatabaseDriverFactory.getDriver(connection.type);
     return await driver.commitChanges(
@@ -92,6 +93,7 @@ class TableDataRepositoryImpl implements TableDataRepository {
       structure: structure,
       cellChanges: cellChanges,
       deletedRows: deletedRows,
+      insertedRows: insertedRows,
       onHistory: _historyRepository.save,
     );
   }

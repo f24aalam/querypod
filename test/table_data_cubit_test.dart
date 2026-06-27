@@ -372,6 +372,7 @@ class _FakeTableDataRepository implements TableDataRepository {
     required TableStructure structure,
     required List<TableCellChange> cellChanges,
     required List<TableDataRow> deletedRows,
+    required List<Map<String, dynamic>> insertedRows,
   }) async {
     if (commitError case final error?) throw error;
     commitRequests.add(
@@ -442,6 +443,7 @@ class _ControlledPageRepository implements TableDataRepository {
     required TableStructure structure,
     required List<TableCellChange> cellChanges,
     required List<TableDataRow> deletedRows,
+    required List<Map<String, dynamic>> insertedRows,
   }) async {}
 }
 

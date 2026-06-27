@@ -30,7 +30,7 @@ if [[ ! -f "${DESKTOP_SOURCE}" ]]; then
   exit 1
 fi
 
-VERSION="$(sed -nE 's/^version:[[:space:]]*([^+[:space:]]+)(\+.*)?$/\1/p' "${ROOT_DIR}/pubspec.yaml" | head -n 1)"
+VERSION="${RELEASE_VERSION:-$(sed -nE 's/^version:[[:space:]]*([^+[:space:]]+)(\+.*)?$/\1/p' "${ROOT_DIR}/pubspec.yaml" | head -n 1)}"
 if [[ -z "${VERSION}" ]]; then
   echo "Unable to read app version from pubspec.yaml" >&2
   exit 1

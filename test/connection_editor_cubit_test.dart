@@ -45,4 +45,14 @@ void main() {
     expect(cubit.state.draft.id, id);
     expect(cubit.state.draft.toConnection().id, id);
   });
+
+  test('TLS setting is editable and preserved when saved', () {
+    final cubit = ConnectionEditorCubit()..load(connection);
+
+    cubit.updateUseTls(false);
+
+    expect(cubit.state.isDirty, isTrue);
+    expect(cubit.state.draft.useTls, isFalse);
+    expect(cubit.state.draft.toConnection().useTls, isFalse);
+  });
 }

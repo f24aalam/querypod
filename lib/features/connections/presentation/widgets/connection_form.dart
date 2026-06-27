@@ -157,6 +157,43 @@ class ConnectionForm extends StatelessWidget {
                                         onChanged: editor.updateDatabase,
                                         optional: true,
                                       ),
+                                      const SizedBox(height: 12),
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  'Use TLS',
+                                                  style: TextStyle(
+                                                    fontSize: 14,
+                                                    fontWeight: FontWeight.w500,
+                                                    color: theme
+                                                        .colors
+                                                        .foreground,
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 4),
+                                                Text(
+                                                  'Encrypt the database connection. Recommended.',
+                                                  style: TextStyle(
+                                                    fontSize: 12,
+                                                    color: theme
+                                                        .colors
+                                                        .mutedForeground,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          FSwitch(
+                                            value: draft.useTls,
+                                            onChange: editor.updateUseTls,
+                                          ),
+                                        ],
+                                      ),
                                     ] else ...[
                                       Row(
                                         crossAxisAlignment: CrossAxisAlignment.end,

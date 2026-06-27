@@ -46,7 +46,7 @@ class MySQLDriver implements DatabaseDriver {
       databaseName: (database ?? connection.database).isEmpty
           ? null
           : (database ?? connection.database),
-      secure: false,
+      secure: connection.useTls,
     );
     await conn.connect();
     return conn;

@@ -11,6 +11,7 @@ class Connection {
   final String password;
   final String database;
   final ConnectionType type;
+  final bool useTls;
 
   const Connection({
     required this.id,
@@ -21,6 +22,7 @@ class Connection {
     required this.password,
     required this.database,
     this.type = ConnectionType.mysql,
+    this.useTls = true,
   });
 
   Connection copyWith({
@@ -32,6 +34,7 @@ class Connection {
     String? password,
     String? database,
     ConnectionType? type,
+    bool? useTls,
   }) {
     return Connection(
       id: id ?? this.id,
@@ -42,6 +45,7 @@ class Connection {
       password: password ?? this.password,
       database: database ?? this.database,
       type: type ?? this.type,
+      useTls: useTls ?? this.useTls,
     );
   }
 
@@ -55,6 +59,7 @@ class Connection {
     password: password,
     database: database,
     type: type,
+    useTls: useTls,
   );
 }
 
@@ -66,6 +71,7 @@ class ConnectionSessionIdentity {
   final String password;
   final String database;
   final ConnectionType type;
+  final bool useTls;
 
   const ConnectionSessionIdentity({
     required this.id,
@@ -75,6 +81,7 @@ class ConnectionSessionIdentity {
     required this.password,
     required this.database,
     required this.type,
+    required this.useTls,
   });
 
   @override
@@ -87,9 +94,10 @@ class ConnectionSessionIdentity {
           user == other.user &&
           password == other.password &&
           database == other.database &&
-          type == other.type;
+          type == other.type &&
+          useTls == other.useTls;
 
   @override
   int get hashCode =>
-      Object.hash(id, host, port, user, password, database, type);
+      Object.hash(id, host, port, user, password, database, type, useTls);
 }

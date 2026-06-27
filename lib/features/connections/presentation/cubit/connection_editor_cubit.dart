@@ -35,6 +35,8 @@ class ConnectionEditorCubit extends Cubit<ConnectionEditorState> {
       _update(state.draft.copyWith(database: value));
   void updateType(ConnectionType value) =>
       _update(state.draft.copyWith(type: value));
+  void updateUseTls(bool value) =>
+      _update(state.draft.copyWith(useTls: value));
 
   void _update(ConnectionDraft draft) {
     if (draft == state.draft) return;

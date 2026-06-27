@@ -50,7 +50,9 @@ class PostgresDriver implements DatabaseDriver {
 
     return await pg.Connection.open(
       endpoint,
-      settings: const pg.ConnectionSettings(sslMode: pg.SslMode.disable),
+      settings: pg.ConnectionSettings(
+        sslMode: connection.useTls ? pg.SslMode.require : pg.SslMode.disable,
+      ),
     );
   }
 

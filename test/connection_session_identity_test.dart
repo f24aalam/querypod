@@ -28,5 +28,9 @@ void main() {
       connection.copyWith(database: 'other').sessionIdentity,
       isNot(connection.sessionIdentity),
     );
+    expect(
+      connection.copyWith(useTls: false).sessionIdentity,
+      isNot(connection.sessionIdentity),
+    );
   });
 }

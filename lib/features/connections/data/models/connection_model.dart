@@ -10,6 +10,7 @@ class ConnectionModel extends Connection {
     required super.password,
     required super.database,
     super.type = ConnectionType.mysql,
+    super.useTls = true,
   });
 
   factory ConnectionModel.fromJson(
@@ -28,6 +29,7 @@ class ConnectionModel extends Connection {
         (e) => e.name == json['type'],
         orElse: () => ConnectionType.mysql,
       ),
+      useTls: json['useTls'] as bool? ?? true,
     );
   }
 
@@ -40,6 +42,7 @@ class ConnectionModel extends Connection {
       'user': user,
       'database': database,
       'type': type.name,
+      'useTls': useTls,
     };
   }
 
@@ -53,6 +56,7 @@ class ConnectionModel extends Connection {
       password: entity.password,
       database: entity.database,
       type: entity.type,
+      useTls: entity.useTls,
     );
   }
 }

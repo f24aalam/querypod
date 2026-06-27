@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Querypod
+Comment=Desktop SQL workspace
+Exec=/usr/bin/querypod
+Icon=querypod
+Terminal=false
+Categories=Development;Database;
+StartupWMClass=querypod

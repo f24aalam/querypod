@@ -11,10 +11,22 @@ import '../../../features/workspace/domain/entities/table_data.dart';
 import '../../../features/workspace/domain/entities/workspace_database.dart';
 import '../../../features/workspace/domain/entities/workspace_table.dart';
 import '../database_driver.dart';
+import 'alter_table_sql.dart';
 
 class PostgresDriver implements DatabaseDriver {
   @override
-  List<String> get supportedOperators => ['=', '!=', '>', '<', '>=', '<=', 'ILIKE', 'NOT ILIKE', 'LIKE', 'NOT LIKE'];
+  List<String> get supportedOperators => [
+    '=',
+    '!=',
+    '>',
+    '<',
+    '>=',
+    '<=',
+    'ILIKE',
+    'NOT ILIKE',
+    'LIKE',
+    'NOT LIKE',
+  ];
 
   String _asString(dynamic value) {
     if (value == null) return '';
@@ -50,7 +62,9 @@ class PostgresDriver implements DatabaseDriver {
       await conn.close();
     } catch (e) {
       if (e is pg.ServerException) {
-        final base = e.message.isNotEmpty ? e.message : 'PostgreSQL client returned an error';
+        final base = e.message.isNotEmpty
+            ? e.message
+            : 'PostgreSQL client returned an error';
         throw Exception('Failed to connect: $base');
       }
 
@@ -62,7 +76,9 @@ class PostgresDriver implements DatabaseDriver {
               message.contains('OS Error'));
 
       if (localhostHint) {
-        throw Exception('Failed to connect: $message. If this app is running on a simulator/device, 127.0.0.1 points to the device, not your computer.');
+        throw Exception(
+          'Failed to connect: $message. If this app is running on a simulator/device, 127.0.0.1 points to the device, not your computer.',
+        );
       }
 
       throw Exception('Failed to connect: $message');
@@ -70,11 +86,13 @@ class PostgresDriver implements DatabaseDriver {
   }
 
   @override
-  Future<List<WorkspaceDatabase>> listDatabases(covariant Connection connection) async {
+  Future<List<WorkspaceDatabase>> listDatabases(
+    covariant Connection connection,
+  ) async {
     final conn = await _connect(connection);
     try {
       final results = await conn.execute(
-        'SELECT datname FROM pg_database WHERE datistemplate = false;'
+        'SELECT datname FROM pg_database WHERE datistemplate = false;',
       );
       return results
           .map((row) => WorkspaceDatabase(name: _asString(row[0])))
@@ -93,14 +111,13 @@ class PostgresDriver implements DatabaseDriver {
     final conn = await _connect(connection, database: database);
     try {
       final results = await conn.execute(
-        "SELECT table_name, table_type FROM information_schema.tables WHERE table_schema = 'public';"
+        "SELECT table_name, table_type FROM information_schema.tables WHERE table_schema = 'public';",
       );
 
       return results
           .map((row) {
             final tableName = row[0];
-            final tableType =
-                _asString(row[1]).toUpperCase() == 'VIEW'
+            final tableType = _asString(row[1]).toUpperCase() == 'VIEW'
                 ? WorkspaceTableType.view
                 : WorkspaceTableType.table;
 
@@ -123,7 +140,8 @@ class PostgresDriver implements DatabaseDriver {
     final conn = await _connect(connection, database: database);
     try {
       final quotedTable = _quoteIdentifier(table);
-      final sql = "SELECT column_name, data_type, character_maximum_length, is_nullable FROM information_schema.columns WHERE table_schema = 'public' AND table_name = '$table' ORDER BY ordinal_position;";
+      final sql =
+          "SELECT column_name, data_type, character_maximum_length, is_nullable FROM information_schema.columns WHERE table_schema = 'public' AND table_name = '$table' ORDER BY ordinal_position;";
       final startMs = DateTime.now().millisecondsSinceEpoch;
       final schema = await conn.execute(sql);
       final execMs = DateTime.now().millisecondsSinceEpoch - startMs;
@@ -141,13 +159,14 @@ class PostgresDriver implements DatabaseDriver {
         ),
       );
 
-      final pkeySql = '''
+      final pkeySql =
+          '''
         SELECT a.attname
         FROM pg_index i
         JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)
         WHERE i.indrelid = '$quotedTable'::regclass AND i.indisprimary;
       ''';
-      
+
       final pkeyResults = await conn.execute(pkeySql);
       final primaryKeys = pkeyResults.map((row) => _asString(row[0])).toSet();
 
@@ -166,9 +185,12 @@ class PostgresDriver implements DatabaseDriver {
               AND ccu.table_schema = tc.table_schema
         WHERE tc.constraint_type = 'FOREIGN KEY' AND tc.table_name = @table;
       ''';
-      
+
       final startFkMs = DateTime.now().millisecondsSinceEpoch;
-      final fkSchema = await conn.execute(pg.Sql.named(fkSql), parameters: {'table': table});
+      final fkSchema = await conn.execute(
+        pg.Sql.named(fkSql),
+        parameters: {'table': table},
+      );
       final execFkMs = DateTime.now().millisecondsSinceEpoch - startFkMs;
 
       onHistory?.call(
@@ -206,21 +228,17 @@ class PostgresDriver implements DatabaseDriver {
         }
       }
 
-      final columns = schema
-          .map(
-            (row) {
-              final name = _asString(row[0]);
-              return TableDataColumn(
-                name: name,
-                databaseType: types[name] ?? 'unknown',
-                length: lengths[name] ?? 0,
-                isPrimaryKey: primaryKeys.contains(name),
-                isNullable: nullables.contains(name),
-                foreignKey: fks[name],
-              );
-            }
-          )
-          .toList();
+      final columns = schema.map((row) {
+        final name = _asString(row[0]);
+        return TableDataColumn(
+          name: name,
+          databaseType: types[name] ?? 'unknown',
+          length: lengths[name] ?? 0,
+          isPrimaryKey: primaryKeys.contains(name),
+          isNullable: nullables.contains(name),
+          foreignKey: fks[name],
+        );
+      }).toList();
 
       final idxSql = '''
         SELECT
@@ -238,9 +256,12 @@ class PostgresDriver implements DatabaseDriver {
         ORDER BY
             i.relname, a.attnum;
       ''';
-      
+
       final startIdxMs = DateTime.now().millisecondsSinceEpoch;
-      final idxSchema = await conn.execute(pg.Sql.named(idxSql), parameters: {'table': table});
+      final idxSchema = await conn.execute(
+        pg.Sql.named(idxSql),
+        parameters: {'table': table},
+      );
       final execIdxMs = DateTime.now().millisecondsSinceEpoch - startIdxMs;
 
       onHistory?.call(
@@ -262,16 +283,16 @@ class PostgresDriver implements DatabaseDriver {
         final colName = _asString(row[1]);
         final isUnique = row[2] as bool? ?? false;
         final isPrimaryKey = row[3] as bool? ?? false;
-        
+
         if (indexesMap.containsKey(indexName)) {
-           indexesMap[indexName]!.columns.add(colName);
+          indexesMap[indexName]!.columns.add(colName);
         } else {
-           indexesMap[indexName] = TableIndex(
-             name: indexName,
-             columns: [colName],
-             isUnique: isUnique,
-             isPrimaryKey: isPrimaryKey,
-           );
+          indexesMap[indexName] = TableIndex(
+            name: indexName,
+            columns: [colName],
+            isUnique: isUnique,
+            isPrimaryKey: isPrimaryKey,
+          );
         }
       }
       final indexes = indexesMap.values.toList();
@@ -286,7 +307,7 @@ class PostgresDriver implements DatabaseDriver {
           )
           .name;
       return TableStructure(
-        columns: columns, 
+        columns: columns,
         indexes: indexes,
         orderColumn: orderColumn,
       );
@@ -308,30 +329,40 @@ class PostgresDriver implements DatabaseDriver {
     final conn = await _connect(connection, database: database);
     try {
       var sql = 'SELECT COUNT(*) AS total FROM ${_quoteIdentifier(table)}';
-      
+
       final parameters = <String, dynamic>{};
       final whereClauses = <String>[];
-      
+
       if (searchQuery != null && searchQuery.isNotEmpty) {
-        final searchClauses = structure.columns.map((col) => 'CAST(${_quoteIdentifier(col.name)} AS TEXT) ILIKE @search').join(' OR ');
+        final searchClauses = structure.columns
+            .map(
+              (col) =>
+                  'CAST(${_quoteIdentifier(col.name)} AS TEXT) ILIKE @search',
+            )
+            .join(' OR ');
         whereClauses.add('($searchClauses)');
         parameters['search'] = '%$searchQuery%';
       }
-      
+
       if (filters != null && filters.isNotEmpty) {
         for (int i = 0; i < filters.length; i++) {
           final filter = filters[i];
-          whereClauses.add('${_quoteIdentifier(filter.column)} ${filter.operator} @filter$i');
+          whereClauses.add(
+            '${_quoteIdentifier(filter.column)} ${filter.operator} @filter$i',
+          );
           parameters['filter$i'] = filter.value;
         }
       }
-      
+
       if (whereClauses.isNotEmpty) {
         sql += ' WHERE ${whereClauses.join(' AND ')}';
       }
-      
+
       final startMs = DateTime.now().millisecondsSinceEpoch;
-      final result = await conn.execute(pg.Sql.named(sql), parameters: parameters);
+      final result = await conn.execute(
+        pg.Sql.named(sql),
+        parameters: parameters,
+      );
       final execMs = DateTime.now().millisecondsSinceEpoch - startMs;
 
       onHistory?.call(
@@ -370,32 +401,43 @@ class PostgresDriver implements DatabaseDriver {
     final stopwatch = Stopwatch()..start();
     try {
       var sql = 'SELECT * FROM ${_quoteIdentifier(table)}';
-      
+
       final parameters = <String, dynamic>{};
       final whereClauses = <String>[];
-      
+
       if (searchQuery != null && searchQuery.isNotEmpty) {
-        final searchClauses = structure.columns.map((col) => 'CAST(${_quoteIdentifier(col.name)} AS TEXT) ILIKE @search').join(' OR ');
+        final searchClauses = structure.columns
+            .map(
+              (col) =>
+                  'CAST(${_quoteIdentifier(col.name)} AS TEXT) ILIKE @search',
+            )
+            .join(' OR ');
         whereClauses.add('($searchClauses)');
         parameters['search'] = '%$searchQuery%';
       }
-      
+
       if (filters != null && filters.isNotEmpty) {
         for (int i = 0; i < filters.length; i++) {
           final filter = filters[i];
-          whereClauses.add('${_quoteIdentifier(filter.column)} ${filter.operator} @filter$i');
+          whereClauses.add(
+            '${_quoteIdentifier(filter.column)} ${filter.operator} @filter$i',
+          );
           parameters['filter$i'] = filter.value;
         }
       }
-      
+
       if (whereClauses.isNotEmpty) {
         sql += ' WHERE ${whereClauses.join(' AND ')}';
       }
-      
-      sql += ' ORDER BY ${_quoteIdentifier(structure.orderColumn)} ASC '
+
+      sql +=
+          ' ORDER BY ${_quoteIdentifier(structure.orderColumn)} ASC '
           'LIMIT $limit OFFSET $offset';
       final startMs = DateTime.now().millisecondsSinceEpoch;
-      final result = await conn.execute(pg.Sql.named(sql), parameters: parameters);
+      final result = await conn.execute(
+        pg.Sql.named(sql),
+        parameters: parameters,
+      );
       final execMs = DateTime.now().millisecondsSinceEpoch - startMs;
 
       onHistory?.call(
@@ -490,29 +532,29 @@ class PostgresDriver implements DatabaseDriver {
   ) async {
     final column = structure.columns[change.columnIndex];
     final setClause = '${_quoteIdentifier(column.name)} = @p';
-    
+
     final whereClauses = <String>[];
     for (int i = 0; i < primaryKeyIndexes.length; i++) {
-        whereClauses.add('${_quoteIdentifier(structure.columns[primaryKeyIndexes[i]].name)} = @pk$i');
+      whereClauses.add(
+        '${_quoteIdentifier(structure.columns[primaryKeyIndexes[i]].name)} = @pk$i',
+      );
     }
     final where = whereClauses.join(' AND ');
-    
+
     final sql =
         'UPDATE ${_quoteIdentifier(table)} '
         'SET $setClause WHERE $where';
-        
+
     final updatedValue =
         change.row.cells[change.columnIndex].kind == TableCellKind.binary
         ? _decodeHex(change.value)
         : change.value;
-        
-    final parameters = <String, dynamic>{
-      'p': updatedValue,
-    };
+
+    final parameters = <String, dynamic>{'p': updatedValue};
     for (int i = 0; i < primaryKeyIndexes.length; i++) {
       parameters['pk$i'] = change.row.cells[primaryKeyIndexes[i]].rawValue;
     }
-    
+
     final startMs = DateTime.now().millisecondsSinceEpoch;
     await txn.execute(pg.Sql.named(sql), parameters: parameters);
     final execMs = DateTime.now().millisecondsSinceEpoch - startMs;
@@ -543,19 +585,21 @@ class PostgresDriver implements DatabaseDriver {
   ) async {
     final whereClauses = <String>[];
     for (int i = 0; i < primaryKeyIndexes.length; i++) {
-        whereClauses.add('${_quoteIdentifier(structure.columns[primaryKeyIndexes[i]].name)} = @pk$i');
+      whereClauses.add(
+        '${_quoteIdentifier(structure.columns[primaryKeyIndexes[i]].name)} = @pk$i',
+      );
     }
     final where = whereClauses.join(' AND ');
-    
+
     final sql =
         'DELETE FROM ${_quoteIdentifier(table)} '
         'WHERE $where';
-        
+
     final parameters = <String, dynamic>{};
     for (int i = 0; i < primaryKeyIndexes.length; i++) {
       parameters['pk$i'] = row.cells[primaryKeyIndexes[i]].rawValue;
     }
-    
+
     final startMs = DateTime.now().millisecondsSinceEpoch;
     await txn.execute(pg.Sql.named(sql), parameters: parameters);
     final execMs = DateTime.now().millisecondsSinceEpoch - startMs;
@@ -632,7 +676,8 @@ class PostgresDriver implements DatabaseDriver {
               .map(
                 (col) => TableDataColumn(
                   name: col.columnName ?? '?',
-                  databaseType: 'unknown', // schema might not have types explicitly exposed simply
+                  databaseType:
+                      'unknown', // schema might not have types explicitly exposed simply
                   length: 0,
                   isPrimaryKey: false,
                   isNullable: true,
@@ -721,34 +766,26 @@ class PostgresDriver implements DatabaseDriver {
 
       for (final col in columns) {
         var def = '"${col.name.replaceAll('"', '""')}"';
-        
-        if (col.isAutoIncrement) {
-          if (col.type.toUpperCase() == 'INTEGER' || col.type.toUpperCase() == 'INT') {
-            def += ' SERIAL';
-          } else if (col.type.toUpperCase() == 'BIGINT') {
-            def += ' BIGSERIAL';
-          } else if (col.type.toUpperCase() == 'SMALLINT') {
-            def += ' SMALLSERIAL';
-          } else {
-            // Postgres 10+ standard way
-            def += ' ${col.type} GENERATED ALWAYS AS IDENTITY';
-          }
-        } else {
-          def += ' ${col.type}';
-          if (col.length != null) {
-            def += '(${col.length})';
-          }
+
+        def += ' ${col.type}';
+        if (col.length != null) {
+          def += '(${col.length})';
         }
-        
+        if (col.isAutoIncrement) {
+          def += ' GENERATED BY DEFAULT AS IDENTITY';
+        }
+
         if (!col.isNullable) {
           def += ' NOT NULL';
         }
-        
-        if (col.defaultValue != null && col.defaultValue!.isNotEmpty) {
+
+        if (!col.isAutoIncrement &&
+            col.defaultValue != null &&
+            col.defaultValue!.isNotEmpty) {
           if (col.defaultValue!.toUpperCase() == 'CURRENT_TIMESTAMP') {
-             def += ' DEFAULT CURRENT_TIMESTAMP';
+            def += ' DEFAULT CURRENT_TIMESTAMP';
           } else {
-             def += " DEFAULT '${col.defaultValue!.replaceAll("'", "''")}'";
+            def += " DEFAULT '${col.defaultValue!.replaceAll("'", "''")}'";
           }
         }
 
@@ -763,7 +800,8 @@ class PostgresDriver implements DatabaseDriver {
         columnDefs.add('PRIMARY KEY (${primaryKeys.join(', ')})');
       }
 
-      final sql = 'CREATE TABLE "${tableName.replaceAll('"', '""')}" (\n  ${columnDefs.join(',\n  ')}\n)';
+      final sql =
+          'CREATE TABLE "${tableName.replaceAll('"', '""')}" (\n  ${columnDefs.join(',\n  ')}\n)';
       await conn.execute(sql);
     } finally {
       await conn.close();
@@ -778,18 +816,33 @@ class PostgresDriver implements DatabaseDriver {
   ) async {
     final conn = await _connect(connection, database: database);
     try {
-      final quotedTable = _quoteIdentifier(table);
-      final sql = "SELECT column_name, data_type, character_maximum_length, is_nullable, column_default, is_identity FROM information_schema.columns WHERE table_schema = 'public' AND table_name = '$table' ORDER BY ordinal_position;";
-      final schema = await conn.execute(sql);
-      
-      final pkeySql = '''
-        SELECT a.attname
-        FROM pg_index i
-        JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)
-        WHERE i.indrelid = '$quotedTable'::regclass AND i.indisprimary;
-      ''';
-      
-      final pkeyResults = await conn.execute(pkeySql);
+      final schema = await conn.execute(
+        pg.Sql.named('''
+          SELECT column_name, data_type, character_maximum_length,
+                 is_nullable, column_default, is_identity
+          FROM information_schema.columns
+          WHERE table_schema = 'public' AND table_name = @table
+          ORDER BY ordinal_position
+        '''),
+        parameters: {'table': table},
+      );
+
+      final pkeyResults = await conn.execute(
+        pg.Sql.named('''
+          SELECT key_column_usage.column_name
+          FROM information_schema.table_constraints
+          JOIN information_schema.key_column_usage
+            ON key_column_usage.constraint_schema =
+               table_constraints.constraint_schema
+           AND key_column_usage.constraint_name =
+               table_constraints.constraint_name
+          WHERE table_constraints.table_schema = 'public'
+            AND table_constraints.table_name = @table
+            AND table_constraints.constraint_type = 'PRIMARY KEY'
+          ORDER BY key_column_usage.ordinal_position
+        '''),
+        parameters: {'table': table},
+      );
       final primaryKeys = pkeyResults.map((row) => _asString(row[0])).toSet();
 
       final columns = <TableColumnDefinition>[];
@@ -801,13 +854,13 @@ class PostgresDriver implements DatabaseDriver {
         final isNullable = _asString(row[3]).toUpperCase() == 'YES';
         final defaultValue = row[4] != null ? _asString(row[4]) : null;
         final isIdentity = _asString(row[5]).toUpperCase() == 'YES';
-        
+
         final isPk = primaryKeys.contains(name);
-        
+
         var isAutoIncrement = isIdentity;
         var type = typeRaw;
         var cleanDefault = defaultValue;
-        
+
         if (defaultValue != null && defaultValue.startsWith('nextval(')) {
           isAutoIncrement = true;
           cleanDefault = null;
@@ -825,16 +878,18 @@ class PostgresDriver implements DatabaseDriver {
           type = 'TIMESTAMP';
         }
 
-        columns.add(TableColumnDefinition(
-          name: name,
-          originalName: name,
-          type: type.toUpperCase(),
-          length: length,
-          isPrimaryKey: isPk,
-          isNullable: isNullable,
-          isAutoIncrement: isAutoIncrement,
-          defaultValue: cleanDefault,
-        ));
+        columns.add(
+          TableColumnDefinition(
+            name: name,
+            originalName: name,
+            type: type.toUpperCase(),
+            length: length,
+            isPrimaryKey: isPk,
+            isNullable: isNullable,
+            isAutoIncrement: isAutoIncrement,
+            defaultValue: cleanDefault,
+          ),
+        );
       }
       return columns;
     } finally {
@@ -853,120 +908,59 @@ class PostgresDriver implements DatabaseDriver {
   ) async {
     final conn = await _connect(connection, database: database);
     try {
-      final actions = <String>[];
-      final oldMap = {for (final c in oldColumns) c.name: c};
-      final processedOldNames = <String>{};
-      
-      for (final newCol in newColumns) {
-        final origName = newCol.originalName;
-        if (origName != null && oldMap.containsKey(origName)) {
-           final oldCol = oldMap[origName]!;
-           processedOldNames.add(origName);
-           
-           if (newCol.name != oldCol.name) {
-              await conn.execute('ALTER TABLE ${_quoteIdentifier(oldTableName)} RENAME COLUMN ${_quoteIdentifier(oldCol.name)} TO ${_quoteIdentifier(newCol.name)}');
-           }
-           
-           if (oldCol.type != newCol.type || oldCol.length != newCol.length) {
-              var typeStr = newCol.type;
-              if (newCol.length != null) typeStr += '(${newCol.length})';
-              actions.add('ALTER COLUMN ${_quoteIdentifier(newCol.name)} TYPE $typeStr USING ${_quoteIdentifier(newCol.name)}::$typeStr');
-           }
-           
-           if (oldCol.isNullable != newCol.isNullable) {
-              actions.add('ALTER COLUMN ${_quoteIdentifier(newCol.name)} ${newCol.isNullable ? 'DROP NOT NULL' : 'SET NOT NULL'}');
-           }
-           
-           if (oldCol.defaultValue != newCol.defaultValue) {
-              if (newCol.defaultValue == null || newCol.defaultValue!.isEmpty) {
-                 actions.add('ALTER COLUMN ${_quoteIdentifier(newCol.name)} DROP DEFAULT');
-              } else {
-                 final defVal = newCol.defaultValue!.toUpperCase() == 'CURRENT_TIMESTAMP' 
-                     ? 'CURRENT_TIMESTAMP' 
-                     : "'${newCol.defaultValue!.replaceAll("'", "''")}'";
-                 actions.add('ALTER COLUMN ${_quoteIdentifier(newCol.name)} SET DEFAULT $defVal');
-              }
-           }
-           
-           if (oldCol.isAutoIncrement != newCol.isAutoIncrement) {
-               if (newCol.isAutoIncrement) {
-                   actions.add('ALTER COLUMN ${_quoteIdentifier(newCol.name)} ADD GENERATED ALWAYS AS IDENTITY');
-               } else {
-                   actions.add('ALTER COLUMN ${_quoteIdentifier(newCol.name)} DROP IDENTITY IF EXISTS');
-               }
-           }
-        } else {
-           final typeDef = _buildColumnDefinition(newCol);
-           actions.add('ADD COLUMN ${_quoteIdentifier(newCol.name)} $typeDef');
+      await conn.runTx((transaction) async {
+        final pkResult = await transaction.execute(
+          pg.Sql.named('''
+            SELECT constraint_name
+            FROM information_schema.table_constraints
+            WHERE table_schema = 'public'
+              AND table_name = @table
+              AND constraint_type = 'PRIMARY KEY'
+          '''),
+          parameters: {'table': oldTableName},
+        );
+        final primaryKeyConstraint = pkResult.isEmpty
+            ? null
+            : _asString(pkResult.first[0]);
+
+        final serialResult = await transaction.execute(
+          pg.Sql.named('''
+            SELECT columns.column_name,
+                   format('%I.%I', sequence_schema.nspname, sequence.relname)
+            FROM information_schema.columns AS columns
+            JOIN pg_class AS sequence
+              ON sequence.oid = pg_get_serial_sequence(
+                   format('%I.%I', columns.table_schema, columns.table_name),
+                   columns.column_name
+                 )::regclass
+            JOIN pg_namespace AS sequence_schema
+              ON sequence_schema.oid = sequence.relnamespace
+            WHERE columns.table_schema = 'public'
+              AND columns.table_name = @table
+              AND columns.is_identity = 'NO'
+              AND columns.column_default LIKE 'nextval(%'
+          '''),
+          parameters: {'table': oldTableName},
+        );
+        final serialSequences = <String, String>{
+          for (final row in serialResult)
+            if (row[1] != null) _asString(row[0]): _asString(row[1]),
+        };
+
+        final statements = buildPostgresAlterStatements(
+          oldTableName: oldTableName,
+          newTableName: newTableName,
+          oldColumns: oldColumns,
+          newColumns: newColumns,
+          primaryKeyConstraint: primaryKeyConstraint,
+          serialSequences: serialSequences,
+        );
+        for (final statement in statements) {
+          await transaction.execute(statement);
         }
-      }
-      
-      for (final oldCol in oldColumns) {
-         if (!processedOldNames.contains(oldCol.name)) {
-            actions.add('DROP COLUMN ${_quoteIdentifier(oldCol.name)}');
-         }
-      }
-      
-      final oldPks = oldColumns.where((c) => c.isPrimaryKey).map((c) => c.name).toSet();
-      final newPks = newColumns.where((c) => c.isPrimaryKey).map((c) => c.name).toSet();
-      
-      final oldPkOrig = oldColumns.where((c) => c.isPrimaryKey).map((c) => c.name).toSet();
-      final newPkOrig = newColumns.where((c) => c.isPrimaryKey).map((c) => c.originalName ?? c.name).toSet();
-      
-      if (oldPkOrig.length != newPkOrig.length || oldPkOrig.intersection(newPkOrig).length != oldPkOrig.length) {
-         if (oldPks.isNotEmpty) {
-            actions.add('DROP CONSTRAINT IF EXISTS ${_quoteIdentifier('${oldTableName}_pkey')}');
-         }
-         if (newPks.isNotEmpty) {
-            final pkCols = newPks.map((n) => _quoteIdentifier(n)).join(', ');
-            actions.add('ADD PRIMARY KEY ($pkCols)');
-         }
-      }
-      
-      if (actions.isNotEmpty) {
-         final sql = 'ALTER TABLE ${_quoteIdentifier(oldTableName)} \n  ${actions.join(',\n  ')}';
-         await conn.execute(sql);
-      }
-      
-      if (oldTableName != newTableName) {
-         await conn.execute('ALTER TABLE ${_quoteIdentifier(oldTableName)} RENAME TO ${_quoteIdentifier(newTableName)}');
-      }
-      
+      });
     } finally {
       await conn.close();
     }
-  }
-
-  String _buildColumnDefinition(TableColumnDefinition col) {
-    var def = '';
-    if (col.isAutoIncrement) {
-      if (col.type.toUpperCase() == 'INTEGER' || col.type.toUpperCase() == 'INT') {
-        def += 'SERIAL';
-      } else if (col.type.toUpperCase() == 'BIGINT') {
-        def += 'BIGSERIAL';
-      } else if (col.type.toUpperCase() == 'SMALLINT') {
-        def += 'SMALLSERIAL';
-      } else {
-        def += '${col.type} GENERATED ALWAYS AS IDENTITY';
-      }
-    } else {
-      def += col.type;
-      if (col.length != null) {
-        def += '(${col.length})';
-      }
-    }
-    
-    if (!col.isNullable) {
-      def += ' NOT NULL';
-    }
-    
-    if (col.defaultValue != null && col.defaultValue!.isNotEmpty) {
-      if (col.defaultValue!.toUpperCase() == 'CURRENT_TIMESTAMP') {
-         def += ' DEFAULT CURRENT_TIMESTAMP';
-      } else {
-         def += " DEFAULT '${col.defaultValue!.replaceAll("'", "''")}'";
-      }
-    }
-    return def;
   }
 }

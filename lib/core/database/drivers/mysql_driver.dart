@@ -12,10 +12,20 @@ import '../../../features/workspace/domain/entities/table_data.dart';
 import '../../../features/workspace/domain/entities/workspace_database.dart';
 import '../../../features/workspace/domain/entities/workspace_table.dart';
 import '../database_driver.dart';
+import 'alter_table_sql.dart';
 
 class MySQLDriver implements DatabaseDriver {
   @override
-  List<String> get supportedOperators => ['=', '!=', '>', '<', '>=', '<=', 'LIKE', 'NOT LIKE'];
+  List<String> get supportedOperators => [
+    '=',
+    '!=',
+    '>',
+    '<',
+    '>=',
+    '<=',
+    'LIKE',
+    'NOT LIKE',
+  ];
 
   String _asString(dynamic value) {
     if (value == null) return '';
@@ -50,7 +60,9 @@ class MySQLDriver implements DatabaseDriver {
       await conn.close();
     } catch (e) {
       if (e is MySQLException) {
-        final base = e.message.isNotEmpty ? e.message : 'MySQL client returned an error';
+        final base = e.message.isNotEmpty
+            ? e.message
+            : 'MySQL client returned an error';
         throw Exception('Failed to connect: $base');
       }
 
@@ -62,7 +74,9 @@ class MySQLDriver implements DatabaseDriver {
               message.contains('OS Error'));
 
       if (localhostHint) {
-        throw Exception('Failed to connect: $message. If this app is running on a simulator/device, 127.0.0.1 points to the device, not your computer.');
+        throw Exception(
+          'Failed to connect: $message. If this app is running on a simulator/device, 127.0.0.1 points to the device, not your computer.',
+        );
       }
 
       throw Exception('Failed to connect: $message');
@@ -75,7 +89,10 @@ class MySQLDriver implements DatabaseDriver {
     try {
       final results = await conn.execute('SHOW DATABASES');
       return results.rows
-          .map((row) => WorkspaceDatabase(name: _asString(row.colByName('Database'))))
+          .map(
+            (row) =>
+                WorkspaceDatabase(name: _asString(row.colByName('Database'))),
+          )
           .where((db) => db.name.isNotEmpty)
           .toList();
     } finally {
@@ -172,7 +189,10 @@ class MySQLDriver implements DatabaseDriver {
           AND REFERENCED_TABLE_NAME IS NOT NULL
       ''';
       final startFkMs = DateTime.now().millisecondsSinceEpoch;
-      final fkSchema = await conn.execute(fkSql, {'db': database, 'table': table});
+      final fkSchema = await conn.execute(fkSql, {
+        'db': database,
+        'table': table,
+      });
       final execFkMs = DateTime.now().millisecondsSinceEpoch - startFkMs;
 
       onHistory?.call(
@@ -200,7 +220,8 @@ class MySQLDriver implements DatabaseDriver {
       final sampleSql = 'SELECT * FROM $quotedDatabase.$quotedTable LIMIT 0';
       final startSampleMs = DateTime.now().millisecondsSinceEpoch;
       final sample = await conn.execute(sampleSql);
-      final execSampleMs = DateTime.now().millisecondsSinceEpoch - startSampleMs;
+      final execSampleMs =
+          DateTime.now().millisecondsSinceEpoch - startSampleMs;
 
       onHistory?.call(
         QueryHistory(
@@ -235,7 +256,10 @@ class MySQLDriver implements DatabaseDriver {
         ORDER BY SEQ_IN_INDEX;
       ''';
       final startIdxMs = DateTime.now().millisecondsSinceEpoch;
-      final idxSchema = await conn.execute(idxSql, {'db': database, 'table': table});
+      final idxSchema = await conn.execute(idxSql, {
+        'db': database,
+        'table': table,
+      });
       final execIdxMs = DateTime.now().millisecondsSinceEpoch - startIdxMs;
 
       onHistory?.call(
@@ -256,16 +280,16 @@ class MySQLDriver implements DatabaseDriver {
         final indexName = _asString(row.colByName('INDEX_NAME'));
         final isUnique = _asString(row.colByName('NON_UNIQUE')) == '0';
         final colName = _asString(row.colByName('COLUMN_NAME'));
-        
+
         if (indexesMap.containsKey(indexName)) {
-           indexesMap[indexName]!.columns.add(colName);
+          indexesMap[indexName]!.columns.add(colName);
         } else {
-           indexesMap[indexName] = TableIndex(
-             name: indexName,
-             columns: [colName],
-             isUnique: isUnique,
-             isPrimaryKey: indexName.toUpperCase() == 'PRIMARY',
-           );
+          indexesMap[indexName] = TableIndex(
+            name: indexName,
+            columns: [colName],
+            isUnique: isUnique,
+            isPrimaryKey: indexName.toUpperCase() == 'PRIMARY',
+          );
         }
       }
       final indexes = indexesMap.values.toList();
@@ -280,7 +304,7 @@ class MySQLDriver implements DatabaseDriver {
           )
           .name;
       return TableStructure(
-        columns: columns, 
+        columns: columns,
         indexes: indexes,
         orderColumn: orderColumn,
       );
@@ -304,27 +328,31 @@ class MySQLDriver implements DatabaseDriver {
       var sql =
           'SELECT COUNT(*) AS total FROM '
           '${_quoteIdentifier(database)}.${_quoteIdentifier(table)}';
-      
+
       final queryParams = <String, dynamic>{};
       final whereClauses = <String>[];
-      
+
       if (searchQuery != null && searchQuery.isNotEmpty) {
         final searchClauses = <String>[];
         for (int i = 0; i < structure.columns.length; i++) {
-          searchClauses.add('${_quoteIdentifier(structure.columns[i].name)} LIKE :search$i');
+          searchClauses.add(
+            '${_quoteIdentifier(structure.columns[i].name)} LIKE :search$i',
+          );
           queryParams['search$i'] = '%$searchQuery%';
         }
         whereClauses.add('(${searchClauses.join(' OR ')})');
       }
-      
+
       if (filters != null && filters.isNotEmpty) {
         for (int i = 0; i < filters.length; i++) {
           final filter = filters[i];
-          whereClauses.add('${_quoteIdentifier(filter.column)} ${filter.operator} :filter$i');
+          whereClauses.add(
+            '${_quoteIdentifier(filter.column)} ${filter.operator} :filter$i',
+          );
           queryParams['filter$i'] = filter.value;
         }
       }
-      
+
       if (whereClauses.isNotEmpty) {
         sql += ' WHERE ${whereClauses.join(' AND ')}';
       }
@@ -367,35 +395,41 @@ class MySQLDriver implements DatabaseDriver {
     final conn = await _connect(connection, database: database);
     final stopwatch = Stopwatch()..start();
     try {
-      var sql = 'SELECT * FROM ${_quoteIdentifier(database)}.${_quoteIdentifier(table)}';
-      
+      var sql =
+          'SELECT * FROM ${_quoteIdentifier(database)}.${_quoteIdentifier(table)}';
+
       final queryParams = <String, dynamic>{};
       final whereClauses = <String>[];
-      
+
       if (searchQuery != null && searchQuery.isNotEmpty) {
         final searchClauses = <String>[];
         for (int i = 0; i < structure.columns.length; i++) {
-          searchClauses.add('${_quoteIdentifier(structure.columns[i].name)} LIKE :search$i');
+          searchClauses.add(
+            '${_quoteIdentifier(structure.columns[i].name)} LIKE :search$i',
+          );
           queryParams['search$i'] = '%$searchQuery%';
         }
         whereClauses.add('(${searchClauses.join(' OR ')})');
       }
-      
+
       if (filters != null && filters.isNotEmpty) {
         for (int i = 0; i < filters.length; i++) {
           final filter = filters[i];
-          whereClauses.add('${_quoteIdentifier(filter.column)} ${filter.operator} :filter$i');
+          whereClauses.add(
+            '${_quoteIdentifier(filter.column)} ${filter.operator} :filter$i',
+          );
           queryParams['filter$i'] = filter.value;
         }
       }
-      
+
       if (whereClauses.isNotEmpty) {
         sql += ' WHERE ${whereClauses.join(' AND ')}';
       }
-      
-      sql += ' ORDER BY ${_quoteIdentifier(structure.orderColumn)} ASC '
+
+      sql +=
+          ' ORDER BY ${_quoteIdentifier(structure.orderColumn)} ASC '
           'LIMIT $limit OFFSET $offset';
-          
+
       final startMs = DateTime.now().millisecondsSinceEpoch;
       final result = await conn.execute(sql, queryParams);
       final execMs = DateTime.now().millisecondsSinceEpoch - startMs;
@@ -569,7 +603,9 @@ class MySQLDriver implements DatabaseDriver {
     List<int> primaryKeyIndexes,
   ) {
     return primaryKeyIndexes
-        .map((index) => '${_quoteIdentifier(structure.columns[index].name)} = ?')
+        .map(
+          (index) => '${_quoteIdentifier(structure.columns[index].name)} = ?',
+        )
         .join(' AND ');
   }
 
@@ -729,28 +765,28 @@ class MySQLDriver implements DatabaseDriver {
 
       for (final col in columns) {
         var def = '`${col.name.replaceAll('`', '``')}` ${col.type}';
-        
+
         if (col.length != null) {
           def += '(${col.length})';
         }
-        
+
         if (!col.isNullable) {
           def += ' NOT NULL';
         }
-        
+
         if (col.isAutoIncrement) {
           def += ' AUTO_INCREMENT';
         }
-        
+
         if (col.defaultValue != null && col.defaultValue!.isNotEmpty) {
           // A bit simplistic for string defaults vs numeric defaults
           // Ideally we would inspect the type, but standard SQL usually needs quotes for strings
           // For simplicity, assuming default values are appropriately formatted by the user
           // Or we quote them. Let's just pass it as is, or maybe wrap in single quotes if it's not a function like CURRENT_TIMESTAMP
           if (col.defaultValue!.toUpperCase() == 'CURRENT_TIMESTAMP') {
-             def += ' DEFAULT CURRENT_TIMESTAMP';
+            def += ' DEFAULT CURRENT_TIMESTAMP';
           } else {
-             def += " DEFAULT '${col.defaultValue!.replaceAll("'", "''")}'";
+            def += " DEFAULT '${col.defaultValue!.replaceAll("'", "''")}'";
           }
         }
 
@@ -765,7 +801,8 @@ class MySQLDriver implements DatabaseDriver {
         columnDefs.add('PRIMARY KEY (${primaryKeys.join(', ')})');
       }
 
-      final sql = 'CREATE TABLE `${tableName.replaceAll('`', '``')}` (\n  ${columnDefs.join(',\n  ')}\n)';
+      final sql =
+          'CREATE TABLE `${tableName.replaceAll('`', '``')}` (\n  ${columnDefs.join(',\n  ')}\n)';
       await conn.execute(sql);
     } finally {
       await conn.close();
@@ -782,40 +819,45 @@ class MySQLDriver implements DatabaseDriver {
     try {
       final quotedDatabase = _quoteIdentifier(database);
       final quotedTable = _quoteIdentifier(table);
-      final schema = await conn.execute('SHOW COLUMNS FROM $quotedDatabase.$quotedTable');
-      
+      final schema = await conn.execute(
+        'SHOW COLUMNS FROM $quotedDatabase.$quotedTable',
+      );
+
       final columns = <TableColumnDefinition>[];
       for (final row in schema.rows) {
         final name = _asString(row.colByName('Field'));
         var typeRaw = _asString(row.colByName('Type'));
-        final isNullable = _asString(row.colByName('Null')).toUpperCase() == 'YES';
+        final isNullable =
+            _asString(row.colByName('Null')).toUpperCase() == 'YES';
         final isPk = _asString(row.colByName('Key')).toUpperCase() == 'PRI';
         final defaultValue = _asString(row.colByName('Default'));
         final extra = _asString(row.colByName('Extra')).toUpperCase();
-        
+
         final isAutoIncrement = extra.contains('AUTO_INCREMENT');
-        
+
         int? length;
         var type = typeRaw;
-        
+
         final lengthMatch = RegExp(r'\((\d+)\)').firstMatch(typeRaw);
         if (lengthMatch != null) {
           length = int.tryParse(lengthMatch.group(1)!);
           type = typeRaw.replaceAll(lengthMatch.group(0)!, '');
         }
-        
+
         type = type.split(' ')[0].toUpperCase();
 
-        columns.add(TableColumnDefinition(
-          name: name,
-          originalName: name,
-          type: type,
-          length: length,
-          isPrimaryKey: isPk,
-          isNullable: isNullable,
-          isAutoIncrement: isAutoIncrement,
-          defaultValue: defaultValue.isNotEmpty ? defaultValue : null,
-        ));
+        columns.add(
+          TableColumnDefinition(
+            name: name,
+            originalName: name,
+            type: type,
+            length: length,
+            isPrimaryKey: isPk,
+            isNullable: isNullable,
+            isAutoIncrement: isAutoIncrement,
+            defaultValue: defaultValue.isNotEmpty ? defaultValue : null,
+          ),
+        );
       }
       return columns;
     } finally {
@@ -834,87 +876,17 @@ class MySQLDriver implements DatabaseDriver {
   ) async {
     final conn = await _connect(connection, database: database);
     try {
-      final actions = <String>[];
-      final oldMap = {for (final c in oldColumns) c.name: c};
-      final processedOldNames = <String>{};
-      
-      for (final newCol in newColumns) {
-        final origName = newCol.originalName;
-        if (origName != null && oldMap.containsKey(origName)) {
-           final oldCol = oldMap[origName]!;
-           processedOldNames.add(origName);
-           
-           final typeDef = _buildColumnDefinition(newCol);
-           
-           if (newCol.name != oldCol.name) {
-              actions.add('CHANGE COLUMN ${_quoteIdentifier(oldCol.name)} ${_quoteIdentifier(newCol.name)} $typeDef');
-           } else {
-              if (oldCol.type != newCol.type || oldCol.length != newCol.length || 
-                  oldCol.isNullable != newCol.isNullable || oldCol.isAutoIncrement != newCol.isAutoIncrement ||
-                  oldCol.defaultValue != newCol.defaultValue) {
-                 actions.add('MODIFY COLUMN ${_quoteIdentifier(newCol.name)} $typeDef');
-              }
-           }
-        } else {
-           final typeDef = _buildColumnDefinition(newCol);
-           actions.add('ADD COLUMN ${_quoteIdentifier(newCol.name)} $typeDef');
-        }
+      final statements = buildMySqlAlterStatements(
+        oldTableName: oldTableName,
+        newTableName: newTableName,
+        oldColumns: oldColumns,
+        newColumns: newColumns,
+      );
+      for (final statement in statements) {
+        await conn.execute(statement);
       }
-      
-      for (final oldCol in oldColumns) {
-         if (!processedOldNames.contains(oldCol.name)) {
-            actions.add('DROP COLUMN ${_quoteIdentifier(oldCol.name)}');
-         }
-      }
-      
-      final oldPks = oldColumns.where((c) => c.isPrimaryKey).map((c) => c.name).toSet();
-      final newPks = newColumns.where((c) => c.isPrimaryKey).map((c) => c.name).toSet();
-      
-      final oldPkOrig = oldColumns.where((c) => c.isPrimaryKey).map((c) => c.name).toSet();
-      final newPkOrig = newColumns.where((c) => c.isPrimaryKey).map((c) => c.originalName ?? c.name).toSet();
-      
-      if (oldPkOrig.length != newPkOrig.length || oldPkOrig.intersection(newPkOrig).length != oldPkOrig.length) {
-         if (oldPks.isNotEmpty) {
-            actions.add('DROP PRIMARY KEY');
-         }
-         if (newPks.isNotEmpty) {
-            final pkCols = newPks.map((n) => _quoteIdentifier(n)).join(', ');
-            actions.add('ADD PRIMARY KEY ($pkCols)');
-         }
-      }
-      
-      if (actions.isNotEmpty) {
-         final sql = 'ALTER TABLE ${_quoteIdentifier(oldTableName)} \n  ${actions.join(',\n  ')}';
-         await conn.execute(sql);
-      }
-      
-      if (oldTableName != newTableName) {
-         await conn.execute('RENAME TABLE ${_quoteIdentifier(oldTableName)} TO ${_quoteIdentifier(newTableName)}');
-      }
-      
     } finally {
       await conn.close();
     }
-  }
-
-  String _buildColumnDefinition(TableColumnDefinition col) {
-    var def = col.type;
-    if (col.length != null) {
-      def += '(${col.length})';
-    }
-    if (!col.isNullable) {
-      def += ' NOT NULL';
-    }
-    if (col.isAutoIncrement) {
-      def += ' AUTO_INCREMENT';
-    }
-    if (col.defaultValue != null && col.defaultValue!.isNotEmpty) {
-      if (col.defaultValue!.toUpperCase() == 'CURRENT_TIMESTAMP') {
-         def += ' DEFAULT CURRENT_TIMESTAMP';
-      } else {
-         def += " DEFAULT '${col.defaultValue!.replaceAll("'", "''")}'";
-      }
-    }
-    return def;
   }
 }

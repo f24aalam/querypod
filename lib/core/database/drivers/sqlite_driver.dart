@@ -1280,6 +1280,49 @@ class SQLiteDriver implements DatabaseDriver {
       }
     }
   }
+
+  @override
+  Future<void> dropTable(
+    Connection connection,
+    String database,
+    String table, {
+    bool cascade = false,
+  }) async {
+    final db = await _connect(connection);
+    try {
+      if (cascade) {
+        await db.execute('PRAGMA foreign_keys = OFF');
+      }
+      await db.execute('DROP TABLE ${_quoteIdentifier(table)}');
+    } finally {
+      if (cascade) {
+        await db.execute('PRAGMA foreign_keys = ON');
+      }
+      await db.close();
+    }
+  }
+
+  @override
+  Future<void> truncateTable(
+    Connection connection,
+    String database,
+    String table, {
+    bool cascade = false,
+  }) async {
+    final db = await _connect(connection);
+    try {
+      if (cascade) {
+        await db.execute('PRAGMA foreign_keys = OFF');
+      }
+      // SQLite does not support TRUNCATE TABLE, so we use DELETE FROM
+      await db.execute('DELETE FROM ${_quoteIdentifier(table)}');
+    } finally {
+      if (cascade) {
+        await db.execute('PRAGMA foreign_keys = ON');
+      }
+      await db.close();
+    }
+  }
 }
 
 class _SqlitePreservedSchema {

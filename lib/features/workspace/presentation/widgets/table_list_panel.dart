@@ -14,6 +14,7 @@ import '../cubit/workspace_metadata_cubit.dart';
 import '../cubit/workspace_metadata_state.dart';
 import 'create_database_dialog.dart';
 import 'sidebar_header.dart';
+import 'table_destructive_action_dialog.dart';
 
 class TableListPanel extends StatefulWidget {
   const TableListPanel({super.key});
@@ -386,6 +387,68 @@ class _TableItem extends StatelessWidget {
                   connectionId: connection.id,
                   database: database,
                   tableToEdit: table.name,
+                );
+              },
+            ),
+          ],
+        ),
+        FItemGroup(
+          children: [
+            FItem(
+              title: Text(
+                'Truncate',
+                style: TextStyle(color: theme.colors.destructive),
+              ),
+              prefix: Icon(
+                Icons.delete_sweep_outlined,
+                size: 14,
+                color: theme.colors.destructive,
+              ),
+              onPress: () {
+                controller.hide();
+                final metadata = context.read<WorkspaceMetadataCubit>();
+                final connection = context
+                    .read<ConnectionCubit>()
+                    .state
+                    .activeConnection;
+                final database = metadata.state.selectedDatabase;
+                if (connection == null || database == null) return;
+
+                TableDestructiveActionDialog.show(
+                  context,
+                  connection: connection,
+                  database: database,
+                  tableName: table.name,
+                  actionType: DestructiveActionType.truncate,
+                );
+              },
+            ),
+            FItem(
+              title: Text(
+                'Drop',
+                style: TextStyle(color: theme.colors.destructive),
+              ),
+              prefix: Icon(
+                Icons.delete_outline,
+                size: 14,
+                color: theme.colors.destructive,
+              ),
+              onPress: () {
+                controller.hide();
+                final metadata = context.read<WorkspaceMetadataCubit>();
+                final connection = context
+                    .read<ConnectionCubit>()
+                    .state
+                    .activeConnection;
+                final database = metadata.state.selectedDatabase;
+                if (connection == null || database == null) return;
+
+                TableDestructiveActionDialog.show(
+                  context,
+                  connection: connection,
+                  database: database,
+                  tableName: table.name,
+                  actionType: DestructiveActionType.drop,
                 );
               },
             ),

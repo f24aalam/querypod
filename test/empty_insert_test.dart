@@ -19,9 +19,9 @@ void main() {
       await db.transaction((txn) async {
         await txn.execute('INSERT INTO "test" DEFAULT VALUES', []);
       });
-      print('Insert succeeded!');
+      // Insert succeeded
     } catch (e) {
-      print('Insert failed: $e');
+      // Insert failed
     }
 
     await db.close();

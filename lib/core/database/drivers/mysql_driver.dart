@@ -951,4 +951,46 @@ class MySQLDriver implements DatabaseDriver {
       await conn.close();
     }
   }
+
+  @override
+  Future<void> dropTable(
+    Connection connection,
+    String database,
+    String table, {
+    bool cascade = false,
+  }) async {
+    final conn = await _connect(connection, database: database);
+    try {
+      if (cascade) {
+        await conn.execute('SET FOREIGN_KEY_CHECKS=0');
+      }
+      await conn.execute('DROP TABLE ${_quoteIdentifier(table)}');
+    } finally {
+      if (cascade) {
+        await conn.execute('SET FOREIGN_KEY_CHECKS=1');
+      }
+      await conn.close();
+    }
+  }
+
+  @override
+  Future<void> truncateTable(
+    Connection connection,
+    String database,
+    String table, {
+    bool cascade = false,
+  }) async {
+    final conn = await _connect(connection, database: database);
+    try {
+      if (cascade) {
+        await conn.execute('SET FOREIGN_KEY_CHECKS=0');
+      }
+      await conn.execute('TRUNCATE TABLE ${_quoteIdentifier(table)}');
+    } finally {
+      if (cascade) {
+        await conn.execute('SET FOREIGN_KEY_CHECKS=1');
+      }
+      await conn.close();
+    }
+  }
 }

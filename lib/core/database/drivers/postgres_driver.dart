@@ -1030,4 +1030,42 @@ class PostgresDriver implements DatabaseDriver {
       await conn.close();
     }
   }
+
+  @override
+  Future<void> dropTable(
+    covariant Connection connection,
+    String database,
+    String table, {
+    bool cascade = false,
+  }) async {
+    final conn = await _connect(connection, database: database);
+    try {
+      var sql = 'DROP TABLE ${_quoteIdentifier(table)}';
+      if (cascade) {
+        sql += ' CASCADE';
+      }
+      await conn.execute(sql);
+    } finally {
+      await conn.close();
+    }
+  }
+
+  @override
+  Future<void> truncateTable(
+    covariant Connection connection,
+    String database,
+    String table, {
+    bool cascade = false,
+  }) async {
+    final conn = await _connect(connection, database: database);
+    try {
+      var sql = 'TRUNCATE TABLE ${_quoteIdentifier(table)}';
+      if (cascade) {
+        sql += ' CASCADE';
+      }
+      await conn.execute(sql);
+    } finally {
+      await conn.close();
+    }
+  }
 }

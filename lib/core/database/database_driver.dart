@@ -91,4 +91,18 @@ abstract class DatabaseDriver {
     List<TableColumnDefinition> oldColumns,
     List<TableColumnDefinition> newColumns,
   );
+
+  Future<void> dropTable(
+    Connection connection,
+    String database,
+    String table, {
+    bool cascade = false,
+  });
+
+  Future<void> truncateTable(
+    Connection connection,
+    String database,
+    String table, {
+    bool cascade = false,
+  });
 }

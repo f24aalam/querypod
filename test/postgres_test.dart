@@ -7,9 +7,9 @@ void main() {
     // but we can check if Sql.named throws or hangs before connecting?
     try {
       final sql = pg.Sql.named('INSERT INTO "table" DEFAULT VALUES');
-      print('Sql.named created: $sql');
+      expect(sql, isNotNull); // Use the variable to avoid unused warning
     } catch (e) {
-      print('Sql.named failed: $e');
+      // Failed
     }
   });
 }

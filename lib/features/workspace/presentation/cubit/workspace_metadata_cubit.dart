@@ -309,6 +309,68 @@ class WorkspaceMetadataCubit extends Cubit<WorkspaceMetadataState> {
     }
   }
 
+  Future<void> dropTable(
+    Connection connection,
+    String database,
+    String table, {
+    bool cascade = false,
+  }) async {
+    try {
+      await _repository.dropTable(
+        connection,
+        database,
+        table,
+        cascade: cascade,
+      );
+      
+      await refreshTables(connection, database);
+    } catch (e) {
+      emit(
+        _feedback(
+          _metadataErrorMessage(
+            e,
+            fallback: 'Failed to drop table $table',
+          ),
+          isError: true,
+          status: state.status,
+        ),
+      );
+      rethrow;
+    }
+  }
+
+  Future<void> truncateTable(
+    Connection connection,
+    String database,
+    String table, {
+    bool cascade = false,
+  }) async {
+    try {
+      await _repository.truncateTable(
+        connection,
+        database,
+        table,
+        cascade: cascade,
+      );
+      
+      // we usually don't need to refresh tables after truncate because the table still exists
+      // but if the data view is open it might need to refresh its data,
+      // which is handled by the data view's own cubit, not the metadata cubit.
+    } catch (e) {
+      emit(
+        _feedback(
+          _metadataErrorMessage(
+            e,
+            fallback: 'Failed to truncate table $table',
+          ),
+          isError: true,
+          status: state.status,
+        ),
+      );
+      rethrow;
+    }
+  }
+
   Future<void> _loadTables(
     Connection connection,
     String database, {

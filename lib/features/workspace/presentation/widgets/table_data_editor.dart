@@ -115,8 +115,9 @@ class _TableContent extends StatelessWidget {
         !showForeignPreview &&
         !showRowDetail &&
         !showBatchInspector &&
-        !showTableStructure)
+        !showTableStructure) {
       return grid;
+    }
 
     return FResizable(
       axis: Axis.horizontal,

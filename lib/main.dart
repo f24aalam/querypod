@@ -1,19 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:window_manager/window_manager.dart';
-import 'package:flutter/foundation.dart';
 
 import 'app/app.dart';
 import 'app/injection.dart';
+import 'core/platform_utils.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   sqfliteFfiInit();
   await configureDependencies(databaseFactory: databaseFactoryFfi);
-  
-  if (!kIsWeb) {
+
+  if (isDesktop) {
     await windowManager.ensureInitialized();
-    WindowOptions windowOptions = const WindowOptions(
+    const windowOptions = WindowOptions(
       size: Size(1200, 800),
       center: true,
       titleBarStyle: TitleBarStyle.hidden,

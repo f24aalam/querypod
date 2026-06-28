@@ -1,51 +1,61 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:forui/forui.dart';
 
 import '../../../../core/platform_utils.dart';
 import 'app_menu_actions.dart';
 
-class AppMenuBar extends StatelessWidget {
-  const AppMenuBar({super.key});
+/// Installs the native macOS menu or global desktop shortcuts around the app.
+class AppMenuShell extends StatelessWidget {
+  const AppMenuShell({super.key, required this.child});
+
+  final Widget child;
 
   @override
   Widget build(BuildContext context) {
-    // Only show on non-macOS desktop platforms
-    if (isMacOS) return const SizedBox.shrink();
-
-    final theme = context.theme;
-
-    return Container(
-      height: 30,
-      color: theme.colors.background,
-      child: MenuBar(
-        style: MenuStyle(
-          backgroundColor: WidgetStatePropertyAll(theme.colors.background),
-          elevation: const WidgetStatePropertyAll(0),
-          padding: const WidgetStatePropertyAll(EdgeInsets.zero),
-        ),
-        children: [
-          SubmenuButton(
-            menuChildren: [
-              MenuItemButton(
-                onPressed: AppMenuActions.quit,
-                shortcut: const SingleActivator(LogicalKeyboardKey.keyQ, control: true),
-                child: Text('Quit', style: TextStyle(color: theme.colors.foreground)),
+    if (isMacOS) {
+      return PlatformMenuBar(
+        menus: [
+          const PlatformMenu(
+            label: 'QueryPod',
+            menus: [
+              PlatformMenuItemGroup(
+                members: [PlatformProvidedMenuItem(type: .about)],
+              ),
+              PlatformMenuItemGroup(
+                members: [PlatformProvidedMenuItem(type: .servicesSubmenu)],
+              ),
+              PlatformMenuItemGroup(
+                members: [
+                  PlatformProvidedMenuItem(type: .hide),
+                  PlatformProvidedMenuItem(type: .hideOtherApplications),
+                  PlatformProvidedMenuItem(type: .showAllApplications),
+                ],
+              ),
+              PlatformMenuItemGroup(
+                members: [PlatformProvidedMenuItem(type: .quit)],
               ),
             ],
-            child: Text('File', style: TextStyle(color: theme.colors.foreground)),
           ),
-          SubmenuButton(
-            menuChildren: [
-              MenuItemButton(
-                onPressed: () => AppMenuActions.changeWorkspace(context),
-                child: Text('Change Workspace', style: TextStyle(color: theme.colors.foreground)),
+          PlatformMenu(
+            label: 'Workspace',
+            menus: [
+              PlatformMenuItem(
+                label: 'Change Workspace',
+                onSelected: () => AppMenuActions.changeWorkspace(context),
               ),
             ],
-            child: Text('Workspace', style: TextStyle(color: theme.colors.foreground)),
           ),
         ],
-      ),
+        child: child,
+      );
+    }
+
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.keyQ, control: true):
+            AppMenuActions.quit,
+      },
+      child: child,
     );
   }
 }

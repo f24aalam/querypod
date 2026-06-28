@@ -6,60 +6,36 @@ import '../features/connections/presentation/cubit/connection_cubit.dart';
 
 import '../features/editor/presentation/pages/connection_page.dart';
 import '../features/workspaces/presentation/pages/workspaces_page.dart';
-import '../features/editor/presentation/widgets/app_menu_actions.dart';
-import 'package:flutter/services.dart';
+import '../features/editor/presentation/widgets/app_menu_bar.dart';
 
 final router = GoRouter(
   routes: [
     ShellRoute(
       builder: (context, state, child) {
-        return PlatformMenuBar(
-          menus: [
-            PlatformMenu(
-              label: 'File',
-              menus: [
-                PlatformMenuItem(
-                  label: 'Quit',
-                  shortcut: const SingleActivator(LogicalKeyboardKey.keyQ, meta: true),
-                  onSelected: () => AppMenuActions.quit(),
-                ),
-              ],
-            ),
-            PlatformMenu(
-              label: 'Workspace',
-              menus: [
-                PlatformMenuItem(
-                  label: 'Change Workspace',
-                  onSelected: () => AppMenuActions.changeWorkspace(context),
-                ),
-              ],
-            ),
-          ],
-          child: child,
-        );
+        return AppMenuShell(child: child);
       },
       routes: [
-    GoRoute(
-      path: '/',
-      pageBuilder: (context, state) =>
-          _fadePage(key: state.pageKey, child: const WorkspacesPage()),
-    ),
-    GoRoute(
-      path: '/workspace/:id',
-      redirect: (context, state) {
-        final id = state.pathParameters['id'];
-        if (id != null) {
-          final cubit = context.read<ConnectionCubit>();
-          if (cubit.state.activeWorkspaceId != id) {
-            cubit.setWorkspace(id);
-          }
-        }
-        return null;
-      },
-      pageBuilder: (context, state) {
-        return _fadePage(key: state.pageKey, child: const ConnectionPage());
-      },
-    ),
+        GoRoute(
+          path: '/',
+          pageBuilder: (context, state) =>
+              _fadePage(key: state.pageKey, child: const WorkspacesPage()),
+        ),
+        GoRoute(
+          path: '/workspace/:id',
+          redirect: (context, state) {
+            final id = state.pathParameters['id'];
+            if (id != null) {
+              final cubit = context.read<ConnectionCubit>();
+              if (cubit.state.activeWorkspaceId != id) {
+                cubit.setWorkspace(id);
+              }
+            }
+            return null;
+          },
+          pageBuilder: (context, state) {
+            return _fadePage(key: state.pageKey, child: const ConnectionPage());
+          },
+        ),
       ],
     ),
   ],

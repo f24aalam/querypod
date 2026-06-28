@@ -422,6 +422,96 @@ class TableDataCubit extends Cubit<TableDataState> {
     beginCellEdit(key, newIndex, 0);
   }
 
+  void stageDuplicateForRow(TableTabKey key, int rowIndex) {
+    final session = state.session(key);
+    if (session == null || !session.isEditable || session.structure == null || !_isValidRow(session, rowIndex)) return;
+
+    List<int> targetSelection;
+    if (session.selectedRowIndexes.contains(rowIndex)) {
+      targetSelection = session.selectedRowIndexes.toList()..sort();
+    } else {
+      targetSelection = [rowIndex];
+    }
+
+    final numDuplicates = targetSelection.length;
+
+    final newlyDuplicatedRows = <TableDataRow>[];
+    for (final idx in targetSelection) {
+      final existingRow = session.rows[idx];
+      newlyDuplicatedRows.add(TableDataRow([
+        for (int c = 0; c < existingRow.cells.length; c++)
+          session.structure!.columns[c].isPrimaryKey
+              ? const TableCellValue.nullValue()
+              : existingRow.cells[c],
+      ]));
+    }
+
+    final newRows = List<TableDataRow>.from(newlyDuplicatedRows)..addAll(session.rows);
+
+    final shiftedInserts = <int>{};
+    for (int i = 0; i < numDuplicates; i++) {
+      shiftedInserts.add(i);
+    }
+    for (final i in session.stagedInsertedRowIndexes) {
+      shiftedInserts.add(i + numDuplicates);
+    }
+
+    final shiftedDeletes = <int>{};
+    for (final i in session.stagedDeletedRowIndexes) {
+      shiftedDeletes.add(i + numDuplicates);
+    }
+
+    final shiftedEdits = <TableCellCoordinate, TableCellEdit>{};
+    for (final edit in session.stagedCellEdits.values) {
+      final newEditRowIndex = edit.rowIndex + numDuplicates;
+      final newCoord = TableCellCoordinate(rowIndex: newEditRowIndex, columnIndex: edit.columnIndex);
+      shiftedEdits[newCoord] = edit.copyWith(rowIndex: newEditRowIndex);
+    }
+
+    for (int newIndex = 0; newIndex < numDuplicates; newIndex++) {
+      final originalIdx = targetSelection[newIndex];
+      final shiftedOriginalIdx = originalIdx + numDuplicates;
+      final existingRow = session.rows[originalIdx];
+
+      for (int c = 0; c < session.structure!.columns.length; c++) {
+        final oldCoord = TableCellCoordinate(rowIndex: shiftedOriginalIdx, columnIndex: c);
+        final existingEdit = shiftedEdits[oldCoord];
+        final cell = existingRow.cells[c];
+        
+        final valueStr = existingEdit?.draftText ?? cell.editText;
+        final isPrimaryKey = session.structure!.columns[c].isPrimaryKey;
+        
+        if (!isPrimaryKey && (valueStr.isNotEmpty || cell.kind != TableCellKind.nullValue || existingEdit != null)) {
+          final newCoord = TableCellCoordinate(rowIndex: newIndex, columnIndex: c);
+          shiftedEdits[newCoord] = TableCellEdit(
+            rowIndex: newIndex,
+            columnIndex: c,
+            originalText: '',
+            draftText: valueStr,
+          );
+        }
+      }
+    }
+
+    final activeEdit = session.activeCellEdit?.copyWith(
+      rowIndex: session.activeCellEdit!.rowIndex + numDuplicates,
+    );
+
+    _setSession(
+      session.copyWith(
+        rows: newRows,
+        stagedInsertedRowIndexes: shiftedInserts,
+        stagedDeletedRowIndexes: shiftedDeletes,
+        stagedCellEdits: shiftedEdits,
+        selectedRowIndexes: <int>{},
+        selectionAnchorRowIndex: () => null,
+        activeCellEdit: () => activeEdit,
+        isShowingStructure: false,
+        foreignRowPreview: () => null,
+      ),
+    );
+  }
+
   void stageDeleteForRow(TableTabKey key, int rowIndex) {
     final session = state.session(key);
     if (session == null ||

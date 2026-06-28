@@ -1056,6 +1056,20 @@ class _GridRow extends StatelessWidget {
         FItemGroup(
           children: [
             FItem(
+              enabled: editable,
+              prefix: const Icon(Icons.copy_outlined, size: 14),
+              title: const Text('Duplicate'),
+              onPress: editable
+                  ? () {
+                      controller.hide();
+                      context.read<TableDataCubit>().stageDuplicateForRow(
+                        tableKey,
+                        rowIndex,
+                      );
+                    }
+                  : null,
+            ),
+            FItem(
               variant: FItemVariant.destructive,
               enabled: editable,
               prefix: const Icon(Icons.delete_outline, size: 14),
@@ -1235,7 +1249,7 @@ class _GridCell extends StatelessWidget {
             : EdgeInsets.zero,
         alignment: Alignment.centerLeft,
         decoration: BoxDecoration(
-          color: pendingEdit && !deleted
+          color: pendingEdit && !deleted && !inserted
               ? Colors.amber.withValues(alpha: 0.16)
               : null,
           border: Border(

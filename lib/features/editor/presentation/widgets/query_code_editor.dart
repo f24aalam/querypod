@@ -50,8 +50,8 @@ class QueryCodeEditor extends StatelessWidget {
                   controller: controller,
                   expands: true,
                   textStyle: TextStyle(
-                    fontSize: 14,
-                    height: 1.55,
+                    fontSize: 16,
+                    height: 1.6,
                     fontFamily: 'monospace',
                     color: isDark
                         ? const Color(0xFFF8F8F2)
@@ -59,10 +59,9 @@ class QueryCodeEditor extends StatelessWidget {
                   ),
                   background: theme.colors.background,
                   gutterStyle: GutterStyle(
-                    width: 48,
-                    margin: 14,
+                    margin: 16,
                     textStyle: TextStyle(
-                      fontSize: 13,
+                      height: 1.6,
                       color: theme.colors.mutedForeground,
                     ),
                   ),
@@ -87,28 +86,31 @@ class QueryCodeEditor extends StatelessWidget {
                           size: FTextFieldSizeVariant.sm,
                           hint: 'Select database',
                           clearable: false,
-                          searchFieldProperties: const FSelectSearchFieldProperties(
-                            hint: 'Search databases...',
-                          ),
+                          searchFieldProperties:
+                              const FSelectSearchFieldProperties(
+                                hint: 'Search databases...',
+                              ),
                           contentConstraints: const FAutoWidthPortalConstraints(
                             maxHeight: 300,
                           ),
-                          prefixBuilder: (context, fieldStyle, widget) => Padding(
-                            padding: const EdgeInsets.only(left: 8),
-                            child: Icon(
-                              Icons.storage_outlined,
-                              size: 14,
-                              color: theme.colors.mutedForeground,
-                            ),
-                          ),
-                          suffixBuilder: (context, fieldStyle, widget) => Padding(
-                            padding: const EdgeInsets.only(right: 8),
-                            child: Icon(
-                              Icons.arrow_drop_down,
-                              size: 14,
-                              color: theme.colors.mutedForeground,
-                            ),
-                          ),
+                          prefixBuilder: (context, fieldStyle, widget) =>
+                              Padding(
+                                padding: const EdgeInsets.only(left: 8),
+                                child: Icon(
+                                  Icons.storage_outlined,
+                                  size: 14,
+                                  color: theme.colors.mutedForeground,
+                                ),
+                              ),
+                          suffixBuilder: (context, fieldStyle, widget) =>
+                              Padding(
+                                padding: const EdgeInsets.only(right: 8),
+                                child: Icon(
+                                  Icons.arrow_drop_down,
+                                  size: 14,
+                                  color: theme.colors.mutedForeground,
+                                ),
+                              ),
                           control: FSelectControl.lifted(
                             value: databases.contains(selectedDatabase)
                                 ? selectedDatabase
@@ -117,14 +119,12 @@ class QueryCodeEditor extends StatelessWidget {
                           ),
                         ),
                       ),
-                      if (connection != null && connection!.type != ConnectionType.sqlite) ...[
+                      if (connection != null &&
+                          connection!.type != ConnectionType.sqlite) ...[
                         const SizedBox(width: 8),
                         FButton.icon(
                           onPress: () {
-                            CreateDatabaseDialog.show(
-                              context,
-                              connection!,
-                            );
+                            CreateDatabaseDialog.show(context, connection!);
                           },
                           size: FButtonSizeVariant.sm,
                           variant: FButtonVariant.outline,

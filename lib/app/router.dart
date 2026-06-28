@@ -6,9 +6,39 @@ import '../features/connections/presentation/cubit/connection_cubit.dart';
 
 import '../features/editor/presentation/pages/connection_page.dart';
 import '../features/workspaces/presentation/pages/workspaces_page.dart';
+import '../features/editor/presentation/widgets/app_menu_actions.dart';
+import 'package:flutter/services.dart';
 
 final router = GoRouter(
   routes: [
+    ShellRoute(
+      builder: (context, state, child) {
+        return PlatformMenuBar(
+          menus: [
+            PlatformMenu(
+              label: 'File',
+              menus: [
+                PlatformMenuItem(
+                  label: 'Quit',
+                  shortcut: const SingleActivator(LogicalKeyboardKey.keyQ, meta: true),
+                  onSelected: () => AppMenuActions.quit(),
+                ),
+              ],
+            ),
+            PlatformMenu(
+              label: 'Workspace',
+              menus: [
+                PlatformMenuItem(
+                  label: 'Change Workspace',
+                  onSelected: () => AppMenuActions.changeWorkspace(context),
+                ),
+              ],
+            ),
+          ],
+          child: child,
+        );
+      },
+      routes: [
     GoRoute(
       path: '/',
       pageBuilder: (context, state) =>
@@ -29,6 +59,8 @@ final router = GoRouter(
       pageBuilder: (context, state) {
         return _fadePage(key: state.pageKey, child: const ConnectionPage());
       },
+    ),
+      ],
     ),
   ],
 );

@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import '../cubit/workspaces_cubit.dart';
 import '../cubit/workspaces_state.dart';
 import '../../../connections/presentation/cubit/connection_cubit.dart';
+import '../../../editor/presentation/widgets/app_title_bar.dart';
 
 class WorkspacesPage extends StatefulWidget {
   const WorkspacesPage({super.key});
@@ -33,13 +34,17 @@ class _WorkspacesPageState extends State<WorkspacesPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: context.theme.colors.background,
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 800),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 80),
+      body: Column(
+          children: [
+            const AppTitleBar(),
+            Expanded(
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 800),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: 80),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -207,7 +212,10 @@ class _WorkspacesPageState extends State<WorkspacesPage> {
           ),
         ),
       ),
-    );
+            ), // closes Expanded
+          ], // closes outer Column children
+        ), // closes outer Column
+    ); // closes Scaffold
   }
 }
 

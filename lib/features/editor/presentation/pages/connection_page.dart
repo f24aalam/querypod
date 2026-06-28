@@ -19,6 +19,7 @@ import '../widgets/activity_bar.dart';
 import '../widgets/context_sidebar.dart';
 import '../widgets/editor_area.dart';
 import '../widgets/status_bar.dart';
+import '../widgets/app_title_bar.dart';
 
 class ConnectionPage extends StatefulWidget {
   const ConnectionPage({super.key});
@@ -155,6 +156,8 @@ class _ConnectionPageState extends State<ConnectionPage> {
         color: context.theme.colors.background,
         child: Column(
           children: [
+
+            const AppTitleBar(),
             Expanded(
               child: Row(
                 children: [

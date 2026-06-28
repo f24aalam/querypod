@@ -2,8 +2,8 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querypod/app/database.dart';
-import 'package:querypod/features/workspace/data/repositories/query_repository_impl.dart';
-import 'package:querypod/features/workspace/domain/entities/workspace_query.dart';
+import 'package:querypod/features/editor/data/repositories/query_repository_impl.dart';
+import 'package:querypod/features/editor/domain/entities/connection_query.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 void main() {
@@ -40,13 +40,13 @@ void main() {
   );
 }
 
-WorkspaceQuery _query({
+ConnectionQuery _query({
   required String id,
   required String connectionId,
   required String title,
 }) {
   final now = DateTime(2026, 1, 1);
-  return WorkspaceQuery(
+  return ConnectionQuery(
     id: id,
     connectionId: connectionId,
     title: title,

@@ -1,14 +1,14 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:querypod/features/workspace/domain/entities/workspace_query.dart';
-import 'package:querypod/features/workspace/domain/repositories/query_repository.dart';
+import 'package:querypod/features/editor/domain/entities/connection_query.dart';
+import 'package:querypod/features/editor/domain/repositories/query_repository.dart';
 import 'package:querypod/features/connections/domain/entities/connection.dart';
 import 'package:querypod/features/connections/domain/repositories/connection_repository.dart';
-import 'package:querypod/features/workspace/domain/entities/query_result.dart';
-import 'package:querypod/features/workspace/domain/entities/table_data.dart';
-import 'package:querypod/features/workspace/domain/repositories/table_data_repository.dart';
-import 'package:querypod/features/workspace/domain/entities/query_history.dart';
-import 'package:querypod/features/workspace/domain/repositories/query_history_repository.dart';
-import 'package:querypod/features/workspace/presentation/cubit/query_editor_cubit.dart';
+import 'package:querypod/features/editor/domain/entities/query_result.dart';
+import 'package:querypod/features/editor/domain/entities/table_data.dart';
+import 'package:querypod/features/editor/domain/repositories/table_data_repository.dart';
+import 'package:querypod/features/editor/domain/entities/query_history.dart';
+import 'package:querypod/features/editor/domain/repositories/query_history_repository.dart';
+import 'package:querypod/features/editor/presentation/cubit/query_editor_cubit.dart';
 
 void main() {
   test(
@@ -130,14 +130,14 @@ void main() {
   });
 }
 
-WorkspaceQuery _query({
+ConnectionQuery _query({
   required String id,
   required String connectionId,
   required String title,
   String sql = 'SELECT * FROM users;',
 }) {
   final now = DateTime(2026, 1, 1);
-  return WorkspaceQuery(
+  return ConnectionQuery(
     id: id,
     connectionId: connectionId,
     title: title,
@@ -148,13 +148,13 @@ WorkspaceQuery _query({
 }
 
 class _InMemoryQueryRepository implements QueryRepository {
-  final Map<String, WorkspaceQuery> _queries;
-  final List<WorkspaceQuery> saved = [];
+  final Map<String, ConnectionQuery> _queries;
+  final List<ConnectionQuery> saved = [];
 
-  _InMemoryQueryRepository({List<WorkspaceQuery> seeded = const []})
+  _InMemoryQueryRepository({List<ConnectionQuery> seeded = const []})
     : _queries = {for (final query in seeded) query.id: query};
 
-  WorkspaceQuery? byId(String id) => _queries[id];
+  ConnectionQuery? byId(String id) => _queries[id];
 
   @override
   Future<void> delete(String id) async {
@@ -167,7 +167,7 @@ class _InMemoryQueryRepository implements QueryRepository {
   }
 
   @override
-  Future<List<WorkspaceQuery>> getAllForConnection(String connectionId) async {
+  Future<List<ConnectionQuery>> getAllForConnection(String connectionId) async {
     return _queries.values
         .where((query) => query.connectionId == connectionId)
         .toList()
@@ -175,7 +175,7 @@ class _InMemoryQueryRepository implements QueryRepository {
   }
 
   @override
-  Future<WorkspaceQuery> save(WorkspaceQuery query) async {
+  Future<ConnectionQuery> save(ConnectionQuery query) async {
     _queries[query.id] = query;
     saved.add(query);
     return query;

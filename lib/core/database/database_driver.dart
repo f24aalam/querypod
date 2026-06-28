@@ -1,18 +1,18 @@
 import '../../../features/connections/domain/entities/connection.dart';
-import '../../../features/workspace/domain/entities/query_history.dart';
-import '../../../features/workspace/domain/entities/query_result.dart';
-import '../../../features/workspace/domain/entities/table_data.dart';
-import '../../../features/workspace/domain/entities/workspace_database.dart';
-import '../../../features/workspace/domain/entities/workspace_table.dart';
+import '../../../features/editor/domain/entities/query_history.dart';
+import '../../../features/editor/domain/entities/query_result.dart';
+import '../../../features/editor/domain/entities/table_data.dart';
+import '../../../features/editor/domain/entities/connection_database.dart';
+import '../../../features/editor/domain/entities/connection_table.dart';
 
 abstract class DatabaseDriver {
   List<String> get supportedOperators;
 
   Future<void> testConnection(Connection connection);
 
-  Future<List<WorkspaceDatabase>> listDatabases(Connection connection);
+  Future<List<ConnectionDatabase>> listDatabases(Connection connection);
 
-  Future<List<WorkspaceTable>> listTables(
+  Future<List<ConnectionTable>> listTables(
     Connection connection,
     String database,
   );

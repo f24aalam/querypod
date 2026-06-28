@@ -9,6 +9,7 @@ class ConnectionModel extends Connection {
     required super.user,
     required super.password,
     required super.database,
+    required super.workspaceId,
     super.type = ConnectionType.mysql,
     super.useTls = true,
   });
@@ -25,6 +26,7 @@ class ConnectionModel extends Connection {
       user: json['user'] as String,
       password: password,
       database: json['database'] as String,
+      workspaceId: json['workspaceId'] as String? ?? 'default',
       type: ConnectionType.values.firstWhere(
         (e) => e.name == json['type'],
         orElse: () => ConnectionType.mysql,
@@ -41,6 +43,7 @@ class ConnectionModel extends Connection {
       'port': port,
       'user': user,
       'database': database,
+      'workspaceId': workspaceId,
       'type': type.name,
       'useTls': useTls,
     };
@@ -55,6 +58,7 @@ class ConnectionModel extends Connection {
       user: entity.user,
       password: entity.password,
       database: entity.database,
+      workspaceId: entity.workspaceId,
       type: entity.type,
       useTls: entity.useTls,
     );

@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:forui/forui.dart';
 
-import '../../../workspace/presentation/cubit/editor_tabs_cubit.dart';
-import '../../../workspace/presentation/widgets/sidebar_header.dart';
+import '../../../editor/presentation/cubit/editor_tabs_cubit.dart';
+import '../../../editor/presentation/widgets/sidebar_header.dart';
 import '../cubit/connection_cubit.dart';
 import '../cubit/connection_editor_cubit.dart';
 import '../cubit/connection_state.dart';
@@ -215,7 +215,9 @@ class _ConnectionItem extends StatelessWidget {
 
     await context.read<ConnectionCubit>().select(id);
     if (!context.mounted) return;
-    editor.load(connection);
+    final activeWorkspaceId =
+        context.read<ConnectionCubit>().state.activeWorkspaceId ?? 'default';
+    editor.load(connection, activeWorkspaceId: activeWorkspaceId);
     context.read<EditorTabsCubit>().openConnectionEditor(
       connectionId: id,
       connectionName: name,
@@ -259,7 +261,9 @@ Future<void> _openNewConnection(BuildContext context) async {
   if (!context.mounted) return;
 
   if (!isCurrentNewDraft) {
-    editor.load(null);
+    final activeWorkspaceId =
+        context.read<ConnectionCubit>().state.activeWorkspaceId ?? 'default';
+    editor.load(null, activeWorkspaceId: activeWorkspaceId);
   }
   await context.read<ConnectionCubit>().select(null);
   if (!context.mounted) return;

@@ -11,10 +11,11 @@ void main() {
     user: 'root',
     password: '',
     database: 'app',
+    workspaceId: 'default',
   );
 
   test('draft becomes dirty and survives independently of widgets', () {
-    final cubit = ConnectionEditorCubit()..load(connection);
+    final cubit = ConnectionEditorCubit()..load(connection, activeWorkspaceId: 'default');
 
     cubit.updateHost('localhost');
 
@@ -25,7 +26,7 @@ void main() {
 
   test('marking a saved draft resets dirty state', () {
     final cubit = ConnectionEditorCubit()
-      ..load(connection)
+      ..load(connection, activeWorkspaceId: 'default')
       ..updateName('Renamed');
     final saved = cubit.state.draft.toConnection();
 
@@ -47,7 +48,7 @@ void main() {
   });
 
   test('TLS setting is editable and preserved when saved', () {
-    final cubit = ConnectionEditorCubit()..load(connection);
+    final cubit = ConnectionEditorCubit()..load(connection, activeWorkspaceId: 'default');
 
     cubit.updateUseTls(false);
 

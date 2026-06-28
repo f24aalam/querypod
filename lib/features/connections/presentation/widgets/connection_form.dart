@@ -5,7 +5,7 @@ import 'package:forui/forui.dart';
 
 import '../../domain/entities/connection.dart';
 
-import '../../../workspace/presentation/cubit/editor_tabs_cubit.dart';
+import '../../../editor/presentation/cubit/editor_tabs_cubit.dart';
 import '../cubit/connection_cubit.dart';
 import '../cubit/connection_editor_cubit.dart';
 import '../cubit/connection_editor_state.dart';

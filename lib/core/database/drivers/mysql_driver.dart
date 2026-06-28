@@ -6,11 +6,11 @@ import 'package:mysql_client_plus/mysql_client_plus.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../features/connections/domain/entities/connection.dart';
-import '../../../features/workspace/domain/entities/query_history.dart';
-import '../../../features/workspace/domain/entities/query_result.dart';
-import '../../../features/workspace/domain/entities/table_data.dart';
-import '../../../features/workspace/domain/entities/workspace_database.dart';
-import '../../../features/workspace/domain/entities/workspace_table.dart';
+import '../../../features/editor/domain/entities/query_history.dart';
+import '../../../features/editor/domain/entities/query_result.dart';
+import '../../../features/editor/domain/entities/table_data.dart';
+import '../../../features/editor/domain/entities/connection_database.dart';
+import '../../../features/editor/domain/entities/connection_table.dart';
 import '../database_driver.dart';
 import 'alter_table_sql.dart';
 
@@ -84,14 +84,14 @@ class MySQLDriver implements DatabaseDriver {
   }
 
   @override
-  Future<List<WorkspaceDatabase>> listDatabases(Connection connection) async {
+  Future<List<ConnectionDatabase>> listDatabases(Connection connection) async {
     final conn = await _connect(connection);
     try {
       final results = await conn.execute('SHOW DATABASES');
       return results.rows
           .map(
             (row) =>
-                WorkspaceDatabase(name: _asString(row.colByName('Database'))),
+                ConnectionDatabase(name: _asString(row.colByName('Database'))),
           )
           .where((db) => db.name.isNotEmpty)
           .toList();
@@ -101,7 +101,7 @@ class MySQLDriver implements DatabaseDriver {
   }
 
   @override
-  Future<List<WorkspaceTable>> listTables(
+  Future<List<ConnectionTable>> listTables(
     Connection connection,
     String database,
   ) async {
@@ -120,10 +120,10 @@ class MySQLDriver implements DatabaseDriver {
                 .value;
             final tableType =
                 _asString(row.colByName('Table_type')).toUpperCase() == 'VIEW'
-                ? WorkspaceTableType.view
-                : WorkspaceTableType.table;
+                ? ConnectionTableType.view
+                : ConnectionTableType.table;
 
-            return WorkspaceTable(name: _asString(tableName), type: tableType);
+            return ConnectionTable(name: _asString(tableName), type: tableType);
           })
           .where((table) => table.name.isNotEmpty)
           .toList();

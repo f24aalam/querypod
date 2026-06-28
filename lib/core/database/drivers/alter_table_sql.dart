@@ -1,4 +1,4 @@
-import '../../../features/workspace/domain/entities/table_data.dart';
+import '../../../features/editor/domain/entities/table_data.dart';
 
 String quoteMySqlIdentifier(String value) => '`${value.replaceAll('`', '``')}`';
 

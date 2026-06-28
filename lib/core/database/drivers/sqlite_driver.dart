@@ -5,11 +5,11 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../features/connections/domain/entities/connection.dart';
-import '../../../features/workspace/domain/entities/query_history.dart';
-import '../../../features/workspace/domain/entities/query_result.dart';
-import '../../../features/workspace/domain/entities/table_data.dart';
-import '../../../features/workspace/domain/entities/workspace_database.dart';
-import '../../../features/workspace/domain/entities/workspace_table.dart';
+import '../../../features/editor/domain/entities/query_history.dart';
+import '../../../features/editor/domain/entities/query_result.dart';
+import '../../../features/editor/domain/entities/table_data.dart';
+import '../../../features/editor/domain/entities/connection_database.dart';
+import '../../../features/editor/domain/entities/connection_table.dart';
 import '../database_driver.dart';
 
 class SQLiteDriver implements DatabaseDriver {
@@ -54,15 +54,15 @@ class SQLiteDriver implements DatabaseDriver {
   }
 
   @override
-  Future<List<WorkspaceDatabase>> listDatabases(Connection connection) async {
+  Future<List<ConnectionDatabase>> listDatabases(Connection connection) async {
     // SQLite doesn't have multiple databases per connection in the same way,
     // so we return a single 'main' database or the file name.
     final name = connection.database.split('/').last;
-    return [WorkspaceDatabase(name: name.isNotEmpty ? name : 'main')];
+    return [ConnectionDatabase(name: name.isNotEmpty ? name : 'main')];
   }
 
   @override
-  Future<List<WorkspaceTable>> listTables(
+  Future<List<ConnectionTable>> listTables(
     Connection connection,
     String database,
   ) async {
@@ -76,10 +76,10 @@ class SQLiteDriver implements DatabaseDriver {
           .map((row) {
             final tableName = _asString(row['name']);
             final tableType = _asString(row['type']).toUpperCase() == 'VIEW'
-                ? WorkspaceTableType.view
-                : WorkspaceTableType.table;
+                ? ConnectionTableType.view
+                : ConnectionTableType.table;
 
-            return WorkspaceTable(name: tableName, type: tableType);
+            return ConnectionTable(name: tableName, type: tableType);
           })
           .where(
             (table) => table.name.isNotEmpty && table.name != 'sqlite_sequence',

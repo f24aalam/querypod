@@ -10,14 +10,14 @@ import 'package:querypod/app/injection.dart';
 import 'package:querypod/features/connections/presentation/cubit/connection_editor_cubit.dart';
 import 'package:querypod/features/connections/presentation/widgets/connection_form.dart';
 import 'package:querypod/features/connections/domain/entities/connection.dart';
-import 'package:querypod/features/workspace/domain/entities/query_result.dart';
-import 'package:querypod/features/workspace/domain/entities/table_data.dart';
-import 'package:querypod/features/workspace/domain/entities/workspace_table.dart';
-import 'package:querypod/features/workspace/domain/repositories/table_data_repository.dart';
-import 'package:querypod/features/workspace/presentation/cubit/editor_tabs_cubit.dart';
-import 'package:querypod/features/workspace/presentation/cubit/editor_tabs_state.dart';
-import 'package:querypod/features/workspace/presentation/cubit/table_data_cubit.dart';
-import 'package:querypod/features/workspace/presentation/pages/workspace_page.dart';
+import 'package:querypod/features/editor/domain/entities/query_result.dart';
+import 'package:querypod/features/editor/domain/entities/table_data.dart';
+import 'package:querypod/features/editor/domain/entities/connection_table.dart';
+import 'package:querypod/features/editor/domain/repositories/table_data_repository.dart';
+import 'package:querypod/features/editor/presentation/cubit/editor_tabs_cubit.dart';
+import 'package:querypod/features/editor/presentation/cubit/editor_tabs_state.dart';
+import 'package:querypod/features/editor/presentation/cubit/table_data_cubit.dart';
+import 'package:querypod/features/editor/presentation/pages/connection_page.dart';
 
 void main() {
   setUpAll(sqfliteFfiInit);
@@ -37,7 +37,7 @@ void main() {
   testWidgets('only the active editor is mounted', (tester) async {
     await tester.pumpWidget(const App());
     await tester.pumpAndSettle();
-    final context = tester.element(find.byType(WorkspacePage));
+    final context = tester.element(find.byType(ConnectionPage));
     final tabs = context.read<EditorTabsCubit>();
 
     tabs.openConnectionEditor();
@@ -48,9 +48,9 @@ void main() {
     tabs.pinTable(
       connectionId: 'connection',
       database: 'app',
-      table: const WorkspaceTable(
+      table: const ConnectionTable(
         name: 'users',
-        type: WorkspaceTableType.table,
+        type: ConnectionTableType.table,
       ),
     );
     expect(tabs.state.activeTab?.title, 'users');
@@ -64,14 +64,14 @@ void main() {
   testWidgets('opening an overflowed tab scrolls it into view', (tester) async {
     await tester.pumpWidget(const App());
     await tester.pumpAndSettle();
-    final context = tester.element(find.byType(WorkspacePage));
+    final context = tester.element(find.byType(ConnectionPage));
     final tabs = context.read<EditorTabsCubit>();
 
     for (var i = 0; i < 8; i++) {
       tabs.pinTable(
         connectionId: 'connection',
         database: 'app',
-        table: WorkspaceTable(name: 'table_$i', type: WorkspaceTableType.table),
+        table: ConnectionTable(name: 'table_$i', type: ConnectionTableType.table),
       );
     }
     await tester.pump();
@@ -99,7 +99,7 @@ void main() {
   testWidgets('tab body activates from blank area tap', (tester) async {
     await tester.pumpWidget(const App());
     await tester.pumpAndSettle();
-    final context = tester.element(find.byType(WorkspacePage));
+    final context = tester.element(find.byType(ConnectionPage));
     final tabs = context.read<EditorTabsCubit>();
 
     tabs.openConnectionEditor();
@@ -107,9 +107,9 @@ void main() {
     tabs.pinTable(
       connectionId: 'connection',
       database: 'app',
-      table: const WorkspaceTable(
+      table: const ConnectionTable(
         name: 'users',
-        type: WorkspaceTableType.table,
+        type: ConnectionTableType.table,
       ),
     );
     await tester.pump();
@@ -137,7 +137,7 @@ void main() {
   ) async {
     await tester.pumpWidget(const App());
     await tester.pumpAndSettle();
-    final context = tester.element(find.byType(WorkspacePage));
+    final context = tester.element(find.byType(ConnectionPage));
     final tabs = context.read<EditorTabsCubit>();
 
     tabs.openConnectionEditor();
@@ -149,9 +149,9 @@ void main() {
     tabs.pinTable(
       connectionId: 'connection',
       database: 'app',
-      table: const WorkspaceTable(
+      table: const ConnectionTable(
         name: 'users',
-        type: WorkspaceTableType.table,
+        type: ConnectionTableType.table,
       ),
     );
     await tester.pump(const Duration(milliseconds: 250));
@@ -211,7 +211,7 @@ void main() {
 
     await tester.pumpWidget(const App());
     await tester.pumpAndSettle();
-    final context = tester.element(find.byType(WorkspacePage));
+    final context = tester.element(find.byType(ConnectionPage));
     final tabs = context.read<EditorTabsCubit>();
     final tableData = context.read<TableDataCubit>();
     const key = TableTabKey(
@@ -227,14 +227,15 @@ void main() {
       user: 'root',
       password: '',
       database: 'app',
+      workspaceId: 'default',
     );
 
     tabs.pinTable(
       connectionId: key.connectionId,
       database: key.database,
-      table: const WorkspaceTable(
+      table: const ConnectionTable(
         name: 'users',
-        type: WorkspaceTableType.table,
+        type: ConnectionTableType.table,
       ),
     );
     await tableData.openTable(connection, key);

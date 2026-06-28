@@ -2,12 +2,12 @@ import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querypod/features/connections/domain/entities/connection.dart';
-import 'package:querypod/features/workspace/domain/entities/query_result.dart';
-import 'package:querypod/features/workspace/domain/entities/table_data.dart';
-import 'package:querypod/features/workspace/domain/repositories/table_data_repository.dart';
-import 'package:querypod/features/workspace/presentation/cubit/editor_tabs_state.dart';
-import 'package:querypod/features/workspace/presentation/cubit/table_data_cubit.dart';
-import 'package:querypod/features/workspace/presentation/cubit/table_data_state.dart';
+import 'package:querypod/features/editor/domain/entities/query_result.dart';
+import 'package:querypod/features/editor/domain/entities/table_data.dart';
+import 'package:querypod/features/editor/domain/repositories/table_data_repository.dart';
+import 'package:querypod/features/editor/presentation/cubit/editor_tabs_state.dart';
+import 'package:querypod/features/editor/presentation/cubit/table_data_cubit.dart';
+import 'package:querypod/features/editor/presentation/cubit/table_data_state.dart';
 
 void main() {
   const connection = Connection(
@@ -18,6 +18,7 @@ void main() {
     user: 'root',
     password: '',
     database: 'app',
+    workspaceId: 'default',
   );
   const key = TableTabKey(
     connectionId: 'connection',

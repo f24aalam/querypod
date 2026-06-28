@@ -10,6 +10,7 @@ void main() {
     user: 'root',
     password: '',
     database: 'app',
+    workspaceId: 'default',
   );
 
   test('name-only changes preserve connection session identity', () {

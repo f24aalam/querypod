@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querypod/core/database/drivers/alter_table_sql.dart';
-import 'package:querypod/features/workspace/domain/entities/table_data.dart';
+import 'package:querypod/features/editor/domain/entities/table_data.dart';
 
 void main() {
   const oldColumns = [

@@ -10,6 +10,7 @@ class Connection {
   final String user;
   final String password;
   final String database;
+  final String workspaceId;
   final ConnectionType type;
   final bool useTls;
 
@@ -21,6 +22,7 @@ class Connection {
     required this.user,
     required this.password,
     required this.database,
+    required this.workspaceId,
     this.type = ConnectionType.mysql,
     this.useTls = true,
   });
@@ -33,6 +35,7 @@ class Connection {
     String? user,
     String? password,
     String? database,
+    String? workspaceId,
     ConnectionType? type,
     bool? useTls,
   }) {
@@ -44,6 +47,7 @@ class Connection {
       user: user ?? this.user,
       password: password ?? this.password,
       database: database ?? this.database,
+      workspaceId: workspaceId ?? this.workspaceId,
       type: type ?? this.type,
       useTls: useTls ?? this.useTls,
     );

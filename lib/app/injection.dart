@@ -7,17 +7,20 @@ import '../app/database.dart';
 import '../features/connections/data/repositories/connection_repository_impl.dart';
 import '../features/connections/domain/repositories/connection_repository.dart';
 import '../features/connections/presentation/cubit/connection_cubit.dart';
-import '../features/workspace/data/repositories/query_history_repository_impl.dart';
-import '../features/workspace/data/repositories/query_repository_impl.dart';
-import '../features/workspace/data/repositories/workspace_metadata_repository_impl.dart';
-import '../features/workspace/data/repositories/table_data_repository_impl.dart';
-import '../features/workspace/domain/repositories/query_history_repository.dart';
-import '../features/workspace/domain/repositories/query_repository.dart';
-import '../features/workspace/domain/repositories/table_data_repository.dart';
-import '../features/workspace/domain/repositories/workspace_metadata_repository.dart';
-import '../features/workspace/presentation/cubit/query_editor_cubit.dart';
-import '../features/workspace/presentation/cubit/workspace_metadata_cubit.dart';
-import '../features/workspace/presentation/cubit/table_data_cubit.dart';
+import '../features/editor/data/repositories/query_history_repository_impl.dart';
+import '../features/editor/data/repositories/query_repository_impl.dart';
+import '../features/editor/data/repositories/connection_metadata_repository_impl.dart';
+import '../features/editor/data/repositories/table_data_repository_impl.dart';
+import '../features/workspaces/data/repositories/workspace_repository_impl.dart';
+import '../features/editor/domain/repositories/query_history_repository.dart';
+import '../features/workspaces/domain/repositories/workspace_repository.dart';
+import '../features/editor/domain/repositories/query_repository.dart';
+import '../features/editor/domain/repositories/table_data_repository.dart';
+import '../features/editor/domain/repositories/connection_metadata_repository.dart';
+import '../features/editor/presentation/cubit/query_editor_cubit.dart';
+import '../features/editor/presentation/cubit/connection_metadata_cubit.dart';
+import '../features/editor/presentation/cubit/table_data_cubit.dart';
+import '../features/workspaces/presentation/cubit/workspaces_cubit.dart';
 
 final getIt = GetIt.instance;
 
@@ -37,8 +40,11 @@ Future<void> configureDependencies({
   getIt.registerLazySingleton<QueryHistoryRepository>(
     () => QueryHistoryRepositoryImpl(database: database),
   );
-  getIt.registerLazySingleton<WorkspaceMetadataRepository>(
-    () => WorkspaceMetadataRepositoryImpl(),
+  getIt.registerLazySingleton<ConnectionMetadataRepository>(
+    () => ConnectionMetadataRepositoryImpl(),
+  );
+  getIt.registerLazySingleton<WorkspaceRepository>(
+    () => WorkspaceRepositoryImpl(prefs),
   );
   getIt.registerLazySingleton<TableDataRepository>(
     () => TableDataRepositoryImpl(historyRepository: getIt()),
@@ -54,6 +60,7 @@ Future<void> configureDependencies({
       tableDataRepository: getIt(),
     ),
   );
-  getIt.registerFactory(() => WorkspaceMetadataCubit(repository: getIt()));
+  getIt.registerFactory(() => ConnectionMetadataCubit(repository: getIt()));
   getIt.registerFactory(() => TableDataCubit(repository: getIt()));
+  getIt.registerFactory(() => WorkspacesCubit(repository: getIt()));
 }

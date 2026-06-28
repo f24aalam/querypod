@@ -5,11 +5,11 @@ import 'package:postgres/postgres.dart' as pg;
 import 'package:uuid/uuid.dart';
 
 import '../../../features/connections/domain/entities/connection.dart';
-import '../../../features/workspace/domain/entities/query_history.dart';
-import '../../../features/workspace/domain/entities/query_result.dart';
-import '../../../features/workspace/domain/entities/table_data.dart';
-import '../../../features/workspace/domain/entities/workspace_database.dart';
-import '../../../features/workspace/domain/entities/workspace_table.dart';
+import '../../../features/editor/domain/entities/query_history.dart';
+import '../../../features/editor/domain/entities/query_result.dart';
+import '../../../features/editor/domain/entities/table_data.dart';
+import '../../../features/editor/domain/entities/connection_database.dart';
+import '../../../features/editor/domain/entities/connection_table.dart';
 import '../database_driver.dart';
 import 'alter_table_sql.dart';
 
@@ -88,7 +88,7 @@ class PostgresDriver implements DatabaseDriver {
   }
 
   @override
-  Future<List<WorkspaceDatabase>> listDatabases(
+  Future<List<ConnectionDatabase>> listDatabases(
     covariant Connection connection,
   ) async {
     final conn = await _connect(connection);
@@ -97,7 +97,7 @@ class PostgresDriver implements DatabaseDriver {
         'SELECT datname FROM pg_database WHERE datistemplate = false;',
       );
       return results
-          .map((row) => WorkspaceDatabase(name: _asString(row[0])))
+          .map((row) => ConnectionDatabase(name: _asString(row[0])))
           .where((db) => db.name.isNotEmpty)
           .toList();
     } finally {
@@ -106,7 +106,7 @@ class PostgresDriver implements DatabaseDriver {
   }
 
   @override
-  Future<List<WorkspaceTable>> listTables(
+  Future<List<ConnectionTable>> listTables(
     covariant Connection connection,
     String database,
   ) async {
@@ -120,10 +120,10 @@ class PostgresDriver implements DatabaseDriver {
           .map((row) {
             final tableName = row[0];
             final tableType = _asString(row[1]).toUpperCase() == 'VIEW'
-                ? WorkspaceTableType.view
-                : WorkspaceTableType.table;
+                ? ConnectionTableType.view
+                : ConnectionTableType.table;
 
-            return WorkspaceTable(name: _asString(tableName), type: tableType);
+            return ConnectionTable(name: _asString(tableName), type: tableType);
           })
           .where((table) => table.name.isNotEmpty)
           .toList();

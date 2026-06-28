@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querypod/core/database/drivers/sqlite_driver.dart';
 import 'package:querypod/features/connections/domain/entities/connection.dart';
-import 'package:querypod/features/workspace/domain/entities/table_data.dart';
+import 'package:querypod/features/editor/domain/entities/table_data.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 void main() {
@@ -26,6 +26,7 @@ void main() {
       user: '',
       password: '',
       database: databasePath,
+      workspaceId: 'default',
       type: ConnectionType.sqlite,
     );
   });

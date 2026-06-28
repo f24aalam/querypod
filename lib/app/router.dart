@@ -1,16 +1,35 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
-import '../features/workspace/presentation/pages/workspace_page.dart';
+import '../features/connections/presentation/cubit/connection_cubit.dart';
+
+import '../features/editor/presentation/pages/connection_page.dart';
+import '../features/workspaces/presentation/pages/workspaces_page.dart';
 
 final router = GoRouter(
   routes: [
     GoRoute(
       path: '/',
       pageBuilder: (context, state) =>
-          _fadePage(key: state.pageKey, child: const WorkspacePage()),
+          _fadePage(key: state.pageKey, child: const WorkspacesPage()),
     ),
-    GoRoute(path: '/workspace', redirect: (context, state) => '/'),
+    GoRoute(
+      path: '/workspace/:id',
+      redirect: (context, state) {
+        final id = state.pathParameters['id'];
+        if (id != null) {
+          final cubit = context.read<ConnectionCubit>();
+          if (cubit.state.activeWorkspaceId != id) {
+            cubit.setWorkspace(id);
+          }
+        }
+        return null;
+      },
+      pageBuilder: (context, state) {
+        return _fadePage(key: state.pageKey, child: const ConnectionPage());
+      },
+    ),
   ],
 );
 

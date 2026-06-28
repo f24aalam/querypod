@@ -9,6 +9,7 @@ class ConnectionDraft {
   final String user;
   final String password;
   final String database;
+  final String workspaceId;
   final ConnectionType type;
   final bool useTls;
 
@@ -21,11 +22,12 @@ class ConnectionDraft {
     required this.user,
     required this.password,
     required this.database,
+    required this.workspaceId,
     required this.type,
     required this.useTls,
   });
 
-  factory ConnectionDraft.empty() => ConnectionDraft(
+  factory ConnectionDraft.empty(String workspaceId) => ConnectionDraft(
     id: Connection.generateId(),
     sourceConnectionId: null,
     name: '',
@@ -34,6 +36,7 @@ class ConnectionDraft {
     user: '',
     password: '',
     database: '',
+    workspaceId: workspaceId,
     type: ConnectionType.mysql,
     useTls: true,
   );
@@ -48,6 +51,7 @@ class ConnectionDraft {
         user: connection.user,
         password: connection.password,
         database: connection.database,
+        workspaceId: connection.workspaceId,
         type: connection.type,
         useTls: connection.useTls,
       );
@@ -59,6 +63,7 @@ class ConnectionDraft {
     String? user,
     String? password,
     String? database,
+    String? workspaceId,
     ConnectionType? type,
     bool? useTls,
   }) {
@@ -71,6 +76,7 @@ class ConnectionDraft {
       user: user ?? this.user,
       password: password ?? this.password,
       database: database ?? this.database,
+      workspaceId: workspaceId ?? this.workspaceId,
       type: type ?? this.type,
       useTls: useTls ?? this.useTls,
     );
@@ -90,6 +96,7 @@ class ConnectionDraft {
       user: user,
       password: password,
       database: database,
+      workspaceId: workspaceId,
       type: type,
       useTls: useTls,
     );
@@ -107,6 +114,7 @@ class ConnectionDraft {
           user == other.user &&
           password == other.password &&
           database == other.database &&
+          workspaceId == other.workspaceId &&
           type == other.type &&
           useTls == other.useTls;
 
@@ -120,6 +128,7 @@ class ConnectionDraft {
     user,
     password,
     database,
+    workspaceId,
     type,
     useTls,
   );

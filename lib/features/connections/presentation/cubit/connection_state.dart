@@ -12,7 +12,8 @@ class ConnectionsState {
   final String? feedbackMessage;
   final bool feedbackIsError;
   final int feedbackNonce;
-  final int openWorkspaceNonce;
+  final int openConnectionNonce;
+  final String? activeWorkspaceId;
 
   const ConnectionsState({
     this.connections = const [],
@@ -24,7 +25,8 @@ class ConnectionsState {
     this.feedbackMessage,
     this.feedbackIsError = false,
     this.feedbackNonce = 0,
-    this.openWorkspaceNonce = 0,
+    this.openConnectionNonce = 0,
+    this.activeWorkspaceId,
   });
 
   ConnectionsState copyWith({
@@ -37,7 +39,8 @@ class ConnectionsState {
     String? Function()? feedbackMessage,
     bool? feedbackIsError,
     int? feedbackNonce,
-    int? openWorkspaceNonce,
+    int? openConnectionNonce,
+    String? activeWorkspaceId,
   }) {
     return ConnectionsState(
       connections: connections ?? this.connections,
@@ -53,7 +56,8 @@ class ConnectionsState {
           : this.feedbackMessage,
       feedbackIsError: feedbackIsError ?? this.feedbackIsError,
       feedbackNonce: feedbackNonce ?? this.feedbackNonce,
-      openWorkspaceNonce: openWorkspaceNonce ?? this.openWorkspaceNonce,
+      openConnectionNonce: openConnectionNonce ?? this.openConnectionNonce,
+      activeWorkspaceId: activeWorkspaceId ?? this.activeWorkspaceId,
     );
   }
 

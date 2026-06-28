@@ -4,21 +4,23 @@ import '../../domain/entities/connection.dart';
 import 'connection_editor_state.dart';
 
 class ConnectionEditorCubit extends Cubit<ConnectionEditorState> {
-  ConnectionEditorCubit() : super(_newState());
+  ConnectionEditorCubit()
+      : super(ConnectionEditorState(
+          draft: ConnectionDraft.empty('default'),
+          baseline: ConnectionDraft.empty('default'),
+        ));
 
-  static ConnectionEditorState _newState() {
-    final draft = ConnectionDraft.empty();
-    return ConnectionEditorState(draft: draft, baseline: draft);
-  }
-
-  void load(Connection? connection) {
+  void load(Connection? connection, {required String activeWorkspaceId}) {
     final draft = connection == null
-        ? ConnectionDraft.empty()
+        ? ConnectionDraft.empty(activeWorkspaceId)
         : ConnectionDraft.fromConnection(connection);
     emit(ConnectionEditorState(draft: draft, baseline: draft));
   }
 
-  void discard() => emit(_newState());
+  void discard(String workspaceId) {
+    final draft = ConnectionDraft.empty(workspaceId);
+    emit(ConnectionEditorState(draft: draft, baseline: draft));
+  }
 
   void markSaved(Connection connection) {
     final draft = ConnectionDraft.fromConnection(connection);

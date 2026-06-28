@@ -5,7 +5,7 @@ import '../../../../core/database/database_driver_factory.dart';
 
 import '../../domain/entities/connection.dart';
 import '../../domain/repositories/connection_repository.dart';
-import '../../../workspace/domain/repositories/query_repository.dart';
+import '../../../editor/domain/repositories/query_repository.dart';
 import 'connection_state.dart';
 
 class ConnectionCubit extends Cubit<ConnectionsState> {
@@ -39,7 +39,11 @@ class ConnectionCubit extends Cubit<ConnectionsState> {
   Future<void> load() async {
     emit(state.copyWith(status: ConnectionStatus.loading));
     try {
-      final connections = await _repository.getAll();
+      final allConnections = await _repository.getAll();
+      final connections = state.activeWorkspaceId != null
+          ? allConnections.where((c) => c.workspaceId == state.activeWorkspaceId).toList()
+          : allConnections;
+
       final persistedSelectedId = await _repository.getSelectedId();
       final selectedId = connections.any((c) => c.id == persistedSelectedId)
           ? persistedSelectedId
@@ -116,6 +120,11 @@ class ConnectionCubit extends Cubit<ConnectionsState> {
     emit(state.copyWith(selectedId: () => id));
   }
 
+  Future<void> setWorkspace(String? workspaceId) async {
+    emit(state.copyWith(activeWorkspaceId: workspaceId));
+    await load();
+  }
+
   Future<void> openSavedConnection(String id) async {
     await _repository.setSelectedId(id);
     final selectedConnection = state.connections
@@ -125,7 +134,7 @@ class ConnectionCubit extends Cubit<ConnectionsState> {
       state.copyWith(
         selectedId: () => id,
         activeConnection: () => selectedConnection ?? state.activeConnection,
-        openWorkspaceNonce: state.openWorkspaceNonce + 1,
+        openConnectionNonce: state.openConnectionNonce + 1,
       ),
     );
   }
@@ -161,7 +170,7 @@ class ConnectionCubit extends Cubit<ConnectionsState> {
       emit(
         _feedback('Connection successful', isError: false).copyWith(
           activeConnection: () => connection,
-          openWorkspaceNonce: state.openWorkspaceNonce + 1,
+          openConnectionNonce: state.openConnectionNonce + 1,
         ),
       );
     } catch (e) {

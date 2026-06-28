@@ -1,11 +1,11 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:querypod/features/workspace/domain/entities/workspace_table.dart';
-import 'package:querypod/features/workspace/presentation/cubit/editor_tabs_cubit.dart';
-import 'package:querypod/features/workspace/presentation/cubit/editor_tabs_state.dart';
+import 'package:querypod/features/editor/domain/entities/connection_table.dart';
+import 'package:querypod/features/editor/presentation/cubit/editor_tabs_cubit.dart';
+import 'package:querypod/features/editor/presentation/cubit/editor_tabs_state.dart';
 
 void main() {
-  const users = WorkspaceTable(name: 'users', type: WorkspaceTableType.table);
-  const posts = WorkspaceTable(name: 'posts', type: WorkspaceTableType.table);
+  const users = ConnectionTable(name: 'users', type: ConnectionTableType.table);
+  const posts = ConnectionTable(name: 'posts', type: ConnectionTableType.table);
 
   test('single-click previews reuse one preview tab', () {
     final cubit = EditorTabsCubit();

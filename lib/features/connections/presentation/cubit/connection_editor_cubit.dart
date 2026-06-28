@@ -4,11 +4,12 @@ import '../../domain/entities/connection.dart';
 import 'connection_editor_state.dart';
 
 class ConnectionEditorCubit extends Cubit<ConnectionEditorState> {
-  ConnectionEditorCubit()
-      : super(ConnectionEditorState(
-          draft: ConnectionDraft.empty('default'),
-          baseline: ConnectionDraft.empty('default'),
-        ));
+  ConnectionEditorCubit() : super(_initialState());
+
+  static ConnectionEditorState _initialState() {
+    final draft = ConnectionDraft.empty('default');
+    return ConnectionEditorState(draft: draft, baseline: draft);
+  }
 
   void load(Connection? connection, {required String activeWorkspaceId}) {
     final draft = connection == null

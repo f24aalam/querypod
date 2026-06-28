@@ -201,6 +201,26 @@ class EditorTabsCubit extends Cubit<EditorTabsState> {
     );
   }
 
+  void activateNextTab() {
+    if (state.tabs.isEmpty) return;
+    final currentIndex = state.tabs.indexWhere(
+      (tab) => tab.key == state.activeTabKey,
+    );
+    if (currentIndex == -1) return;
+    final nextIndex = (currentIndex + 1) % state.tabs.length;
+    activate(state.tabs[nextIndex].key);
+  }
+
+  void activatePreviousTab() {
+    if (state.tabs.isEmpty) return;
+    final currentIndex = state.tabs.indexWhere(
+      (tab) => tab.key == state.activeTabKey,
+    );
+    if (currentIndex == -1) return;
+    final previousIndex = (currentIndex - 1 + state.tabs.length) % state.tabs.length;
+    activate(state.tabs[previousIndex].key);
+  }
+
   void pinTab(EditorTabKey key) {
     final index = state.tabs.indexWhere((tab) => tab.key == key);
     if (index == -1) return;

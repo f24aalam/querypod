@@ -5,6 +5,7 @@ import 'package:flutter_highlight/themes/monokai-sublime.dart';
 import 'package:forui/forui.dart';
 
 import '../../../connections/domain/entities/connection.dart';
+import '../../../../core/keyboard/keyboard_shortcuts.dart';
 import 'create_database_dialog.dart';
 
 class QueryCodeEditor extends StatelessWidget {
@@ -135,16 +136,28 @@ class QueryCodeEditor extends StatelessWidget {
                   ),
                   const SizedBox(width: 8),
                 ],
-                FButton(
-                  onPress: isRunning ? null : onRun,
-                  size: FButtonSizeVariant.sm,
-                  child: isRunning
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text('Run'),
+                CallbackShortcuts(
+                  bindings: {
+                    KeyboardShortcuts.runQuery: () {
+                      if (!isRunning && onRun != null) {
+                        onRun!();
+                      }
+                    },
+                  },
+                  child: FTooltip(
+                    tipBuilder: (context, controller) => Text('Run query (${KeyboardShortcuts.format('Enter')})'),
+                    child: FButton(
+                      onPress: isRunning ? null : onRun,
+                      size: FButtonSizeVariant.sm,
+                      child: isRunning
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Text('Run'),
+                    ),
+                  ),
                 ),
               ],
             ),

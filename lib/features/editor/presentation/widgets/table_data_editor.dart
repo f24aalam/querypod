@@ -8,6 +8,7 @@ import '../../domain/entities/table_data.dart';
 import '../cubit/editor_tabs_state.dart';
 import '../cubit/table_data_cubit.dart';
 import '../cubit/table_data_state.dart';
+import '../../../../core/keyboard/keyboard_shortcuts.dart';
 
 class TableDataEditor extends StatelessWidget {
   final EditorTab tab;
@@ -888,61 +889,87 @@ class _DataGridState extends State<_DataGrid> {
     super.dispose();
   }
 
+  void _moveSelection(int delta) {
+    final idx = widget.session.singleSelectedRowIndex ??
+        widget.session.selectionAnchorRowIndex;
+    if (idx != null) {
+      final nextIdx = (idx + delta).clamp(0, widget.session.rows.length - 1);
+      context.read<TableDataCubit>().selectSingleRow(widget.tableKey, nextIdx);
+    } else if (widget.session.rows.isNotEmpty) {
+      context.read<TableDataCubit>().selectSingleRow(widget.tableKey, 0);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final columns = widget.session.structure!.columns;
     final widths = columns.map(_columnWidth).toList();
     final totalWidth = widths.fold<double>(0, (sum, width) => sum + width);
 
-    return LayoutBuilder(
-      builder: (context, constraints) => Scrollbar(
-        controller: _horizontal,
-        thumbVisibility: true,
-        child: SingleChildScrollView(
-          controller: _horizontal,
-          scrollDirection: Axis.horizontal,
-          child: SizedBox(
-            width: totalWidth < constraints.maxWidth
-                ? constraints.maxWidth
-                : totalWidth,
-            height: constraints.maxHeight,
-            child: Column(
-              children: [
-                _HeaderRow(columns: columns, widths: widths),
-                Expanded(
-                  child: widget.session.rows.isEmpty
-                      ? const _NoRows()
-                      : ListView.builder(
-                          itemExtent: 34,
-                          itemCount: widget.session.rows.length,
-                          itemBuilder: (context, index) => _GridRow(
-                            tableKey: widget.tableKey,
-                            rowIndex: index,
-                            row: widget.session.rows[index],
-                            widths: widths,
-                            selected: widget.session.selectedRowIndexes
-                                .contains(index),
-                            activeEdit: widget.session.activeCellEdit,
-                            stagedEdits: widget.session.stagedCellEdits,
-                            stagedDelete: widget.session.stagedDeletedRowIndexes
-                                .contains(index),
-                            stagedInsert: widget
-                                .session
-                                .stagedInsertedRowIndexes
-                                .contains(index),
-                            editable: widget.session.isEditable,
-                            columns: columns,
-                            onOpenForeignKey: (fk, value) {
-                              context.read<TableDataCubit>().previewForeignRow(
-                                widget.tableKey,
-                                fk,
-                                value.rawValue?.toString() ?? value.display,
-                              );
-                            },
-                          ),
-                        ),
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.arrowUp): () => _moveSelection(-1),
+        const SingleActivator(LogicalKeyboardKey.arrowDown): () => _moveSelection(1),
+        const SingleActivator(LogicalKeyboardKey.enter): () {
+          final idx = widget.session.singleSelectedRowIndex;
+          if (idx != null) {
+            context.read<TableDataCubit>().beginCellEdit(widget.tableKey, idx, 0);
+          }
+        },
+      },
+      child: Focus(
+        autofocus: true,
+        child: LayoutBuilder(
+          builder: (context, constraints) => Scrollbar(
+            controller: _horizontal,
+            thumbVisibility: true,
+            child: SingleChildScrollView(
+              controller: _horizontal,
+              scrollDirection: Axis.horizontal,
+              child: SizedBox(
+                width: totalWidth < constraints.maxWidth
+                    ? constraints.maxWidth
+                    : totalWidth,
+                height: constraints.maxHeight,
+                child: Column(
+                  children: [
+                    _HeaderRow(columns: columns, widths: widths),
+                    Expanded(
+                      child: widget.session.rows.isEmpty
+                          ? const _NoRows()
+                          : ListView.builder(
+                              itemExtent: 34,
+                              itemCount: widget.session.rows.length,
+                              itemBuilder: (context, index) => _GridRow(
+                                tableKey: widget.tableKey,
+                                rowIndex: index,
+                                row: widget.session.rows[index],
+                                widths: widths,
+                                selected: widget.session.selectedRowIndexes
+                                    .contains(index),
+                                activeEdit: widget.session.activeCellEdit,
+                                stagedEdits: widget.session.stagedCellEdits,
+                                stagedDelete: widget.session.stagedDeletedRowIndexes
+                                    .contains(index),
+                                stagedInsert: widget
+                                    .session
+                                    .stagedInsertedRowIndexes
+                                    .contains(index),
+                                editable: widget.session.isEditable,
+                                columns: columns,
+                                onOpenForeignKey: (fk, value) {
+                                  context.read<TableDataCubit>().previewForeignRow(
+                                    widget.tableKey,
+                                    fk,
+                                    value.rawValue?.toString() ?? value.display,
+                                  );
+                                },
+                              ),
+                            ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
         ),
@@ -1130,6 +1157,34 @@ class _GridRow extends StatelessWidget {
                 onChanged: (value) => context
                     .read<TableDataCubit>()
                     .updateCellDraft(tableKey, value),
+                onNavigate: (reverse) {
+                  final session = context.read<TableDataCubit>().state.session(tableKey);
+                  if (session == null) return;
+                  final nextCol = reverse ? activeEdit!.columnIndex - 1 : activeEdit!.columnIndex + 1;
+                  if (nextCol >= 0 && nextCol < session.structure!.columns.length) {
+                    context.read<TableDataCubit>().beginCellEdit(tableKey, activeEdit!.rowIndex, nextCol);
+                  } else if (nextCol >= session.structure!.columns.length) {
+                    // wrap to next row
+                    final nextRow = activeEdit!.rowIndex + 1;
+                    if (nextRow < session.rows.length) {
+                      context.read<TableDataCubit>().beginCellEdit(tableKey, nextRow, 0);
+                    }
+                  } else if (nextCol < 0) {
+                    // wrap to prev row
+                    final prevRow = activeEdit!.rowIndex - 1;
+                    if (prevRow >= 0) {
+                      context.read<TableDataCubit>().beginCellEdit(tableKey, prevRow, session.structure!.columns.length - 1);
+                    }
+                  }
+                },
+                onNavigateRow: (reverse) {
+                  final session = context.read<TableDataCubit>().state.session(tableKey);
+                  if (session == null) return;
+                  final nextRow = reverse ? activeEdit!.rowIndex - 1 : activeEdit!.rowIndex + 1;
+                  if (nextRow >= 0 && nextRow < session.rows.length) {
+                    context.read<TableDataCubit>().beginCellEdit(tableKey, nextRow, activeEdit!.columnIndex);
+                  }
+                },
                 foreignKey: columns[index].foreignKey,
                 onOpenForeignKey:
                     columns[index].foreignKey != null &&
@@ -1158,6 +1213,8 @@ class _GridCell extends StatelessWidget {
   final bool inserted;
   final VoidCallback onActivate;
   final ValueChanged<String> onChanged;
+  final ValueChanged<bool>? onNavigate;
+  final ValueChanged<bool>? onNavigateRow;
   final TableForeignKey? foreignKey;
   final VoidCallback? onOpenForeignKey;
 
@@ -1172,6 +1229,8 @@ class _GridCell extends StatelessWidget {
     required this.inserted,
     required this.onActivate,
     required this.onChanged,
+    this.onNavigate,
+    this.onNavigateRow,
     this.foreignKey,
     this.onOpenForeignKey,
   });
@@ -1265,7 +1324,12 @@ class _GridCell extends StatelessWidget {
           ),
         ),
         child: activeEdit != null
-            ? _CellTextField(edit: activeEdit!, onChanged: onChanged)
+            ? _CellTextField(
+                edit: activeEdit!,
+                onChanged: onChanged,
+                onNavigate: onNavigate,
+                onNavigateRow: onNavigateRow,
+              )
             : content,
       ),
     );
@@ -1275,8 +1339,15 @@ class _GridCell extends StatelessWidget {
 class _CellTextField extends StatefulWidget {
   final TableCellEdit edit;
   final ValueChanged<String> onChanged;
+  final ValueChanged<bool>? onNavigate;
+  final ValueChanged<bool>? onNavigateRow;
 
-  const _CellTextField({required this.edit, required this.onChanged});
+  const _CellTextField({
+    required this.edit,
+    required this.onChanged,
+    this.onNavigate,
+    this.onNavigateRow,
+  });
 
   @override
   State<_CellTextField> createState() => _CellTextFieldState();
@@ -1293,7 +1364,21 @@ class _CellTextFieldState extends State<_CellTextField> {
     _controller.selection = TextSelection.collapsed(
       offset: _controller.text.length,
     );
-    _focusNode = FocusNode();
+    _focusNode = FocusNode(
+      onKeyEvent: (node, event) {
+        if (event is KeyDownEvent || event is KeyRepeatEvent) {
+          if (event.logicalKey == LogicalKeyboardKey.tab) {
+            final shift = HardwareKeyboard.instance.isShiftPressed;
+            widget.onNavigate?.call(shift);
+            return KeyEventResult.handled;
+          } else if (event.logicalKey == LogicalKeyboardKey.enter && !HardwareKeyboard.instance.isShiftPressed) {
+            widget.onNavigateRow?.call(false);
+            return KeyEventResult.handled;
+          }
+        }
+        return KeyEventResult.ignored;
+      },
+    );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _focusNode.requestFocus();
     });
@@ -1454,30 +1539,36 @@ class _PaginationBar extends StatelessWidget {
                     if (session.hasPendingChanges) const SizedBox(width: 12),
                   ],
                   if (session.hasPendingChanges) ...[
-                    FButton(
-                      size: FButtonSizeVariant.xs,
-                      variant: session.hasPendingDeletes
-                          ? FButtonVariant.destructive
-                          : FButtonVariant.primary,
-                      onPress: session.isCommittingChanges
-                          ? null
-                          : () => context
-                                .read<TableDataCubit>()
-                                .commitPendingChanges(tableKey),
-                      child: Text(
-                        session.isCommittingChanges ? 'Committing…' : 'Commit',
+                    FTooltip(
+                      tipBuilder: (context, controller) => Text('Commit changes (${KeyboardShortcuts.format('Cmd-S')})'),
+                      child: FButton(
+                        size: FButtonSizeVariant.xs,
+                        variant: session.hasPendingDeletes
+                            ? FButtonVariant.destructive
+                            : FButtonVariant.primary,
+                        onPress: session.isCommittingChanges
+                            ? null
+                            : () => context
+                                  .read<TableDataCubit>()
+                                  .commitPendingChanges(tableKey),
+                        child: Text(
+                          session.isCommittingChanges ? 'Committing…' : 'Commit',
+                        ),
                       ),
                     ),
                     const SizedBox(width: 6),
-                    FButton(
-                      size: FButtonSizeVariant.xs,
-                      variant: FButtonVariant.outline,
-                      onPress: session.isCommittingChanges
-                          ? null
-                          : () => context
-                                .read<TableDataCubit>()
-                                .clearPendingChanges(tableKey),
-                      child: const Text('Cancel'),
+                    FTooltip(
+                      tipBuilder: (context, controller) => const Text('Cancel changes (Esc)'),
+                      child: FButton(
+                        size: FButtonSizeVariant.xs,
+                        variant: FButtonVariant.outline,
+                        onPress: session.isCommittingChanges
+                            ? null
+                            : () => context
+                                  .read<TableDataCubit>()
+                                  .clearPendingChanges(tableKey),
+                        child: const Text('Cancel'),
+                      ),
                     ),
                   ],
                 ],

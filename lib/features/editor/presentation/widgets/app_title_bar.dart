@@ -5,8 +5,16 @@ import 'package:window_manager/window_manager.dart';
 import '../../../../core/platform_utils.dart';
 import 'app_menu_actions.dart';
 
-class AppTitleBar extends StatelessWidget {
+class AppTitleBar extends StatefulWidget {
   const AppTitleBar({super.key});
+
+  @override
+  State<AppTitleBar> createState() => _AppTitleBarState();
+}
+
+class _AppTitleBarState extends State<AppTitleBar> {
+  bool _isFileMenuOpen = false;
+  bool _isWorkspaceMenuOpen = false;
 
   static const _appIconAsset = 'assets/branding/QueryPod-512.png';
   static const _titleBarHeight = 34.0;
@@ -63,7 +71,9 @@ class AppTitleBar extends StatelessWidget {
   }
 
   Widget _buildMenuBar(BuildContext context, FThemeData theme) {
-    final topLevelStyle = _topLevelButtonStyle(theme);
+    final fileTopLevelStyle = _topLevelButtonStyle(theme, _isFileMenuOpen);
+    final workspaceTopLevelStyle =
+        _topLevelButtonStyle(theme, _isWorkspaceMenuOpen);
     final menuSurfaceStyle = _menuSurfaceStyle(theme);
     final menuItemStyle = _menuItemStyle(theme);
 
@@ -79,7 +89,13 @@ class AppTitleBar extends StatelessWidget {
         children: [
           SubmenuButton(
             alignmentOffset: _submenuOffset,
-            style: topLevelStyle,
+            onOpen: () {
+              if (mounted) setState(() => _isFileMenuOpen = true);
+            },
+            onClose: () {
+              if (mounted) setState(() => _isFileMenuOpen = false);
+            },
+            style: fileTopLevelStyle,
             menuStyle: menuSurfaceStyle,
             menuChildren: [
               MenuItemButton(
@@ -102,7 +118,13 @@ class AppTitleBar extends StatelessWidget {
           ),
           SubmenuButton(
             alignmentOffset: _submenuOffset,
-            style: topLevelStyle,
+            onOpen: () {
+              if (mounted) setState(() => _isWorkspaceMenuOpen = true);
+            },
+            onClose: () {
+              if (mounted) setState(() => _isWorkspaceMenuOpen = false);
+            },
+            style: workspaceTopLevelStyle,
             menuStyle: menuSurfaceStyle,
             menuChildren: [
               MenuItemButton(
@@ -138,7 +160,7 @@ class AppTitleBar extends StatelessWidget {
     );
   }
 
-  ButtonStyle _topLevelButtonStyle(FThemeData theme) {
+  ButtonStyle _topLevelButtonStyle(FThemeData theme, bool isOpen) {
     return ButtonStyle(
       minimumSize: const WidgetStatePropertyAll(Size(0, _titleBarHeight)),
       fixedSize: const WidgetStatePropertyAll(Size.fromHeight(_titleBarHeight)),
@@ -147,7 +169,7 @@ class AppTitleBar extends StatelessWidget {
       ),
       foregroundColor: WidgetStatePropertyAll(theme.colors.foreground),
       backgroundColor: WidgetStateProperty.resolveWith((states) {
-        if (states.contains(WidgetState.selected) ||
+        if (isOpen ||
             states.contains(WidgetState.hovered) ||
             states.contains(WidgetState.focused) ||
             states.contains(WidgetState.pressed)) {

@@ -155,7 +155,7 @@ void main() {
       final decoration = titleBar.decoration! as BoxDecoration;
       expect(
         tester.getSize(find.byKey(const ValueKey('app-title-bar'))).height,
-        30,
+        34,
       );
       expect(decoration.border, isNotNull);
 
@@ -206,6 +206,13 @@ void main() {
 
       await tester.tap(find.text('File'));
       await tester.pumpAndSettle();
+      final openFileMenu = tester.widget<SubmenuButton>(
+        find.byType(SubmenuButton).first,
+      );
+      expect(
+        openFileMenu.statesController!.value.contains(WidgetState.selected),
+        isTrue,
+      );
       expect(find.byKey(const ValueKey('quit-shortcut-hint')), findsOneWidget);
       expect(
         find.byKey(const ValueKey('desktop-caption-buttons')),

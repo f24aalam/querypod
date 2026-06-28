@@ -108,9 +108,15 @@ class _TableContent extends StatelessWidget {
         selectedIndex < session.rows.length &&
         session.structure != null;
     final showBatchInspector = session.selectionCount > 1;
-    final showTableStructure = session.isShowingStructure && session.structure != null;
+    final showTableStructure =
+        session.isShowingStructure && session.structure != null;
 
-    if (!isFetchingForeignRow && !showForeignPreview && !showRowDetail && !showBatchInspector && !showTableStructure) return grid;
+    if (!isFetchingForeignRow &&
+        !showForeignPreview &&
+        !showRowDetail &&
+        !showBatchInspector &&
+        !showTableStructure)
+      return grid;
 
     return FResizable(
       axis: Axis.horizontal,
@@ -129,22 +135,27 @@ class _TableContent extends StatelessWidget {
               ? Container(
                   decoration: BoxDecoration(
                     color: context.theme.colors.background,
-                    border: Border(left: BorderSide(color: context.theme.colors.border, width: 1)),
+                    border: Border(
+                      left: BorderSide(
+                        color: context.theme.colors.border,
+                        width: 1,
+                      ),
+                    ),
                   ),
                   child: const Center(child: CircularProgressIndicator()),
                 )
               : showForeignPreview
-                  ? _ForeignRowPreviewPanel(tableKey: tableKey, session: session)
-                  : showTableStructure
-                      ? _TableStructurePanel(tableKey: tableKey, session: session)
-                      : showBatchInspector
-                          ? _BatchInspector(tableKey: tableKey, session: session)
-                          : _RowDetailPanel(
-                              tableKey: tableKey,
-                              columns: session.structure!.columns,
-                              row: session.rows[selectedIndex!],
-                              rowNumber: session.rangeStart + selectedIndex,
-                            ),
+              ? _ForeignRowPreviewPanel(tableKey: tableKey, session: session)
+              : showTableStructure
+              ? _TableStructurePanel(tableKey: tableKey, session: session)
+              : showBatchInspector
+              ? _BatchInspector(tableKey: tableKey, session: session)
+              : _RowDetailPanel(
+                  tableKey: tableKey,
+                  columns: session.structure!.columns,
+                  row: session.rows[selectedIndex!],
+                  rowNumber: session.rangeStart + selectedIndex,
+                ),
         ),
       ],
     );
@@ -164,9 +175,7 @@ class _TableStructurePanel extends StatelessWidget {
     final indexes = session.structure!.indexes;
 
     return Container(
-      decoration: BoxDecoration(
-        color: theme.colors.background,
-      ),
+      decoration: BoxDecoration(color: theme.colors.background),
       child: Column(
         children: [
           Container(
@@ -199,8 +208,9 @@ class _TableStructurePanel extends StatelessWidget {
                   tooltip: 'Close table structure',
                   padding: EdgeInsets.zero,
                   splashRadius: 12,
-                  onPressed: () =>
-                      context.read<TableDataCubit>().hideTableStructure(tableKey),
+                  onPressed: () => context
+                      .read<TableDataCubit>()
+                      .hideTableStructure(tableKey),
                   icon: Icon(
                     Icons.close,
                     size: 14,
@@ -220,11 +230,17 @@ class _TableStructurePanel extends StatelessWidget {
               ),
               children: [
                 FTabEntry(
-                  label: Text('Columns (${columns.length})', style: const TextStyle(fontSize: 12)),
+                  label: Text(
+                    'Columns (${columns.length})',
+                    style: const TextStyle(fontSize: 12),
+                  ),
                   child: _buildColumns(context, columns),
                 ),
                 FTabEntry(
-                  label: Text('Indexes (${indexes.length})', style: const TextStyle(fontSize: 12)),
+                  label: Text(
+                    'Indexes (${indexes.length})',
+                    style: const TextStyle(fontSize: 12),
+                  ),
                   child: _buildIndexes(context, indexes),
                 ),
               ],
@@ -287,7 +303,10 @@ class _TableStructurePanel extends StatelessWidget {
                         children: [
                           if (column.isNullable) ...[
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
                               decoration: BoxDecoration(
                                 color: theme.colors.secondary,
                                 borderRadius: BorderRadius.circular(4),
@@ -305,12 +324,16 @@ class _TableStructurePanel extends StatelessWidget {
                                 ),
                               ),
                             ),
-                            if (column.foreignKey != null) const SizedBox(width: 6),
+                            if (column.foreignKey != null)
+                              const SizedBox(width: 6),
                           ],
                           if (column.foreignKey != null)
                             Flexible(
                               child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
                                 decoration: BoxDecoration(
                                   color: theme.colors.secondary,
                                   borderRadius: BorderRadius.circular(4),
@@ -322,7 +345,11 @@ class _TableStructurePanel extends StatelessWidget {
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Icon(Icons.link, size: 10, color: theme.colors.foreground),
+                                    Icon(
+                                      Icons.link,
+                                      size: 10,
+                                      color: theme.colors.foreground,
+                                    ),
                                     const SizedBox(width: 4),
                                     Flexible(
                                       child: Text(
@@ -392,12 +419,19 @@ class _TableStructurePanel extends StatelessWidget {
                   if (idx.isPrimaryKey || idx.isUnique) ...[
                     const SizedBox(width: 8),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 4,
+                        vertical: 2,
+                      ),
                       decoration: BoxDecoration(
-                        color: idx.isPrimaryKey ? Colors.amber.withValues(alpha: 0.2) : theme.colors.primary.withValues(alpha: 0.1),
+                        color: idx.isPrimaryKey
+                            ? Colors.amber.withValues(alpha: 0.2)
+                            : theme.colors.primary.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(4),
                         border: Border.all(
-                          color: idx.isPrimaryKey ? Colors.amber.shade700 : theme.colors.primary,
+                          color: idx.isPrimaryKey
+                              ? Colors.amber.shade700
+                              : theme.colors.primary,
                           width: 1,
                         ),
                       ),
@@ -406,7 +440,9 @@ class _TableStructurePanel extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 9,
                           fontWeight: FontWeight.bold,
-                          color: idx.isPrimaryKey ? Colors.amber.shade700 : theme.colors.primary,
+                          color: idx.isPrimaryKey
+                              ? Colors.amber.shade700
+                              : theme.colors.primary,
                         ),
                       ),
                     ),
@@ -472,7 +508,10 @@ class _ForeignRowPreviewPanel extends StatelessWidget {
   final TableTabKey tableKey;
   final TableDataSession session;
 
-  const _ForeignRowPreviewPanel({required this.tableKey, required this.session});
+  const _ForeignRowPreviewPanel({
+    required this.tableKey,
+    required this.session,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -516,8 +555,9 @@ class _ForeignRowPreviewPanel extends StatelessWidget {
                   tooltip: 'Close preview',
                   padding: EdgeInsets.zero,
                   splashRadius: 12,
-                  onPressed: () =>
-                      context.read<TableDataCubit>().clearForeignRowPreview(tableKey),
+                  onPressed: () => context
+                      .read<TableDataCubit>()
+                      .clearForeignRowPreview(tableKey),
                   icon: Icon(
                     Icons.close,
                     size: 14,
@@ -885,7 +925,9 @@ class _DataGridState extends State<_DataGrid> {
                             stagedEdits: widget.session.stagedCellEdits,
                             stagedDelete: widget.session.stagedDeletedRowIndexes
                                 .contains(index),
-                            stagedInsert: widget.session.stagedInsertedRowIndexes
+                            stagedInsert: widget
+                                .session
+                                .stagedInsertedRowIndexes
                                 .contains(index),
                             editable: widget.session.isEditable,
                             columns: columns,
@@ -1017,7 +1059,7 @@ class _GridRow extends StatelessWidget {
               variant: FItemVariant.destructive,
               enabled: editable,
               prefix: const Icon(Icons.delete_outline, size: 14),
-              title: const Text('Delete selection'),
+              title: const Text('Delete'),
               onPress: editable
                   ? () {
                       controller.hide();
@@ -1075,12 +1117,13 @@ class _GridRow extends StatelessWidget {
                     .updateCellDraft(tableKey, value),
                 foreignKey: columns[index].foreignKey,
                 onOpenForeignKey:
-                    columns[index].foreignKey != null && onOpenForeignKey != null
-                        ? () => onOpenForeignKey!(
-                          columns[index].foreignKey!,
-                          row.cells[index],
-                        )
-                        : null,
+                    columns[index].foreignKey != null &&
+                        onOpenForeignKey != null
+                    ? () => onOpenForeignKey!(
+                        columns[index].foreignKey!,
+                        row.cells[index],
+                      )
+                    : null,
               ),
           ],
         ),
@@ -1152,7 +1195,10 @@ class _GridCell extends StatelessWidget {
           )
         : text;
 
-    if (activeEdit == null && foreignKey != null && value.kind != TableCellKind.nullValue && onOpenForeignKey != null) {
+    if (activeEdit == null &&
+        foreignKey != null &&
+        value.kind != TableCellKind.nullValue &&
+        onOpenForeignKey != null) {
       content = Row(
         children: [
           Expanded(child: content),
@@ -1162,8 +1208,15 @@ class _GridCell extends StatelessWidget {
               behavior: HitTestBehavior.opaque,
               onTap: onOpenForeignKey,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
-                child: Icon(Icons.open_in_new, size: 12, color: theme.colors.primary),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 8.0,
+                  vertical: 8.0,
+                ),
+                child: Icon(
+                  Icons.open_in_new,
+                  size: 12,
+                  color: theme.colors.primary,
+                ),
               ),
             ),
           ),
@@ -1187,12 +1240,12 @@ class _GridCell extends StatelessWidget {
               : null,
           border: Border(
             right: BorderSide(
-              color: inserted ? Colors.green : theme.colors.border, 
-              width: 1
+              color: inserted ? Colors.green : theme.colors.border,
+              width: 1,
             ),
             bottom: BorderSide(
-              color: inserted ? Colors.green : theme.colors.border, 
-              width: inserted ? 1 : 0.5
+              color: inserted ? Colors.green : theme.colors.border,
+              width: inserted ? 1 : 0.5,
             ),
           ),
         ),
@@ -1453,7 +1506,8 @@ class _PaginationBar extends StatelessWidget {
                   ),
                   const SizedBox(width: 6),
                   FTooltip(
-                    tipBuilder: (context, controller) => const Text('Insert Row'),
+                    tipBuilder: (context, controller) =>
+                        const Text('Insert Row'),
                     child: FButton.icon(
                       size: FButtonSizeVariant.xs,
                       variant: FButtonVariant.outline,
@@ -1673,7 +1727,9 @@ class _TableActionBarState extends State<_TableActionBar> {
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         color: theme.colors.background,
-        border: Border(bottom: BorderSide(color: theme.colors.border, width: 1)),
+        border: Border(
+          bottom: BorderSide(color: theme.colors.border, width: 1),
+        ),
       ),
       child: Row(
         children: [
@@ -1712,7 +1768,7 @@ class _TableActionBarState extends State<_TableActionBar> {
     final cubit = context.read<TableDataCubit>();
     final session = widget.session;
     final operators = cubit.supportedOperators(widget.tableKey);
-    
+
     showFSheet(
       context: context,
       side: FLayout.rtl,
@@ -1752,18 +1808,24 @@ class _FilterSheetState extends State<_FilterSheet> {
   @override
   void initState() {
     super.initState();
-    _rows = widget.initialFilters.map((f) => _FilterFormRow(
-      column: f.column,
-      operator: f.operator,
-      valueController: TextEditingController(text: f.value),
-    )).toList();
+    _rows = widget.initialFilters
+        .map(
+          (f) => _FilterFormRow(
+            column: f.column,
+            operator: f.operator,
+            valueController: TextEditingController(text: f.value),
+          ),
+        )
+        .toList();
 
     if (_rows.isEmpty) {
-      _rows.add(_FilterFormRow(
-        column: widget.columns.isNotEmpty ? widget.columns.first.name : '',
-        operator: widget.operators.isNotEmpty ? widget.operators.first : '=',
-        valueController: TextEditingController(),
-      ));
+      _rows.add(
+        _FilterFormRow(
+          column: widget.columns.isNotEmpty ? widget.columns.first.name : '',
+          operator: widget.operators.isNotEmpty ? widget.operators.first : '=',
+          valueController: TextEditingController(),
+        ),
+      );
     }
   }
 
@@ -1777,11 +1839,13 @@ class _FilterSheetState extends State<_FilterSheet> {
 
   void _addFilter() {
     setState(() {
-      _rows.add(_FilterFormRow(
-        column: widget.columns.isNotEmpty ? widget.columns.first.name : '',
-        operator: widget.operators.isNotEmpty ? widget.operators.first : '=',
-        valueController: TextEditingController(),
-      ));
+      _rows.add(
+        _FilterFormRow(
+          column: widget.columns.isNotEmpty ? widget.columns.first.name : '',
+          operator: widget.operators.isNotEmpty ? widget.operators.first : '=',
+          valueController: TextEditingController(),
+        ),
+      );
     });
   }
 
@@ -1793,11 +1857,16 @@ class _FilterSheetState extends State<_FilterSheet> {
   }
 
   void _applyFilters() {
-    final filters = _rows.where((row) => row.column.isNotEmpty && row.operator.isNotEmpty).map((row) => TableFilter(
-      column: row.column,
-      operator: row.operator,
-      value: row.valueController.text,
-    )).toList();
+    final filters = _rows
+        .where((row) => row.column.isNotEmpty && row.operator.isNotEmpty)
+        .map(
+          (row) => TableFilter(
+            column: row.column,
+            operator: row.operator,
+            value: row.valueController.text,
+          ),
+        )
+        .toList();
     widget.onApply(filters);
   }
 
@@ -1817,7 +1886,9 @@ class _FilterSheetState extends State<_FilterSheet> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
-              border: Border(bottom: BorderSide(color: theme.colors.border, width: 1)),
+              border: Border(
+                bottom: BorderSide(color: theme.colors.border, width: 1),
+              ),
             ),
             child: Row(
               children: [
@@ -1835,7 +1906,11 @@ class _FilterSheetState extends State<_FilterSheet> {
                   padding: EdgeInsets.zero,
                   splashRadius: 20,
                   onPressed: () => Navigator.of(context).pop(),
-                  icon: Icon(Icons.close, size: 20, color: theme.colors.mutedForeground),
+                  icon: Icon(
+                    Icons.close,
+                    size: 20,
+                    color: theme.colors.mutedForeground,
+                  ),
                 ),
               ],
             ),
@@ -1864,7 +1939,7 @@ class _FilterSheetState extends State<_FilterSheet> {
                     Expanded(
                       flex: 2,
                       child: FSelect<String>(
-                        items: { for (var c in widget.columns) c.name : c.name },
+                        items: {for (var c in widget.columns) c.name: c.name},
                         control: FSelectControl.lifted(
                           value: row.column,
                           onChange: (val) {
@@ -1877,7 +1952,7 @@ class _FilterSheetState extends State<_FilterSheet> {
                     Expanded(
                       flex: 1,
                       child: FSelect<String>(
-                        items: { for (var op in widget.operators) op : op },
+                        items: {for (var op in widget.operators) op: op},
                         control: FSelectControl.lifted(
                           value: row.operator,
                           onChange: (val) {
@@ -1909,7 +1984,9 @@ class _FilterSheetState extends State<_FilterSheet> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              border: Border(top: BorderSide(color: theme.colors.border, width: 1)),
+              border: Border(
+                top: BorderSide(color: theme.colors.border, width: 1),
+              ),
             ),
             child: Row(
               children: [
@@ -1925,10 +2002,7 @@ class _FilterSheetState extends State<_FilterSheet> {
                   child: const Text('Cancel'),
                 ),
                 const SizedBox(width: 8),
-                FButton(
-                  onPress: _applyFilters,
-                  child: const Text('Filter'),
-                ),
+                FButton(onPress: _applyFilters, child: const Text('Filter')),
               ],
             ),
           ),

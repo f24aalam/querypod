@@ -10,9 +10,10 @@ import 'core/platform_utils.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   sqfliteFfiInit();
+  final launchBootstrap = LaunchBootstrapConfig.fromEnvironment();
   await configureDependencies(
     databaseFactory: databaseFactoryFfi,
-    launchBootstrap: LaunchBootstrapConfig.fromEnvironment(),
+    launchBootstrap: launchBootstrap,
   );
 
   if (isDesktop) {
@@ -28,5 +29,5 @@ void main() async {
     });
   }
 
-  runApp(const App());
+  runApp(App(initialLocation: launchBootstrap.initialLocation));
 }

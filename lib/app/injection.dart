@@ -30,11 +30,16 @@ Future<void> configureDependencies({
   LaunchBootstrapConfig launchBootstrap = const LaunchBootstrapConfig(
     profileNamespace: '',
     preset: null,
+    workspace: null,
   ),
 }) async {
   final prefs = await SharedPreferences.getInstance();
   const secureStorage = FlutterSecureStorage();
   final database = await openAppDatabase(databaseFactory: databaseFactory);
+  final workspaceRepository = WorkspaceRepositoryImpl(
+    prefs,
+    keyNamespace: launchBootstrap.profileNamespace,
+  );
   final connectionRepository = ConnectionRepositoryImpl(
     secureStorage: secureStorage,
     prefs: prefs,
@@ -51,9 +56,7 @@ Future<void> configureDependencies({
   getIt.registerLazySingleton<ConnectionMetadataRepository>(
     () => ConnectionMetadataRepositoryImpl(),
   );
-  getIt.registerLazySingleton<WorkspaceRepository>(
-    () => WorkspaceRepositoryImpl(prefs),
-  );
+  getIt.registerLazySingleton<WorkspaceRepository>(() => workspaceRepository);
   getIt.registerLazySingleton<TableDataRepository>(
     () => TableDataRepositoryImpl(historyRepository: getIt()),
   );
@@ -72,9 +75,22 @@ Future<void> configureDependencies({
   getIt.registerFactory(() => TableDataCubit(repository: getIt()));
   getIt.registerFactory(() => WorkspacesCubit(repository: getIt()));
 
+  final workspacePreset = launchBootstrap.workspace;
+  if (workspacePreset != null) {
+    final workspaces = await workspaceRepository.getWorkspaces();
+    final existing = workspaces
+        .where((workspace) => workspace.id == workspacePreset.id)
+        .firstOrNull;
+    if (existing == null) {
+      await workspaceRepository.createWorkspace(workspacePreset.toWorkspace());
+    }
+  }
+
   final preset = launchBootstrap.preset;
   if (preset != null) {
-    final connection = preset.toConnection();
+    final connection = preset.toConnection(
+      workspaceId: workspacePreset?.id ?? 'default',
+    );
     await connectionRepository.save(connection);
     if (preset.selectAfterSave) {
       await connectionRepository.setSelectedId(connection.id);

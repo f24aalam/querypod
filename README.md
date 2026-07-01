@@ -22,7 +22,7 @@ If `3306` or `5432` is already taken on your machine, create `.env` from `.env.e
 Launch the Linux app against a seeded Docker database or sample preset:
 
 ```bash
-make run-app PLATFORM=linux DB=mysql
+make run-app PLATFORM=linux TARGET=mysql
 ```
 
 Run the repository integration tests after exporting DB config or passing `--dart-define` values:
@@ -47,7 +47,7 @@ Use `dev-db/README.md` as the operational guide for:
 - credentials and ports
 - local `.env` port overrides for Docker and app launch helpers
 - helper scripts such as `db_up`, `db_down`, and `db_reset`
-- Linux app launch presets such as `make run-app PLATFORM=linux DB=mysql` and `make run-app PLATFORM=linux EXAMPLE=dvdrental`
+- Linux app launch presets such as `make run-app PLATFORM=linux TARGET=mysql` and `make run-app PLATFORM=linux TARGET=dvdrental`
 - optional sample database downloads
 - manual verification commands
 - exact integration-test invocation examples

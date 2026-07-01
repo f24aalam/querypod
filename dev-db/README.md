@@ -107,7 +107,8 @@ Trusted sample sources used by the helper scripts:
 - MySQL Sakila: `https://downloads.mysql.com/docs/sakila-db.tar.gz`
 - MySQL World: `https://downloads.mysql.com/docs/world-db.tar.gz`
 - MySQL Employees: `https://github.com/datacharmer/test_db/archive/refs/heads/master.tar.gz`
-- PostgreSQL DVD Rental: `https://www.postgresqltutorial.com/wp-content/uploads/2019/05/dvdrental.zip`
+- PostgreSQL DVD Rental primary: `https://www.postgresqltutorial.com/wp-content/uploads/2019/05/dvdrental.zip`
+- PostgreSQL DVD Rental fallback: `https://raw.githubusercontent.com/robconery/dvdrental/master/dvdrental.tar`
 
 Helper commands:
 
@@ -116,7 +117,7 @@ Helper commands:
 ./dev-db/scripts/prepare_samples
 ./dev-db/scripts/load_samples
 ./dev-db/scripts/reset_samples
-./dev-db/scripts/run_app --platform linux --db mysql
+./dev-db/scripts/run_app --platform linux --target mysql
 ```
 
 Each sample helper command also accepts one of:
@@ -142,17 +143,16 @@ Loaded sample database names:
 - PostgreSQL: `dvdrental`
 
 The third-party datasets are not loaded during `db_up`. That keeps the default startup fast and keeps the core QueryPod fixtures deterministic.
+If the primary DVD Rental host is unavailable, the scripts automatically fall back to the GitHub-hosted `dvdrental.tar`.
 
 ## Launch the Linux app with a preset connection
 
 The Linux app can be launched directly against the local Docker databases with a pre-seeded QueryPod connection. These launch commands use an isolated dev-profile namespace for saved connections, so they do not overwrite the user’s normal saved connection list.
 
-Supported core DB values:
+Supported target values:
 
 - `mysql`
 - `postgres`
-
-Supported example values:
 
 - `sakila`
 - `world`
@@ -162,25 +162,24 @@ Supported example values:
 Preferred Make interface:
 
 ```bash
-make run-app PLATFORM=linux DB=mysql
-make run-app PLATFORM=linux DB=postgres
-make run-app PLATFORM=linux EXAMPLE=sakila
-make run-app PLATFORM=linux EXAMPLE=dvdrental
+make run-app PLATFORM=linux TARGET=mysql
+make run-app PLATFORM=linux TARGET=postgres
+make run-app PLATFORM=linux TARGET=sakila
+make run-app PLATFORM=linux TARGET=dvdrental
 ```
 
 Behavior:
 
-- `DB=mysql` and `DB=postgres` start the corresponding Docker service and launch the Linux app against `querypod_lab`
-- `EXAMPLE=sakila|world|employees|dvdrental` automatically load the sample database into Docker if needed, then launch the app against that database
+- `TARGET=mysql` and `TARGET=postgres` start the corresponding Docker service and launch the Linux app against `querypod_lab`
+- `TARGET=sakila|world|employees|dvdrental` automatically load the sample database into Docker if needed, then launch the app against that database
 - the launched app starts with the preset connection already saved and selected
-- `DB` and `EXAMPLE` are mutually exclusive
 - each launch accepts exactly one value; comma-separated lists are rejected
 
 Direct script interface:
 
 ```bash
-./dev-db/scripts/run_app --platform linux --db mysql
-./dev-db/scripts/run_app --platform linux --example sakila
+./dev-db/scripts/run_app --platform linux --target mysql
+./dev-db/scripts/run_app --platform linux --target sakila
 ```
 
 Backward-compatible aliases:

@@ -17,8 +17,10 @@ bootstrap_user=""
 bootstrap_password=""
 bootstrap_database=""
 bootstrap_type=""
-bootstrap_use_tls="false"
+bootstrap_use_tls="true"
 profile_namespace=""
+bootstrap_workspace_id="default"
+bootstrap_workspace_name="Default Workspace"
 
 configure_target() {
   case "${target}" in
@@ -84,6 +86,8 @@ profile_namespace="dev_launch_${target}"
 log "Launching QueryPod Linux app for target '${target}'"
 exec flutter run -d linux \
   --dart-define=QUERYPOD_PROFILE_NAMESPACE="${profile_namespace}" \
+  --dart-define=QUERYPOD_BOOTSTRAP_WORKSPACE_ID="${bootstrap_workspace_id}" \
+  --dart-define=QUERYPOD_BOOTSTRAP_WORKSPACE_NAME="${bootstrap_workspace_name}" \
   --dart-define=QUERYPOD_BOOTSTRAP_CONNECTION_ID="${bootstrap_id}" \
   --dart-define=QUERYPOD_BOOTSTRAP_CONNECTION_NAME="${bootstrap_name}" \
   --dart-define=QUERYPOD_BOOTSTRAP_HOST="${bootstrap_host}" \

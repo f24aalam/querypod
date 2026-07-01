@@ -46,7 +46,9 @@ class ConnectionRepositoryImpl implements ConnectionRepository {
     for (final json in jsonList) {
       final connMap = json as Map<String, dynamic>;
       final id = connMap['id'] as String;
-      final password = await _secureStorage.read(key: _passwordPrefix + id);
+      final password = await _secureStorage.read(
+        key: _passwordStoragePrefix + id,
+      );
       connections.add(
         ConnectionModel.fromJson(connMap, password: password ?? ''),
       );

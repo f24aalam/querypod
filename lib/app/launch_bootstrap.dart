@@ -1,12 +1,15 @@
 import '../features/connections/domain/entities/connection.dart';
+import '../features/workspaces/domain/entities/app_workspace.dart';
 
 class LaunchBootstrapConfig {
   final String profileNamespace;
   final BootstrapConnectionPreset? preset;
+  final BootstrapWorkspacePreset? workspace;
 
   const LaunchBootstrapConfig({
     required this.profileNamespace,
     required this.preset,
+    required this.workspace,
   });
 
   factory LaunchBootstrapConfig.fromEnvironment() {
@@ -15,10 +18,54 @@ class LaunchBootstrapConfig {
       defaultValue: '',
     );
     final preset = BootstrapConnectionPreset.fromEnvironment();
+    final workspace = BootstrapWorkspacePreset.fromEnvironment(
+      enabled: preset != null,
+    );
     return LaunchBootstrapConfig(
       profileNamespace: profileNamespace,
       preset: preset,
+      workspace: workspace,
     );
+  }
+
+  String get initialLocation {
+    final workspaceId = workspace?.id;
+    if (workspaceId == null || workspaceId.isEmpty) return '/';
+    return '/workspace/$workspaceId';
+  }
+}
+
+class BootstrapWorkspacePreset {
+  final String id;
+  final String name;
+
+  const BootstrapWorkspacePreset({required this.id, required this.name});
+
+  static BootstrapWorkspacePreset? fromEnvironment({required bool enabled}) {
+    if (!enabled) return null;
+
+    const id = String.fromEnvironment(
+      'QUERYPOD_BOOTSTRAP_WORKSPACE_ID',
+      defaultValue: 'default',
+    );
+    const name = String.fromEnvironment(
+      'QUERYPOD_BOOTSTRAP_WORKSPACE_NAME',
+      defaultValue: 'Default Workspace',
+    );
+
+    if (id.isEmpty || name.isEmpty) {
+      throw StateError(
+        'Incomplete QueryPod workspace bootstrap config. '
+        'Workspace id and name must be non-empty.',
+      );
+    }
+
+    return const BootstrapWorkspacePreset(id: id, name: name);
+  }
+
+  AppWorkspace toWorkspace() {
+    final now = DateTime.now();
+    return AppWorkspace(id: id, name: name, createdAt: now, updatedAt: now);
   }
 }
 

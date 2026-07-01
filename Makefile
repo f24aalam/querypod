@@ -29,22 +29,22 @@ db-reset-samples:
 	./dev-db/scripts/reset_samples
 
 run-app:
-	./dev-db/scripts/run_app --platform "$(PLATFORM)" $(if $(DB),--db "$(DB)") $(if $(EXAMPLE),--example "$(EXAMPLE)") $(if $(PORT),--port "$(PORT)")
+	./dev-db/scripts/run_app --platform "$(PLATFORM)" $(if $(TARGET),--target "$(TARGET)") $(if $(PORT),--port "$(PORT)")
 
 app-linux-mysql:
-	$(MAKE) run-app PLATFORM=linux DB=mysql
+	$(MAKE) run-app PLATFORM=linux TARGET=mysql
 
 app-linux-postgres:
-	$(MAKE) run-app PLATFORM=linux DB=postgres
+	$(MAKE) run-app PLATFORM=linux TARGET=postgres
 
 app-linux-sakila:
-	$(MAKE) run-app PLATFORM=linux EXAMPLE=sakila
+	$(MAKE) run-app PLATFORM=linux TARGET=sakila
 
 app-linux-world:
-	$(MAKE) run-app PLATFORM=linux EXAMPLE=world
+	$(MAKE) run-app PLATFORM=linux TARGET=world
 
 app-linux-employees:
-	$(MAKE) run-app PLATFORM=linux EXAMPLE=employees
+	$(MAKE) run-app PLATFORM=linux TARGET=employees
 
 app-linux-dvdrental:
-	$(MAKE) run-app PLATFORM=linux EXAMPLE=dvdrental
+	$(MAKE) run-app PLATFORM=linux TARGET=dvdrental

@@ -5,8 +5,7 @@ set -euo pipefail
 source "$(cd "$(dirname "$0")" && pwd)/common.sh"
 
 platform=""
-db=""
-example=""
+target=""
 port=""
 
 while [[ $# -gt 0 ]]; do
@@ -16,14 +15,9 @@ while [[ $# -gt 0 ]]; do
       platform="$2"
       shift 2
       ;;
-    --db)
-      [[ $# -ge 2 ]] || die "Missing value for --db"
-      db="$2"
-      shift 2
-      ;;
-    --example)
-      [[ $# -ge 2 ]] || die "Missing value for --example"
-      example="$2"
+    --target)
+      [[ $# -ge 2 ]] || die "Missing value for --target"
+      target="$2"
       shift 2
       ;;
     --port)
@@ -32,59 +26,36 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
     *)
-      die "Unsupported argument '$1'. Use --platform, --db, --example, and --port."
+      die "Unsupported argument '$1'. Use --platform, --target, and --port."
       ;;
   esac
 done
 
-[[ -n "${platform}" ]] || die "PLATFORM is required. Example: make run-app PLATFORM=linux DB=mysql"
+[[ -n "${platform}" ]] || die "PLATFORM is required. Example: make run-app PLATFORM=linux TARGET=mysql"
 [[ "${platform}" == "linux" ]] || die "Unsupported platform '${platform}'. Only linux is supported right now."
-
-if [[ -n "${db}" && -n "${example}" ]]; then
-  die "DB and EXAMPLE are mutually exclusive. Choose exactly one."
+[[ -n "${target}" ]] || die "TARGET is required. Example: make run-app PLATFORM=linux TARGET=mysql"
+if [[ "${target}" == *","* ]]; then
+  die "TARGET accepts exactly one value. Use mysql, postgres, sakila, world, employees, or dvdrental."
 fi
 
-if [[ -z "${db}" && -z "${example}" ]]; then
-  die "Set exactly one of DB or EXAMPLE. Examples: make run-app PLATFORM=linux DB=mysql or make run-app PLATFORM=linux EXAMPLE=sakila"
-fi
-
-if [[ "${db}" == *","* ]]; then
-  die "DB accepts exactly one value. Use DB=mysql or DB=postgres."
-fi
-
-if [[ "${example}" == *","* ]]; then
-  die "EXAMPLE accepts exactly one value. Use EXAMPLE=sakila, EXAMPLE=world, EXAMPLE=employees, or EXAMPLE=dvdrental."
-fi
-
-target=""
 kind=""
-if [[ -n "${db}" ]]; then
-  case "${db}" in
-    mysql|postgres)
-      target="${db}"
-      kind="${db}"
-      ;;
-    *)
-      die "Unsupported DB '${db}'. Use mysql or postgres."
-      ;;
-  esac
-fi
-
-if [[ -n "${example}" ]]; then
-  case "${example}" in
-    sakila|world|employees)
-      target="${example}"
-      kind="mysql"
-      ;;
-    dvdrental)
-      target="${example}"
-      kind="postgres"
-      ;;
-    *)
-      die "Unsupported EXAMPLE '${example}'. Use sakila, world, employees, or dvdrental."
-      ;;
-  esac
-fi
+case "${target}" in
+  mysql)
+    kind="mysql"
+    ;;
+  postgres)
+    kind="postgres"
+    ;;
+  sakila|world|employees)
+    kind="mysql"
+    ;;
+  dvdrental)
+    kind="postgres"
+    ;;
+  *)
+    die "Unsupported TARGET '${target}'. Use mysql, postgres, sakila, world, employees, or dvdrental."
+    ;;
+esac
 
 if [[ -n "${port}" ]] && ! [[ "${port}" =~ ^[0-9]+$ ]]; then
   die "PORT must be a single integer value."
@@ -93,13 +64,7 @@ fi
 current_port=""
 suggested_port=""
 command_hint=""
-selection_hint=""
-
-if [[ -n "${db}" ]]; then
-  selection_hint="DB=${db}"
-else
-  selection_hint="EXAMPLE=${example}"
-fi
+selection_hint="TARGET=${target}"
 
 case "${kind}" in
   mysql)

@@ -9,4 +9,11 @@ target="${1:-all}"
 sample_enabled "${target}" "sakila" && download_if_missing "${SAMPLE_SAKILA_URL}" "${DOWNLOAD_DIR}/sakila-db.tar.gz"
 sample_enabled "${target}" "world" && download_if_missing "${SAMPLE_WORLD_URL}" "${DOWNLOAD_DIR}/world-db.tar.gz"
 sample_enabled "${target}" "employees" && download_if_missing "${SAMPLE_EMPLOYEES_URL}" "${DOWNLOAD_DIR}/employees-master.tar.gz"
-sample_enabled "${target}" "dvdrental" && download_if_missing "${SAMPLE_DVDRENTAL_URL}" "${DOWNLOAD_DIR}/dvdrental.zip"
+if sample_enabled "${target}" "dvdrental"; then
+  if ! download_if_missing "${SAMPLE_DVDRENTAL_URL}" "${DOWNLOAD_DIR}/dvdrental.zip"; then
+    rm -f "${DOWNLOAD_DIR}/dvdrental.zip"
+    download_first_available \
+      "${DOWNLOAD_DIR}/dvdrental.tar" \
+      "${SAMPLE_DVDRENTAL_FALLBACK_URL}"
+  fi
+fi

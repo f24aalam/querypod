@@ -8,38 +8,44 @@ import '../features/editor/presentation/pages/connection_page.dart';
 import '../features/workspaces/presentation/pages/workspaces_page.dart';
 import '../features/editor/presentation/widgets/app_menu_bar.dart';
 
-final router = GoRouter(
-  routes: [
-    ShellRoute(
-      builder: (context, state, child) {
-        return AppMenuShell(child: child);
-      },
-      routes: [
-        GoRoute(
-          path: '/',
-          pageBuilder: (context, state) =>
-              _fadePage(key: state.pageKey, child: const WorkspacesPage()),
-        ),
-        GoRoute(
-          path: '/workspace/:id',
-          redirect: (context, state) {
-            final id = state.pathParameters['id'];
-            if (id != null) {
-              final cubit = context.read<ConnectionCubit>();
-              if (cubit.state.activeWorkspaceId != id) {
-                cubit.setWorkspace(id);
+GoRouter buildRouter({String initialLocation = '/'}) {
+  return GoRouter(
+    initialLocation: initialLocation,
+    routes: [
+      ShellRoute(
+        builder: (context, state, child) {
+          return AppMenuShell(child: child);
+        },
+        routes: [
+          GoRoute(
+            path: '/',
+            pageBuilder: (context, state) =>
+                _fadePage(key: state.pageKey, child: const WorkspacesPage()),
+          ),
+          GoRoute(
+            path: '/workspace/:id',
+            redirect: (context, state) {
+              final id = state.pathParameters['id'];
+              if (id != null) {
+                final cubit = context.read<ConnectionCubit>();
+                if (cubit.state.activeWorkspaceId != id) {
+                  cubit.setWorkspace(id);
+                }
               }
-            }
-            return null;
-          },
-          pageBuilder: (context, state) {
-            return _fadePage(key: state.pageKey, child: const ConnectionPage());
-          },
-        ),
-      ],
-    ),
-  ],
-);
+              return null;
+            },
+            pageBuilder: (context, state) {
+              return _fadePage(
+                key: state.pageKey,
+                child: const ConnectionPage(),
+              );
+            },
+          ),
+        ],
+      ),
+    ],
+  );
+}
 
 CustomTransitionPage<void> _fadePage({
   required LocalKey key,

@@ -39,6 +39,7 @@ SAMPLE_SAKILA_URL="https://downloads.mysql.com/docs/sakila-db.tar.gz"
 SAMPLE_WORLD_URL="https://downloads.mysql.com/docs/world-db.tar.gz"
 SAMPLE_EMPLOYEES_URL="https://github.com/datacharmer/test_db/archive/refs/heads/master.tar.gz"
 SAMPLE_DVDRENTAL_URL="https://www.postgresqltutorial.com/wp-content/uploads/2019/05/dvdrental.zip"
+SAMPLE_DVDRENTAL_FALLBACK_URL="https://raw.githubusercontent.com/robconery/dvdrental/master/dvdrental.tar"
 
 COMPOSE_CMD=(docker compose -f "${COMPOSE_FILE}")
 
@@ -152,6 +153,32 @@ download_if_missing() {
   curl -fL "${url}" -o "${output}"
 }
 
+download_first_available() {
+  local output="${1}"
+  shift
+
+  if [[ -f "${output}" ]]; then
+    log "Using cached download $(basename "${output}")"
+    return 0
+  fi
+
+  require_cmd curl
+
+  local url
+  local errors=()
+  for url in "$@"; do
+    log "Downloading $(basename "${output}") from ${url}"
+    if curl -fL "${url}" -o "${output}"; then
+      return 0
+    fi
+
+    errors+=("${url}")
+    rm -f "${output}"
+  done
+
+  die "Failed to download $(basename "${output}") from all configured sources: ${errors[*]}"
+}
+
 extract_tarball() {
   local archive="${1}"
   local destination="${2}"
@@ -195,4 +222,11 @@ sample_enabled() {
       [[ "${requested}" == "${sample}" ]]
       ;;
   esac
+}
+
+find_sample_file() {
+  local root="${1}"
+  local name="${2}"
+
+  find "${root}" -maxdepth 3 -type f -name "${name}" | head -n 1
 }

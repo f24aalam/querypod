@@ -10,8 +10,13 @@ target="${1:-all}"
 
 if sample_enabled "${target}" "sakila"; then
   ensure_target_running mysql
+  sakila_schema="$(find_sample_file "${PREPARED_DIR}/sakila" 'sakila-schema.sql')"
+  sakila_data="$(find_sample_file "${PREPARED_DIR}/sakila" 'sakila-data.sql')"
+  [[ -n "${sakila_schema}" ]] || die "Prepared Sakila schema file is missing"
+  [[ -n "${sakila_data}" ]] || die "Prepared Sakila data file is missing"
   mysql_exec -e "DROP DATABASE IF EXISTS sakila; CREATE DATABASE sakila;"
-  cat "${PREPARED_DIR}/sakila/sakila-schema.sql" "${PREPARED_DIR}/sakila/sakila-data.sql" | mysql_exec sakila
+  cat "${sakila_schema}" "${sakila_data}" | mysql_exec sakila
+  mysql_exec -e "GRANT ALL PRIVILEGES ON sakila.* TO '${MYSQL_APP_USER}'@'%'; FLUSH PRIVILEGES;"
   log "Loaded MySQL sample database: sakila"
 fi
 
@@ -20,6 +25,7 @@ if sample_enabled "${target}" "world"; then
   mysql_exec -e "DROP DATABASE IF EXISTS world; CREATE DATABASE world;"
   world_sql="$(find "${PREPARED_DIR}/world" -maxdepth 2 -type f -name '*.sql' | head -n 1)"
   mysql_exec world < "${world_sql}"
+  mysql_exec -e "GRANT ALL PRIVILEGES ON world.* TO '${MYSQL_APP_USER}'@'%'; FLUSH PRIVILEGES;"
   log "Loaded MySQL sample database: world"
 fi
 
@@ -32,6 +38,7 @@ if sample_enabled "${target}" "employees"; then
     cd "${employees_root}"
     mysql_exec < employees.sql
   )
+  mysql_exec -e "GRANT ALL PRIVILEGES ON employees.* TO '${MYSQL_APP_USER}'@'%'; FLUSH PRIVILEGES;"
   log "Loaded MySQL sample database: employees"
 fi
 
@@ -41,6 +48,6 @@ if sample_enabled "${target}" "dvdrental"; then
   [[ -n "${dvd_tar}" ]] || die "Prepared dvdrental archive is missing"
   postgres_psql -d postgres -c "DROP DATABASE IF EXISTS dvdrental;"
   postgres_psql -d postgres -c "CREATE DATABASE dvdrental;"
-  postgres_restore -d dvdrental < "${dvd_tar}"
+  postgres_restore --clean --if-exists --no-owner --no-privileges -d dvdrental < "${dvd_tar}"
   log "Loaded PostgreSQL sample database: dvdrental"
 fi

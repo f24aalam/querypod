@@ -9,8 +9,12 @@ target="${1:-all}"
 if sample_enabled "${target}" "sakila"; then
   download_if_missing "${SAMPLE_SAKILA_URL}" "${DOWNLOAD_DIR}/sakila-db.tar.gz"
   extract_tarball "${DOWNLOAD_DIR}/sakila-db.tar.gz" "${PREPARED_DIR}/sakila"
-  [[ -f "${PREPARED_DIR}/sakila/sakila-schema.sql" ]] || die "Expected sakila-schema.sql after extraction"
-  [[ -f "${PREPARED_DIR}/sakila/sakila-data.sql" ]] || die "Expected sakila-data.sql after extraction"
+  sakila_schema="$(find_sample_file "${PREPARED_DIR}/sakila" 'sakila-schema.sql')"
+  sakila_data="$(find_sample_file "${PREPARED_DIR}/sakila" 'sakila-data.sql')"
+  [[ -n "${sakila_schema}" ]] || die "Expected sakila-schema.sql after extraction"
+  [[ -n "${sakila_data}" ]] || die "Expected sakila-data.sql after extraction"
+  normalize_line_endings "${sakila_schema}"
+  normalize_line_endings "${sakila_data}"
 fi
 
 if sample_enabled "${target}" "world"; then
@@ -33,8 +37,17 @@ if sample_enabled "${target}" "employees"; then
 fi
 
 if sample_enabled "${target}" "dvdrental"; then
-  download_if_missing "${SAMPLE_DVDRENTAL_URL}" "${DOWNLOAD_DIR}/dvdrental.zip"
-  extract_zip "${DOWNLOAD_DIR}/dvdrental.zip" "${PREPARED_DIR}/dvdrental"
+  rm -rf "${PREPARED_DIR}/dvdrental"
+  if download_if_missing "${SAMPLE_DVDRENTAL_URL}" "${DOWNLOAD_DIR}/dvdrental.zip"; then
+    extract_zip "${DOWNLOAD_DIR}/dvdrental.zip" "${PREPARED_DIR}/dvdrental"
+  else
+    rm -f "${DOWNLOAD_DIR}/dvdrental.zip"
+    download_first_available \
+      "${DOWNLOAD_DIR}/dvdrental.tar" \
+      "${SAMPLE_DVDRENTAL_FALLBACK_URL}"
+    mkdir -p "${PREPARED_DIR}/dvdrental"
+    cp "${DOWNLOAD_DIR}/dvdrental.tar" "${PREPARED_DIR}/dvdrental/dvdrental.tar"
+  fi
   dvd_tar="$(find "${PREPARED_DIR}/dvdrental" -maxdepth 2 -type f -name 'dvdrental.tar' | head -n 1)"
   [[ -n "${dvd_tar}" ]] || die "Expected dvdrental.tar in the extracted archive"
 fi

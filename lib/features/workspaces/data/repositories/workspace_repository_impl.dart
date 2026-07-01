@@ -6,12 +6,20 @@ import '../../domain/repositories/workspace_repository.dart';
 class WorkspaceRepositoryImpl implements WorkspaceRepository {
   final SharedPreferences _prefs;
   static const _workspacesKey = 'querypod_workspaces';
+  final String _workspacesStorageKey;
 
-  WorkspaceRepositoryImpl(this._prefs);
+  WorkspaceRepositoryImpl(this._prefs, {String keyNamespace = ''})
+    : _workspacesStorageKey = _withNamespace(_workspacesKey, keyNamespace);
+
+  static String _withNamespace(String key, String namespace) {
+    final normalized = namespace.trim();
+    if (normalized.isEmpty) return key;
+    return '${normalized}_$key';
+  }
 
   @override
   Future<List<AppWorkspace>> getWorkspaces() async {
-    final workspacesJson = _prefs.getStringList(_workspacesKey) ?? [];
+    final workspacesJson = _prefs.getStringList(_workspacesStorageKey) ?? [];
     return workspacesJson
         .map((json) => AppWorkspace.fromJson(jsonDecode(json)))
         .toList()
@@ -21,8 +29,10 @@ class WorkspaceRepositoryImpl implements WorkspaceRepository {
   @override
   Future<AppWorkspace> getWorkspace(String id) async {
     final workspaces = await getWorkspaces();
-    return workspaces.firstWhere((w) => w.id == id,
-        orElse: () => throw Exception('Workspace not found'));
+    return workspaces.firstWhere(
+      (w) => w.id == id,
+      orElse: () => throw Exception('Workspace not found'),
+    );
   }
 
   @override
@@ -38,7 +48,7 @@ class WorkspaceRepositoryImpl implements WorkspaceRepository {
     final workspaces = await getWorkspaces();
     final index = workspaces.indexWhere((w) => w.id == workspace.id);
     if (index == -1) throw Exception('Workspace not found');
-    
+
     workspaces[index] = workspace;
     await _saveWorkspaces(workspaces);
     return workspace;
@@ -52,8 +62,9 @@ class WorkspaceRepositoryImpl implements WorkspaceRepository {
   }
 
   Future<void> _saveWorkspaces(List<AppWorkspace> workspaces) async {
-    final workspacesJson =
-        workspaces.map((w) => jsonEncode(w.toJson())).toList();
-    await _prefs.setStringList(_workspacesKey, workspacesJson);
+    final workspacesJson = workspaces
+        .map((w) => jsonEncode(w.toJson()))
+        .toList();
+    await _prefs.setStringList(_workspacesStorageKey, workspacesJson);
   }
 }

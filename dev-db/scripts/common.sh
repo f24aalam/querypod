@@ -1,0 +1,170 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DEV_DB_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+PROJECT_ROOT="$(cd "${DEV_DB_DIR}/.." && pwd)"
+COMPOSE_FILE="${PROJECT_ROOT}/docker-compose.yml"
+DOWNLOAD_DIR="${DEV_DB_DIR}/downloads"
+PREPARED_DIR="${DEV_DB_DIR}/prepared"
+
+MYSQL_SERVICE="mysql80"
+POSTGRES_SERVICE="postgres16"
+MYSQL_CONTAINER="querypod-mysql80"
+POSTGRES_CONTAINER="querypod-postgres16"
+
+MYSQL_ROOT_PASSWORD="rootpass"
+MYSQL_APP_USER="querypod"
+MYSQL_APP_PASSWORD="querypod"
+MYSQL_APP_DB="querypod_lab"
+
+POSTGRES_APP_USER="querypod"
+POSTGRES_APP_PASSWORD="querypod"
+POSTGRES_APP_DB="querypod_lab"
+
+SAMPLE_SAKILA_URL="https://downloads.mysql.com/docs/sakila-db.tar.gz"
+SAMPLE_WORLD_URL="https://downloads.mysql.com/docs/world-db.tar.gz"
+SAMPLE_EMPLOYEES_URL="https://github.com/datacharmer/test_db/archive/refs/heads/master.tar.gz"
+SAMPLE_DVDRENTAL_URL="https://www.postgresqltutorial.com/wp-content/uploads/2019/05/dvdrental.zip"
+
+COMPOSE_CMD=(docker compose -f "${COMPOSE_FILE}")
+
+mkdir -p "${DOWNLOAD_DIR}" "${PREPARED_DIR}"
+
+log() {
+  printf '[dev-db] %s\n' "$*"
+}
+
+die() {
+  printf '[dev-db] ERROR: %s\n' "$*" >&2
+  exit 1
+}
+
+require_cmd() {
+  command -v "$1" >/dev/null 2>&1 || die "Missing required command: $1"
+}
+
+compose() {
+  (cd "${PROJECT_ROOT}" && "${COMPOSE_CMD[@]}" "$@")
+}
+
+service_for_target() {
+  case "${1:-both}" in
+    ""|both) ;;
+    mysql) printf '%s\n' "${MYSQL_SERVICE}" ;;
+    postgres) printf '%s\n' "${POSTGRES_SERVICE}" ;;
+    *) die "Unsupported target '${1}'. Use: mysql, postgres, or omit it." ;;
+  esac
+}
+
+ensure_target_running() {
+  local target="${1}"
+  case "${target}" in
+    mysql)
+      wait_for_service mysql
+      ;;
+    postgres)
+      wait_for_service postgres
+      ;;
+    *)
+      die "Unsupported target '${target}'"
+      ;;
+  esac
+}
+
+wait_for_service() {
+  local target="${1}"
+  local service
+
+  case "${target}" in
+    mysql) service="${MYSQL_SERVICE}" ;;
+    postgres) service="${POSTGRES_SERVICE}" ;;
+    *) die "Unsupported service '${target}'" ;;
+  esac
+
+  log "Waiting for ${service} to become healthy"
+  for _ in $(seq 1 60); do
+    local state
+    state="$(compose ps --format json "${service}" 2>/dev/null | sed -n 's/.*"Health":"\([^"]*\)".*/\1/p' | head -n 1)"
+    if [[ "${state}" == "healthy" ]]; then
+      log "${service} is healthy"
+      return 0
+    fi
+    sleep 2
+  done
+
+  compose ps
+  die "${service} did not become healthy in time"
+}
+
+mysql_exec() {
+  docker exec -i "${MYSQL_CONTAINER}" mysql -uroot "-p${MYSQL_ROOT_PASSWORD}" "$@"
+}
+
+postgres_psql() {
+  docker exec -i "${POSTGRES_CONTAINER}" psql -v ON_ERROR_STOP=1 -U "${POSTGRES_APP_USER}" "$@"
+}
+
+postgres_restore() {
+  docker exec -i "${POSTGRES_CONTAINER}" pg_restore -U "${POSTGRES_APP_USER}" "$@"
+}
+
+download_if_missing() {
+  local url="${1}"
+  local output="${2}"
+
+  if [[ -f "${output}" ]]; then
+    log "Using cached download $(basename "${output}")"
+    return 0
+  fi
+
+  require_cmd curl
+  log "Downloading $(basename "${output}")"
+  curl -fL "${url}" -o "${output}"
+}
+
+extract_tarball() {
+  local archive="${1}"
+  local destination="${2}"
+
+  require_cmd tar
+  rm -rf "${destination}"
+  mkdir -p "${destination}"
+  tar -xzf "${archive}" -C "${destination}"
+}
+
+extract_zip() {
+  local archive="${1}"
+  local destination="${2}"
+
+  require_cmd unzip
+  rm -rf "${destination}"
+  mkdir -p "${destination}"
+  unzip -oq "${archive}" -d "${destination}"
+}
+
+normalize_line_endings() {
+  local path="${1}"
+  if command -v perl >/dev/null 2>&1; then
+    perl -pi -e 's/\r\n/\n/g' "${path}"
+  fi
+}
+
+sample_enabled() {
+  local requested="${1:-all}"
+  local sample="${2}"
+
+  case "${requested}" in
+    all) return 0 ;;
+    mysql)
+      [[ "${sample}" == "sakila" || "${sample}" == "world" || "${sample}" == "employees" ]]
+      ;;
+    postgres)
+      [[ "${sample}" == "dvdrental" ]]
+      ;;
+    *)
+      [[ "${requested}" == "${sample}" ]]
+      ;;
+  esac
+}

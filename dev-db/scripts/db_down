@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+source "$(cd "$(dirname "$0")" && pwd)/common.sh"
+
+target="${1:-both}"
+service="$(service_for_target "${target}")"
+
+if [[ -n "${service}" ]]; then
+  compose stop "${service}"
+else
+  compose down
+fi

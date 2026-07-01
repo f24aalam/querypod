@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+source "$(cd "$(dirname "$0")" && pwd)/common.sh"
+
+target="${1:-both}"
+
+case "${target}" in
+  both)
+    compose down -v
+    compose up -d
+    wait_for_service mysql
+    wait_for_service postgres
+    ;;
+  mysql)
+    compose rm -sf "${MYSQL_SERVICE}"
+    docker volume rm querypod-dev-db_mysql80_data >/dev/null 2>&1 || true
+    compose up -d "${MYSQL_SERVICE}"
+    wait_for_service mysql
+    ;;
+  postgres)
+    compose rm -sf "${POSTGRES_SERVICE}"
+    docker volume rm querypod-dev-db_postgres16_data >/dev/null 2>&1 || true
+    compose up -d "${POSTGRES_SERVICE}"
+    wait_for_service postgres
+    ;;
+  *)
+    die "Unsupported target '${target}'. Use: mysql, postgres, or omit it."
+    ;;
+esac

@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+source "$(cd "$(dirname "$0")" && pwd)/common.sh"
+
+target="${1:-all}"
+
+if sample_enabled "${target}" "sakila"; then
+  download_if_missing "${SAMPLE_SAKILA_URL}" "${DOWNLOAD_DIR}/sakila-db.tar.gz"
+  extract_tarball "${DOWNLOAD_DIR}/sakila-db.tar.gz" "${PREPARED_DIR}/sakila"
+  [[ -f "${PREPARED_DIR}/sakila/sakila-schema.sql" ]] || die "Expected sakila-schema.sql after extraction"
+  [[ -f "${PREPARED_DIR}/sakila/sakila-data.sql" ]] || die "Expected sakila-data.sql after extraction"
+fi
+
+if sample_enabled "${target}" "world"; then
+  download_if_missing "${SAMPLE_WORLD_URL}" "${DOWNLOAD_DIR}/world-db.tar.gz"
+  extract_tarball "${DOWNLOAD_DIR}/world-db.tar.gz" "${PREPARED_DIR}/world"
+  world_sql="$(find "${PREPARED_DIR}/world" -maxdepth 2 -type f -name '*.sql' | head -n 1)"
+  [[ -n "${world_sql}" ]] || die "Expected a SQL file in the world archive"
+  normalize_line_endings "${world_sql}"
+fi
+
+if sample_enabled "${target}" "employees"; then
+  download_if_missing "${SAMPLE_EMPLOYEES_URL}" "${DOWNLOAD_DIR}/employees-master.tar.gz"
+  extract_tarball "${DOWNLOAD_DIR}/employees-master.tar.gz" "${PREPARED_DIR}/employees"
+  employees_root="$(find "${PREPARED_DIR}/employees" -maxdepth 1 -mindepth 1 -type d | head -n 1)"
+  [[ -n "${employees_root}" ]] || die "Expected extracted employees directory"
+  [[ -f "${employees_root}/employees.sql" ]] || die "Expected employees.sql in employees archive"
+  find "${employees_root}" -type f \( -name '*.sql' -o -name '*.dump' \) -print0 | while IFS= read -r -d '' file; do
+    normalize_line_endings "${file}"
+  done
+fi
+
+if sample_enabled "${target}" "dvdrental"; then
+  download_if_missing "${SAMPLE_DVDRENTAL_URL}" "${DOWNLOAD_DIR}/dvdrental.zip"
+  extract_zip "${DOWNLOAD_DIR}/dvdrental.zip" "${PREPARED_DIR}/dvdrental"
+  dvd_tar="$(find "${PREPARED_DIR}/dvdrental" -maxdepth 2 -type f -name 'dvdrental.tar' | head -n 1)"
+  [[ -n "${dvd_tar}" ]] || die "Expected dvdrental.tar in the extracted archive"
+fi
+
+log "Prepared sample datasets for target '${target}'"

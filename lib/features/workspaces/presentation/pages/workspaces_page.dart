@@ -8,6 +8,7 @@ import '../cubit/workspaces_cubit.dart';
 import '../cubit/workspaces_state.dart';
 import '../../../connections/presentation/cubit/connection_cubit.dart';
 import '../../../editor/presentation/widgets/app_title_bar.dart';
+import '../../domain/entities/app_workspace.dart';
 
 class WorkspacesPage extends StatefulWidget {
   const WorkspacesPage({super.key});
@@ -21,6 +22,78 @@ class _WorkspacesPageState extends State<WorkspacesPage> {
   void initState() {
     super.initState();
     context.read<WorkspacesCubit>().loadWorkspaces();
+  }
+
+  void _showDeleteDialog(AppWorkspace workspace) {
+    showFDialog(
+      context: context,
+      builder: (context, style, animation) => FDialog(
+        animation: animation,
+        direction: Axis.horizontal,
+        title: const Text('Delete Workspace'),
+        body: Text('Are you sure you want to delete "${workspace.name}"?'),
+        actions: [
+          FButton(
+            variant: FButtonVariant.destructive,
+            onPress: () async {
+              Navigator.of(context).pop();
+              this.context.read<WorkspacesCubit>().deleteWorkspace(workspace.id);
+            },
+            child: const Text('Delete'),
+          ),
+          FButton(
+            variant: FButtonVariant.outline,
+            onPress: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showRenameDialog(AppWorkspace workspace) {
+    final controller = TextEditingController(text: workspace.name);
+
+    showFDialog(
+      context: context,
+      builder: (dialogContext, style, animation) => StatefulBuilder(
+        builder: (context, setState) {
+          final trimmed = controller.text.trim();
+          final isValid = trimmed.isNotEmpty && trimmed != workspace.name;
+
+          return FDialog(
+            animation: animation,
+            direction: Axis.horizontal,
+            title: const Text('Rename Workspace'),
+            body: FTextField(
+              autofocus: true,
+              control: FTextFieldControl.managed(
+                controller: controller,
+                onChange: (_) => setState(() {}),
+              ),
+              hint: 'Workspace name',
+            ),
+            actions: [
+              FButton(
+                onPress: !isValid
+                    ? null
+                    : () {
+                        Navigator.of(dialogContext).pop();
+                        final updated = workspace.copyWith(name: trimmed);
+                        this.context.read<WorkspacesCubit>().updateWorkspace(updated);
+                      },
+                child: const Text('Rename'),
+              ),
+              FButton(
+                variant: FButtonVariant.outline,
+                onPress: () => Navigator.of(dialogContext).pop(),
+                child: const Text('Cancel'),
+              ),
+            ],
+          );
+        },
+      ),
+    ).whenComplete(controller.dispose);
   }
 
   void _showCreateDialog() {
@@ -171,14 +244,37 @@ class _WorkspacesPageState extends State<WorkspacesPage> {
                                           ),
                                         ),
                                         const Spacer(),
-                                        IconButton(
-                                          icon: Icon(
-                                            Icons.more_horiz,
-                                            color: context.theme.colors.mutedForeground,
+                                        FPopoverMenu(
+                                          menuBuilder: (context, controller, menu) => [
+                                            FItemGroup(
+                                              children: [
+                                                FItem(
+                                                  title: const Text('Rename'),
+                                                  prefix: const Icon(Icons.drive_file_rename_outline, size: 14),
+                                                  onPress: () {
+                                                    controller.hide();
+                                                    _showRenameDialog(workspace);
+                                                  },
+                                                ),
+                                                FItem(
+                                                  title: const Text('Delete'),
+                                                  prefix: const Icon(Icons.delete_outline, size: 14),
+                                                  variant: FItemVariant.destructive,
+                                                  onPress: () {
+                                                    controller.hide();
+                                                    _showDeleteDialog(workspace);
+                                                  },
+                                                ),
+                                              ],
+                                            ),
+                                          ],
+                                          builder: (context, controller, child) => IconButton(
+                                            icon: Icon(
+                                              Icons.more_horiz,
+                                              color: context.theme.colors.mutedForeground,
+                                            ),
+                                            onPressed: () => controller.toggle(),
                                           ),
-                                          onPressed: () {
-                                            // Handle edit/delete context menu later
-                                          },
                                         ),
                                       ],
                                     ),

@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+source "$(cd "$(dirname "$0")" && pwd)/common.sh"
+
+target="${1:-both}"
+service="$(service_for_target "${target}")"
+
+if [[ -n "${service}" ]]; then
+  compose up -d "${service}"
+else
+  compose up -d
+fi
+
+if [[ "${target}" == "mysql" ]]; then
+  wait_for_service mysql
+elif [[ "${target}" == "postgres" ]]; then
+  wait_for_service postgres
+else
+  wait_for_service mysql
+  wait_for_service postgres
+fi

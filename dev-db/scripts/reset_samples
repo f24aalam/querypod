@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+source "$(cd "$(dirname "$0")" && pwd)/common.sh"
+
+target="${1:-all}"
+
+if sample_enabled "${target}" "sakila" || sample_enabled "${target}" "world" || sample_enabled "${target}" "employees"; then
+  ensure_target_running mysql
+  sample_enabled "${target}" "sakila" && mysql_exec -e "DROP DATABASE IF EXISTS sakila;"
+  sample_enabled "${target}" "world" && mysql_exec -e "DROP DATABASE IF EXISTS world;"
+  sample_enabled "${target}" "employees" && mysql_exec -e "DROP DATABASE IF EXISTS employees;"
+fi
+
+if sample_enabled "${target}" "dvdrental"; then
+  ensure_target_running postgres
+  postgres_psql -d postgres -c "DROP DATABASE IF EXISTS dvdrental;"
+fi
+
+"${SCRIPT_DIR}/load_samples" "${target}"

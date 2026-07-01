@@ -1,0 +1,49 @@
+name: querypod-dev-db
+
+services:
+  mysql80:
+    image: mysql:8.0
+    container_name: querypod-mysql80
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_DATABASE: querypod_lab
+      MYSQL_USER: querypod
+      MYSQL_PASSWORD: querypod
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+    volumes:
+      - mysql80_data:/var/lib/mysql
+      - ./dev-db/mysql/init:/docker-entrypoint-initdb.d:ro
+
+  postgres16:
+    image: postgres:16
+    container_name: querypod-postgres16
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: querypod
+      POSTGRES_PASSWORD: querypod
+      POSTGRES_DB: querypod_lab
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+    volumes:
+      - postgres16_data:/var/lib/postgresql/data
+      - ./dev-db/postgres/init:/docker-entrypoint-initdb.d:ro
+
+volumes:
+  mysql80_data:
+  postgres16_data:

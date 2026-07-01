@@ -14,15 +14,30 @@ class ConnectionRepositoryImpl implements ConnectionRepository {
 
   final FlutterSecureStorage _secureStorage;
   final SharedPreferences _prefs;
+  final String _connectionsStorageKey;
+  final String _selectedConnectionStorageKey;
+  final String _passwordStoragePrefix;
 
   ConnectionRepositoryImpl({
     required this._secureStorage,
     required this._prefs,
-  });
+    String keyNamespace = '',
+  }) : _connectionsStorageKey = _withNamespace(_connectionsKey, keyNamespace),
+       _selectedConnectionStorageKey = _withNamespace(
+         _selectedConnectionKey,
+         keyNamespace,
+       ),
+       _passwordStoragePrefix = _withNamespace(_passwordPrefix, keyNamespace);
+
+  static String _withNamespace(String key, String namespace) {
+    final normalized = namespace.trim();
+    if (normalized.isEmpty) return key;
+    return '${normalized}_$key';
+  }
 
   @override
   Future<List<Connection>> getAll() async {
-    final jsonStr = _prefs.getString(_connectionsKey);
+    final jsonStr = _prefs.getString(_connectionsStorageKey);
     if (jsonStr == null) return [];
 
     final List<dynamic> jsonList = jsonDecode(jsonStr);
@@ -61,7 +76,7 @@ class ConnectionRepositoryImpl implements ConnectionRepository {
     }
 
     await _secureStorage.write(
-      key: _passwordPrefix + connection.id,
+      key: _passwordStoragePrefix + connection.id,
       value: connection.password,
     );
 
@@ -69,7 +84,7 @@ class ConnectionRepositoryImpl implements ConnectionRepository {
         .map((c) => ConnectionModel.fromEntity(c).toJsonMap())
         .toList();
 
-    await _prefs.setString(_connectionsKey, jsonEncode(modelsJson));
+    await _prefs.setString(_connectionsStorageKey, jsonEncode(modelsJson));
 
     return connection;
   }
@@ -79,26 +94,26 @@ class ConnectionRepositoryImpl implements ConnectionRepository {
     final connections = await getAll();
     connections.removeWhere((c) => c.id == id);
 
-    await _secureStorage.delete(key: _passwordPrefix + id);
+    await _secureStorage.delete(key: _passwordStoragePrefix + id);
 
     final modelsJson = connections
         .map((c) => ConnectionModel.fromEntity(c).toJsonMap())
         .toList();
 
-    await _prefs.setString(_connectionsKey, jsonEncode(modelsJson));
+    await _prefs.setString(_connectionsStorageKey, jsonEncode(modelsJson));
   }
 
   @override
   Future<String?> getSelectedId() async =>
-      _prefs.getString(_selectedConnectionKey);
+      _prefs.getString(_selectedConnectionStorageKey);
 
   @override
   Future<void> setSelectedId(String? id) async {
     if (id == null) {
-      await _prefs.remove(_selectedConnectionKey);
+      await _prefs.remove(_selectedConnectionStorageKey);
       return;
     }
 
-    await _prefs.setString(_selectedConnectionKey, id);
+    await _prefs.setString(_selectedConnectionStorageKey, id);
   }
 }

@@ -1,0 +1,135 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+source "$(cd "$(dirname "$0")" && pwd)/common.sh"
+
+platform=""
+db=""
+example=""
+port=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --platform)
+      [[ $# -ge 2 ]] || die "Missing value for --platform"
+      platform="$2"
+      shift 2
+      ;;
+    --db)
+      [[ $# -ge 2 ]] || die "Missing value for --db"
+      db="$2"
+      shift 2
+      ;;
+    --example)
+      [[ $# -ge 2 ]] || die "Missing value for --example"
+      example="$2"
+      shift 2
+      ;;
+    --port)
+      [[ $# -ge 2 ]] || die "Missing value for --port"
+      port="$2"
+      shift 2
+      ;;
+    *)
+      die "Unsupported argument '$1'. Use --platform, --db, --example, and --port."
+      ;;
+  esac
+done
+
+[[ -n "${platform}" ]] || die "PLATFORM is required. Example: make run-app PLATFORM=linux DB=mysql"
+[[ "${platform}" == "linux" ]] || die "Unsupported platform '${platform}'. Only linux is supported right now."
+
+if [[ -n "${db}" && -n "${example}" ]]; then
+  die "DB and EXAMPLE are mutually exclusive. Choose exactly one."
+fi
+
+if [[ -z "${db}" && -z "${example}" ]]; then
+  die "Set exactly one of DB or EXAMPLE. Examples: make run-app PLATFORM=linux DB=mysql or make run-app PLATFORM=linux EXAMPLE=sakila"
+fi
+
+if [[ "${db}" == *","* ]]; then
+  die "DB accepts exactly one value. Use DB=mysql or DB=postgres."
+fi
+
+if [[ "${example}" == *","* ]]; then
+  die "EXAMPLE accepts exactly one value. Use EXAMPLE=sakila, EXAMPLE=world, EXAMPLE=employees, or EXAMPLE=dvdrental."
+fi
+
+target=""
+kind=""
+if [[ -n "${db}" ]]; then
+  case "${db}" in
+    mysql|postgres)
+      target="${db}"
+      kind="${db}"
+      ;;
+    *)
+      die "Unsupported DB '${db}'. Use mysql or postgres."
+      ;;
+  esac
+fi
+
+if [[ -n "${example}" ]]; then
+  case "${example}" in
+    sakila|world|employees)
+      target="${example}"
+      kind="mysql"
+      ;;
+    dvdrental)
+      target="${example}"
+      kind="postgres"
+      ;;
+    *)
+      die "Unsupported EXAMPLE '${example}'. Use sakila, world, employees, or dvdrental."
+      ;;
+  esac
+fi
+
+if [[ -n "${port}" ]] && ! [[ "${port}" =~ ^[0-9]+$ ]]; then
+  die "PORT must be a single integer value."
+fi
+
+current_port=""
+suggested_port=""
+command_hint=""
+selection_hint=""
+
+if [[ -n "${db}" ]]; then
+  selection_hint="DB=${db}"
+else
+  selection_hint="EXAMPLE=${example}"
+fi
+
+case "${kind}" in
+  mysql)
+    current_port="${MYSQL_PORT}"
+    suggested_port="3307"
+    command_hint="make run-app PLATFORM=linux ${selection_hint} PORT=${suggested_port}"
+    ;;
+  postgres)
+    current_port="${POSTGRES_PORT}"
+    suggested_port="5433"
+    command_hint="make run-app PLATFORM=linux ${selection_hint} PORT=${suggested_port}"
+    ;;
+  *)
+    die "Unable to resolve launch kind for target '${target}'."
+    ;;
+esac
+
+if [[ -z "${port}" ]] && is_port_in_use "${current_port}"; then
+  die "Host port ${current_port} is already in use, so Docker cannot expose the ${kind} service there. Retry with a one-off override, for example: ${command_hint}"
+fi
+
+if [[ -n "${port}" ]]; then
+  case "${kind}" in
+    mysql)
+      export QUERYPOD_MYSQL_PORT="${port}"
+      ;;
+    postgres)
+      export QUERYPOD_PG_PORT="${port}"
+      ;;
+  esac
+fi
+
+exec "${SCRIPT_DIR}/run_linux_app" "${target}"

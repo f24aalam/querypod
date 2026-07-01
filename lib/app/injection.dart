@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite_common/sqlite_api.dart';
 
 import '../app/database.dart';
+import '../app/launch_bootstrap.dart';
 import '../features/connections/data/repositories/connection_repository_impl.dart';
 import '../features/connections/domain/repositories/connection_repository.dart';
 import '../features/connections/presentation/cubit/connection_cubit.dart';
@@ -26,14 +27,21 @@ final getIt = GetIt.instance;
 
 Future<void> configureDependencies({
   required DatabaseFactory databaseFactory,
+  LaunchBootstrapConfig launchBootstrap = const LaunchBootstrapConfig(
+    profileNamespace: '',
+    preset: null,
+  ),
 }) async {
   final prefs = await SharedPreferences.getInstance();
   const secureStorage = FlutterSecureStorage();
   final database = await openAppDatabase(databaseFactory: databaseFactory);
-
-  getIt.registerLazySingleton<ConnectionRepository>(
-    () => ConnectionRepositoryImpl(secureStorage: secureStorage, prefs: prefs),
+  final connectionRepository = ConnectionRepositoryImpl(
+    secureStorage: secureStorage,
+    prefs: prefs,
+    keyNamespace: launchBootstrap.profileNamespace,
   );
+
+  getIt.registerLazySingleton<ConnectionRepository>(() => connectionRepository);
   getIt.registerLazySingleton<QueryRepository>(
     () => QueryRepositoryImpl(database: database),
   );
@@ -63,4 +71,13 @@ Future<void> configureDependencies({
   getIt.registerFactory(() => ConnectionMetadataCubit(repository: getIt()));
   getIt.registerFactory(() => TableDataCubit(repository: getIt()));
   getIt.registerFactory(() => WorkspacesCubit(repository: getIt()));
+
+  final preset = launchBootstrap.preset;
+  if (preset != null) {
+    final connection = preset.toConnection();
+    await connectionRepository.save(connection);
+    if (preset.selectAfterSave) {
+      await connectionRepository.setSelectedId(connection.id);
+    }
+  }
 }

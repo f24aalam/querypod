@@ -8,11 +8,23 @@ PROJECT_ROOT="$(cd "${DEV_DB_DIR}/.." && pwd)"
 COMPOSE_FILE="${PROJECT_ROOT}/docker-compose.yml"
 DOWNLOAD_DIR="${DEV_DB_DIR}/downloads"
 PREPARED_DIR="${DEV_DB_DIR}/prepared"
+ENV_FILE="${PROJECT_ROOT}/.env"
+
+if [[ -f "${ENV_FILE}" ]]; then
+  set -a
+  # shellcheck source=/dev/null
+  source "${ENV_FILE}"
+  set +a
+fi
 
 MYSQL_SERVICE="mysql80"
 POSTGRES_SERVICE="postgres16"
 MYSQL_CONTAINER="querypod-mysql80"
 POSTGRES_CONTAINER="querypod-postgres16"
+MYSQL_HOST="${QUERYPOD_MYSQL_HOST:-127.0.0.1}"
+POSTGRES_HOST="${QUERYPOD_PG_HOST:-127.0.0.1}"
+MYSQL_PORT="${QUERYPOD_MYSQL_PORT:-3306}"
+POSTGRES_PORT="${QUERYPOD_PG_PORT:-5432}"
 
 MYSQL_ROOT_PASSWORD="rootpass"
 MYSQL_APP_USER="querypod"
@@ -43,6 +55,22 @@ die() {
 
 require_cmd() {
   command -v "$1" >/dev/null 2>&1 || die "Missing required command: $1"
+}
+
+is_port_in_use() {
+  local port="${1}"
+
+  if command -v lsof >/dev/null 2>&1; then
+    lsof -iTCP:"${port}" -sTCP:LISTEN >/dev/null 2>&1
+    return $?
+  fi
+
+  if command -v ss >/dev/null 2>&1; then
+    ss -ltn "( sport = :${port} )" 2>/dev/null | tail -n +2 | grep -q .
+    return $?
+  fi
+
+  return 1
 }
 
 compose() {

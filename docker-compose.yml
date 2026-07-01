@@ -5,7 +5,7 @@ services:
     image: mysql:8.0
     container_name: querypod-mysql80
     ports:
-      - "3306:3306"
+      - "${QUERYPOD_MYSQL_PORT:-3306}:3306"
     environment:
       MYSQL_ROOT_PASSWORD: rootpass
       MYSQL_DATABASE: querypod_lab
@@ -29,7 +29,7 @@ services:
     image: postgres:16
     container_name: querypod-postgres16
     ports:
-      - "5432:5432"
+      - "${QUERYPOD_PG_PORT:-5432}:5432"
     environment:
       POSTGRES_USER: querypod
       POSTGRES_PASSWORD: querypod

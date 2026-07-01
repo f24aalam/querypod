@@ -4,12 +4,16 @@ import 'package:window_manager/window_manager.dart';
 
 import 'app/app.dart';
 import 'app/injection.dart';
+import 'app/launch_bootstrap.dart';
 import 'core/platform_utils.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   sqfliteFfiInit();
-  await configureDependencies(databaseFactory: databaseFactoryFfi);
+  await configureDependencies(
+    databaseFactory: databaseFactoryFfi,
+    launchBootstrap: LaunchBootstrapConfig.fromEnvironment(),
+  );
 
   if (isDesktop) {
     await windowManager.ensureInitialized();

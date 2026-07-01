@@ -12,6 +12,34 @@ The integration tests are focused on repository and data-source behavior only. T
 - `tar`
 - `unzip` for `dvdrental.zip`
 
+## Port configuration
+
+The Docker-exposed host ports are configurable through a root `.env` file.
+
+Start from:
+
+```bash
+cp .env.example .env
+```
+
+Default values:
+
+```bash
+QUERYPOD_MYSQL_HOST=127.0.0.1
+QUERYPOD_MYSQL_PORT=3306
+QUERYPOD_PG_HOST=127.0.0.1
+QUERYPOD_PG_PORT=5432
+```
+
+If `3306` or `5432` is already in use, change the host-side port in `.env`, for example:
+
+```bash
+QUERYPOD_MYSQL_PORT=3307
+QUERYPOD_PG_PORT=5433
+```
+
+The Compose file, Linux app launch helpers, and integration-test examples all read the same values.
+
 ## Layout
 
 - `docker-compose.yml`: MySQL and PostgreSQL services
@@ -24,15 +52,15 @@ The integration tests are focused on repository and data-source behavior only. T
 ## Local credentials
 
 - MySQL
-  - host: `127.0.0.1`
-  - port: `3306`
+  - host: `127.0.0.1` by default, or `QUERYPOD_MYSQL_HOST` from `.env`
+  - port: `3306` by default, or `QUERYPOD_MYSQL_PORT` from `.env`
   - user: `querypod`
   - password: `querypod`
   - root password: `rootpass`
   - seeded database: `querypod_lab`
 - PostgreSQL
-  - host: `127.0.0.1`
-  - port: `5432`
+  - host: `127.0.0.1` by default, or `QUERYPOD_PG_HOST` from `.env`
+  - port: `5432` by default, or `QUERYPOD_PG_PORT` from `.env`
   - user: `querypod`
   - password: `querypod`
   - seeded database: `querypod_lab`
@@ -88,9 +116,10 @@ Helper commands:
 ./dev-db/scripts/prepare_samples
 ./dev-db/scripts/load_samples
 ./dev-db/scripts/reset_samples
+./dev-db/scripts/run_app --platform linux --db mysql
 ```
 
-Each command also accepts one of:
+Each sample helper command also accepts one of:
 
 - `mysql`
 - `postgres`
@@ -113,6 +142,57 @@ Loaded sample database names:
 - PostgreSQL: `dvdrental`
 
 The third-party datasets are not loaded during `db_up`. That keeps the default startup fast and keeps the core QueryPod fixtures deterministic.
+
+## Launch the Linux app with a preset connection
+
+The Linux app can be launched directly against the local Docker databases with a pre-seeded QueryPod connection. These launch commands use an isolated dev-profile namespace for saved connections, so they do not overwrite the user’s normal saved connection list.
+
+Supported core DB values:
+
+- `mysql`
+- `postgres`
+
+Supported example values:
+
+- `sakila`
+- `world`
+- `employees`
+- `dvdrental`
+
+Preferred Make interface:
+
+```bash
+make run-app PLATFORM=linux DB=mysql
+make run-app PLATFORM=linux DB=postgres
+make run-app PLATFORM=linux EXAMPLE=sakila
+make run-app PLATFORM=linux EXAMPLE=dvdrental
+```
+
+Behavior:
+
+- `DB=mysql` and `DB=postgres` start the corresponding Docker service and launch the Linux app against `querypod_lab`
+- `EXAMPLE=sakila|world|employees|dvdrental` automatically load the sample database into Docker if needed, then launch the app against that database
+- the launched app starts with the preset connection already saved and selected
+- `DB` and `EXAMPLE` are mutually exclusive
+- each launch accepts exactly one value; comma-separated lists are rejected
+
+Direct script interface:
+
+```bash
+./dev-db/scripts/run_app --platform linux --db mysql
+./dev-db/scripts/run_app --platform linux --example sakila
+```
+
+Backward-compatible aliases:
+
+```bash
+make app-linux-mysql
+make app-linux-postgres
+make app-linux-sakila
+make app-linux-world
+make app-linux-employees
+make app-linux-dvdrental
+```
 
 ## Manual verification
 
@@ -158,13 +238,12 @@ Start the lab first:
 Run with environment variables:
 
 ```bash
-QUERYPOD_MYSQL_HOST=127.0.0.1 \
-QUERYPOD_MYSQL_PORT=3306 \
+set -a
+source .env
+set +a
 QUERYPOD_MYSQL_USER=querypod \
 QUERYPOD_MYSQL_PASSWORD=querypod \
 QUERYPOD_MYSQL_DATABASE=querypod_lab \
-QUERYPOD_PG_HOST=127.0.0.1 \
-QUERYPOD_PG_PORT=5432 \
 QUERYPOD_PG_USER=querypod \
 QUERYPOD_PG_PASSWORD=querypod \
 QUERYPOD_PG_DATABASE=querypod_lab \
@@ -175,13 +254,13 @@ Run with `--dart-define` values:
 
 ```bash
 flutter test integration_test \
-  --dart-define=QUERYPOD_MYSQL_HOST=127.0.0.1 \
-  --dart-define=QUERYPOD_MYSQL_PORT=3306 \
+  --dart-define=QUERYPOD_MYSQL_HOST=${QUERYPOD_MYSQL_HOST:-127.0.0.1} \
+  --dart-define=QUERYPOD_MYSQL_PORT=${QUERYPOD_MYSQL_PORT:-3306} \
   --dart-define=QUERYPOD_MYSQL_USER=querypod \
   --dart-define=QUERYPOD_MYSQL_PASSWORD=querypod \
   --dart-define=QUERYPOD_MYSQL_DATABASE=querypod_lab \
-  --dart-define=QUERYPOD_PG_HOST=127.0.0.1 \
-  --dart-define=QUERYPOD_PG_PORT=5432 \
+  --dart-define=QUERYPOD_PG_HOST=${QUERYPOD_PG_HOST:-127.0.0.1} \
+  --dart-define=QUERYPOD_PG_PORT=${QUERYPOD_PG_PORT:-5432} \
   --dart-define=QUERYPOD_PG_USER=querypod \
   --dart-define=QUERYPOD_PG_PASSWORD=querypod \
   --dart-define=QUERYPOD_PG_DATABASE=querypod_lab
@@ -191,6 +270,6 @@ The test config reader checks `--dart-define` first and then falls back to envir
 
 ## Notes
 
-- If port `3306` or `5432` is already in use, stop the conflicting local service or adjust `docker-compose.yml`.
+- If the default DB ports are already in use, set `QUERYPOD_MYSQL_PORT` and/or `QUERYPOD_PG_PORT` in `.env`.
 - `dev-db/downloads/` and `dev-db/prepared/` are intentionally ignored by git.
 - If an upstream sample URL changes, the download step will fail loudly instead of using an untrusted mirror.

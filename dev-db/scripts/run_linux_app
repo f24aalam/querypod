@@ -1,0 +1,96 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+source "$(cd "$(dirname "$0")" && pwd)/common.sh"
+
+require_cmd flutter
+
+target="${1:-}"
+[[ -n "${target}" ]] || die "Missing target. Use one of: mysql, postgres, sakila, world, employees, dvdrental."
+
+bootstrap_id=""
+bootstrap_name=""
+bootstrap_host=""
+bootstrap_port=""
+bootstrap_user=""
+bootstrap_password=""
+bootstrap_database=""
+bootstrap_type=""
+bootstrap_use_tls="false"
+profile_namespace=""
+
+configure_target() {
+  case "${target}" in
+    mysql)
+      compose up -d "${MYSQL_SERVICE}"
+      wait_for_service mysql
+      bootstrap_id="dev-mysql-querypod-lab"
+      bootstrap_name="Dev MySQL querypod_lab"
+      bootstrap_host="${MYSQL_HOST}"
+      bootstrap_port="${MYSQL_PORT}"
+      bootstrap_user="${MYSQL_APP_USER}"
+      bootstrap_password="${MYSQL_APP_PASSWORD}"
+      bootstrap_database="${MYSQL_APP_DB}"
+      bootstrap_type="mysql"
+      ;;
+    postgres)
+      compose up -d "${POSTGRES_SERVICE}"
+      wait_for_service postgres
+      bootstrap_id="dev-postgres-querypod-lab"
+      bootstrap_name="Dev PostgreSQL querypod_lab"
+      bootstrap_host="${POSTGRES_HOST}"
+      bootstrap_port="${POSTGRES_PORT}"
+      bootstrap_user="${POSTGRES_APP_USER}"
+      bootstrap_password="${POSTGRES_APP_PASSWORD}"
+      bootstrap_database="${POSTGRES_APP_DB}"
+      bootstrap_type="postgresql"
+      ;;
+    sakila|world|employees)
+      compose up -d "${MYSQL_SERVICE}"
+      wait_for_service mysql
+      "${SCRIPT_DIR}/load_samples" "${target}"
+      bootstrap_id="dev-mysql-${target}"
+      bootstrap_name="Dev MySQL ${target}"
+      bootstrap_host="${MYSQL_HOST}"
+      bootstrap_port="${MYSQL_PORT}"
+      bootstrap_user="${MYSQL_APP_USER}"
+      bootstrap_password="${MYSQL_APP_PASSWORD}"
+      bootstrap_database="${target}"
+      bootstrap_type="mysql"
+      ;;
+    dvdrental)
+      compose up -d "${POSTGRES_SERVICE}"
+      wait_for_service postgres
+      "${SCRIPT_DIR}/load_samples" "${target}"
+      bootstrap_id="dev-postgres-dvdrental"
+      bootstrap_name="Dev PostgreSQL dvdrental"
+      bootstrap_host="${POSTGRES_HOST}"
+      bootstrap_port="${POSTGRES_PORT}"
+      bootstrap_user="${POSTGRES_APP_USER}"
+      bootstrap_password="${POSTGRES_APP_PASSWORD}"
+      bootstrap_database="dvdrental"
+      bootstrap_type="postgresql"
+      ;;
+    *)
+      die "Unsupported target '${target}'. Use one of: mysql, postgres, sakila, world, employees, dvdrental."
+      ;;
+  esac
+}
+
+configure_target
+profile_namespace="dev_launch_${target}"
+
+log "Launching QueryPod Linux app for target '${target}'"
+exec flutter run -d linux \
+  --dart-define=QUERYPOD_PROFILE_NAMESPACE="${profile_namespace}" \
+  --dart-define=QUERYPOD_BOOTSTRAP_CONNECTION_ID="${bootstrap_id}" \
+  --dart-define=QUERYPOD_BOOTSTRAP_CONNECTION_NAME="${bootstrap_name}" \
+  --dart-define=QUERYPOD_BOOTSTRAP_HOST="${bootstrap_host}" \
+  --dart-define=QUERYPOD_BOOTSTRAP_PORT="${bootstrap_port}" \
+  --dart-define=QUERYPOD_BOOTSTRAP_USER="${bootstrap_user}" \
+  --dart-define=QUERYPOD_BOOTSTRAP_PASSWORD="${bootstrap_password}" \
+  --dart-define=QUERYPOD_BOOTSTRAP_DATABASE="${bootstrap_database}" \
+  --dart-define=QUERYPOD_BOOTSTRAP_TYPE="${bootstrap_type}" \
+  --dart-define=QUERYPOD_BOOTSTRAP_USE_TLS="${bootstrap_use_tls}" \
+  --dart-define=QUERYPOD_BOOTSTRAP_SELECT=true

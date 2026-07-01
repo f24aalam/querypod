@@ -1,8 +1,8 @@
 # QueryPod Dev DB Test Lab
 
-This lab provides a repeatable local database environment for QueryPod. It starts MySQL 8.0 and PostgreSQL 16, seeds a small QueryPod-owned fixture database named `querypod_lab`, and can optionally download and load trusted third-party sample databases for broader manual testing.
+This lab provides a repeatable local database environment for QueryPod. It starts MySQL 8.0 and PostgreSQL 16, seeds a small QueryPod-owned fixture database named `querypod_lab`, can optionally download and load trusted third-party sample databases for broader manual testing, and now supports repository-level Flutter/Dart integration tests against the seeded databases.
 
-Flutter is not connected to these containers yet. This phase only creates the database environment.
+The integration tests are focused on repository and data-source behavior only. They do not touch screens or UI widgets.
 
 ## Prerequisites
 
@@ -130,6 +130,64 @@ After loading optional samples:
 docker exec -it querypod-mysql80 mysql -uquerypod -pquerypod -e "SHOW DATABASES;"
 docker exec -it querypod-postgres16 psql -U querypod -d postgres -c "\l"
 ```
+
+## Repository integration tests
+
+These tests live under `integration_test/` and exercise only:
+
+- driver connection checks
+- `ConnectionMetadataRepositoryImpl`
+- `TableDataRepositoryImpl`
+
+They verify:
+
+- successful and failed connections
+- database/schema listing
+- table and column discovery
+- primary-key and foreign-key detection
+- simple `SELECT` execution
+- invalid SQL error shaping
+- paginated row reads against `large_events`
+
+Start the lab first:
+
+```bash
+./dev-db/scripts/db_reset
+```
+
+Run with environment variables:
+
+```bash
+QUERYPOD_MYSQL_HOST=127.0.0.1 \
+QUERYPOD_MYSQL_PORT=3306 \
+QUERYPOD_MYSQL_USER=querypod \
+QUERYPOD_MYSQL_PASSWORD=querypod \
+QUERYPOD_MYSQL_DATABASE=querypod_lab \
+QUERYPOD_PG_HOST=127.0.0.1 \
+QUERYPOD_PG_PORT=5432 \
+QUERYPOD_PG_USER=querypod \
+QUERYPOD_PG_PASSWORD=querypod \
+QUERYPOD_PG_DATABASE=querypod_lab \
+flutter test integration_test
+```
+
+Run with `--dart-define` values:
+
+```bash
+flutter test integration_test \
+  --dart-define=QUERYPOD_MYSQL_HOST=127.0.0.1 \
+  --dart-define=QUERYPOD_MYSQL_PORT=3306 \
+  --dart-define=QUERYPOD_MYSQL_USER=querypod \
+  --dart-define=QUERYPOD_MYSQL_PASSWORD=querypod \
+  --dart-define=QUERYPOD_MYSQL_DATABASE=querypod_lab \
+  --dart-define=QUERYPOD_PG_HOST=127.0.0.1 \
+  --dart-define=QUERYPOD_PG_PORT=5432 \
+  --dart-define=QUERYPOD_PG_USER=querypod \
+  --dart-define=QUERYPOD_PG_PASSWORD=querypod \
+  --dart-define=QUERYPOD_PG_DATABASE=querypod_lab
+```
+
+The test config reader checks `--dart-define` first and then falls back to environment variables. Missing values fail loudly with a setup message instead of silently skipping.
 
 ## Notes
 

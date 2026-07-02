@@ -9,8 +9,11 @@ import 'package:querypod/features/editor/data/repositories/table_data_repository
 import 'package:querypod/features/editor/domain/entities/connection_table.dart';
 import 'package:querypod/features/editor/domain/entities/query_history.dart';
 import 'package:querypod/features/editor/domain/repositories/query_history_repository.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
-enum TestDatabaseEngine { mysql, postgres }
+import 'sqlite_fixtures.dart';
+
+enum TestDatabaseEngine { mysql, postgres, sqlite }
 
 class DbIntegrationConfig {
   final TestDatabaseEngine engine;
@@ -30,9 +33,24 @@ class DbIntegrationConfig {
   });
 
   static DbIntegrationConfig requireFor(TestDatabaseEngine engine) {
+    // SQLite is file-based — no env vars needed.
+    if (engine == TestDatabaseEngine.sqlite) {
+      final tempDir = Directory.systemTemp.createTempSync('querypod_sqlite_');
+      final dbPath = '${tempDir.path}/querypod_lab_test.db';
+      return DbIntegrationConfig(
+        engine: engine,
+        host: '',
+        port: 0,
+        user: '',
+        password: '',
+        database: dbPath,
+      );
+    }
+
     final prefix = switch (engine) {
       TestDatabaseEngine.mysql => 'QUERYPOD_MYSQL',
       TestDatabaseEngine.postgres => 'QUERYPOD_PG',
+      TestDatabaseEngine.sqlite => '', // unreachable
     };
 
     String? read(String key) {
@@ -103,8 +121,9 @@ class DbIntegrationConfig {
       type: switch (engine) {
         TestDatabaseEngine.mysql => ConnectionType.mysql,
         TestDatabaseEngine.postgres => ConnectionType.postgresql,
+        TestDatabaseEngine.sqlite => ConnectionType.sqlite,
       },
-      useTls: false,
+      useTls: engine == TestDatabaseEngine.mysql,
     );
   }
 }
@@ -189,10 +208,15 @@ class RepositoryIntegrationHarness {
 
   Future<void> expectDatabaseVisible() async {
     final databases = await metadataRepository.listDatabases(connection);
-    expect(
-      databases.map((database) => database.name),
-      contains(config.database),
-    );
+    if (config.engine == TestDatabaseEngine.sqlite) {
+      // SQLite returns the filename as the database name.
+      expect(databases, isNotEmpty);
+    } else {
+      expect(
+        databases.map((database) => database.name),
+        contains(config.database),
+      );
+    }
   }
 
   Future<void> expectSeededTablesVisible() async {
@@ -347,12 +371,43 @@ void defineRepositoryIntegrationSuite(TestDatabaseEngine engine) {
   final config = DbIntegrationConfig.requireFor(engine);
   final harness = RepositoryIntegrationHarness(config);
 
+  // SQLite: initialize sqflite FFI and seed the temp database before tests.
+  if (engine == TestDatabaseEngine.sqlite) {
+    sqfliteFfiInit();
+    databaseFactory = databaseFactoryFfi;
+  }
+
   group('${engine.name} repository integration', () {
+    if (engine == TestDatabaseEngine.sqlite) {
+      setUpAll(() async {
+        final db = await databaseFactoryFfi.openDatabase(config.database);
+        await createSqliteFixtureSchema(db);
+        await seedSqliteFixtureData(db);
+        await db.close();
+      });
+
+      tearDownAll(() {
+        final dbFile = File(config.database);
+        if (dbFile.existsSync()) {
+          dbFile.deleteSync();
+        }
+        final tempDir = dbFile.parent;
+        if (tempDir.existsSync()) {
+          tempDir.deleteSync(recursive: true);
+        }
+      });
+    }
+
     test('successful connection', harness.expectSuccessfulConnection);
-    test(
-      'failed connection with wrong password',
-      harness.expectFailedConnectionWithWrongPassword,
-    );
+
+    // SQLite has no authentication — skip password test.
+    if (engine != TestDatabaseEngine.sqlite) {
+      test(
+        'failed connection with wrong password',
+        harness.expectFailedConnectionWithWrongPassword,
+      );
+    }
+
     test('list schemas/databases', harness.expectDatabaseVisible);
     test('list tables', harness.expectSeededTablesVisible);
     test('list columns', harness.expectProjectColumnsAndRelations);

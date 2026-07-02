@@ -73,19 +73,20 @@ jobs:
           done
 
       - name: Run integration tests
+        env:
+          QUERYPOD_MYSQL_HOST: 127.0.0.1
+          QUERYPOD_MYSQL_PORT: 3306
+          QUERYPOD_MYSQL_USER: querypod
+          QUERYPOD_MYSQL_PASSWORD: querypod
+          QUERYPOD_MYSQL_DATABASE: querypod_lab
+          QUERYPOD_PG_HOST: 127.0.0.1
+          QUERYPOD_PG_PORT: 5432
+          QUERYPOD_PG_USER: querypod
+          QUERYPOD_PG_PASSWORD: querypod
+          QUERYPOD_PG_DATABASE: querypod_lab
         run: |
           # Headless environment needs xvfb for desktop apps
           export DISPLAY=:99
           sudo Xvfb -ac :99 -screen 0 1280x1024x24 > /dev/null 2>&1 &
           
-          flutter test -d linux integration_test \
-            --dart-define=QUERYPOD_MYSQL_HOST=127.0.0.1 \
-            --dart-define=QUERYPOD_MYSQL_PORT=3306 \
-            --dart-define=QUERYPOD_MYSQL_USER=querypod \
-            --dart-define=QUERYPOD_MYSQL_PASSWORD=querypod \
-            --dart-define=QUERYPOD_MYSQL_DATABASE=querypod_lab \
-            --dart-define=QUERYPOD_PG_HOST=127.0.0.1 \
-            --dart-define=QUERYPOD_PG_PORT=5432 \
-            --dart-define=QUERYPOD_PG_USER=querypod \
-            --dart-define=QUERYPOD_PG_PASSWORD=querypod \
-            --dart-define=QUERYPOD_PG_DATABASE=querypod_lab
+          flutter test -d linux integration_test

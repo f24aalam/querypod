@@ -78,7 +78,7 @@ jobs:
           export DISPLAY=:99
           sudo Xvfb -ac :99 -screen 0 1280x1024x24 > /dev/null 2>&1 &
           
-          flutter test integration_test \
+          flutter test -d linux integration_test \
             --dart-define=QUERYPOD_MYSQL_HOST=127.0.0.1 \
             --dart-define=QUERYPOD_MYSQL_PORT=3306 \
             --dart-define=QUERYPOD_MYSQL_USER=querypod \

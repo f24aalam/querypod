@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:integration_test/integration_test.dart';
 import 'package:querypod/core/database/database_driver_factory.dart';
 import 'package:querypod/features/connections/domain/entities/connection.dart';
 import 'package:querypod/features/editor/data/repositories/connection_metadata_repository_impl.dart';
@@ -124,7 +123,7 @@ class DbIntegrationConfig {
         TestDatabaseEngine.postgres => ConnectionType.postgresql,
         TestDatabaseEngine.sqlite => ConnectionType.sqlite,
       },
-      useTls: false,
+      useTls: engine == TestDatabaseEngine.mysql,
     );
   }
 }
@@ -369,7 +368,6 @@ class RepositoryIntegrationHarness {
 }
 
 void defineRepositoryIntegrationSuite(TestDatabaseEngine engine) {
-  IntegrationTestWidgetsFlutterBinding.ensureInitialized();
   final config = DbIntegrationConfig.requireFor(engine);
   final harness = RepositoryIntegrationHarness(config);
 

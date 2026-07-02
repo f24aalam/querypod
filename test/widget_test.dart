@@ -35,7 +35,7 @@ void main() {
   });
 
   testWidgets('only the active editor is mounted', (tester) async {
-    await tester.pumpWidget(const App());
+    await tester.pumpWidget(const App(initialLocation: '/workspace/default'));
     await tester.pumpAndSettle();
     final context = tester.element(find.byType(ConnectionPage));
     final tabs = context.read<EditorTabsCubit>();
@@ -62,7 +62,7 @@ void main() {
   });
 
   testWidgets('opening an overflowed tab scrolls it into view', (tester) async {
-    await tester.pumpWidget(const App());
+    await tester.pumpWidget(const App(initialLocation: '/workspace/default'));
     await tester.pumpAndSettle();
     final context = tester.element(find.byType(ConnectionPage));
     final tabs = context.read<EditorTabsCubit>();
@@ -97,7 +97,7 @@ void main() {
   });
 
   testWidgets('tab body activates from blank area tap', (tester) async {
-    await tester.pumpWidget(const App());
+    await tester.pumpWidget(const App(initialLocation: '/workspace/default'));
     await tester.pumpAndSettle();
     final context = tester.element(find.byType(ConnectionPage));
     final tabs = context.read<EditorTabsCubit>();
@@ -135,7 +135,7 @@ void main() {
   testWidgets('connection draft survives tab switches and guards closing', (
     tester,
   ) async {
-    await tester.pumpWidget(const App());
+    await tester.pumpWidget(const App(initialLocation: '/workspace/default'));
     await tester.pumpAndSettle();
     final context = tester.element(find.byType(ConnectionPage));
     final tabs = context.read<EditorTabsCubit>();
@@ -209,7 +209,7 @@ void main() {
       () => TableDataCubit(repository: getIt<TableDataRepository>()),
     );
 
-    await tester.pumpWidget(const App());
+    await tester.pumpWidget(const App(initialLocation: '/workspace/default'));
     await tester.pumpAndSettle();
     final context = tester.element(find.byType(ConnectionPage));
     final tabs = context.read<EditorTabsCubit>();

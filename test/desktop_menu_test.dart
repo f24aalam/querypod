@@ -210,8 +210,8 @@ void main() {
         find.byType(SubmenuButton).first,
       );
       expect(
-        openFileMenu.statesController!.value.contains(WidgetState.selected),
-        isTrue,
+        openFileMenu.style!.backgroundColor!.resolve({}),
+        isNot(Colors.transparent),
       );
       expect(find.byKey(const ValueKey('quit-shortcut-hint')), findsOneWidget);
       expect(

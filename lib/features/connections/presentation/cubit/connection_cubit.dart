@@ -167,12 +167,7 @@ class ConnectionCubit extends Cubit<ConnectionsState> {
       final driver = DatabaseDriverFactory.getDriver(connection.type);
       await driver.testConnection(connection);
 
-      emit(
-        _feedback('Connection successful', isError: false).copyWith(
-          activeConnection: () => connection,
-          openConnectionNonce: state.openConnectionNonce + 1,
-        ),
-      );
+      emit(_feedback('Connection successful', isError: false));
     } catch (e) {
       emit(
         _feedback(

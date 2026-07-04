@@ -56,4 +56,45 @@ void main() {
     expect(cubit.state.draft.useTls, isFalse);
     expect(cubit.state.draft.toConnection().useTls, isFalse);
   });
+
+  test('loading null creates a new draft for the active workspace', () {
+    final cubit = ConnectionEditorCubit()..load(null, activeWorkspaceId: 'workspace-a');
+
+    expect(cubit.state.isNew, isTrue);
+    expect(cubit.state.draft.workspaceId, 'workspace-a');
+    expect(cubit.state.isDirty, isFalse);
+  });
+
+  test('discard resets the draft and clears dirty state for the workspace', () {
+    final cubit = ConnectionEditorCubit()
+      ..load(connection, activeWorkspaceId: 'default')
+      ..updateName('Changed');
+
+    cubit.discard('workspace-b');
+
+    expect(cubit.state.isNew, isTrue);
+    expect(cubit.state.isDirty, isFalse);
+    expect(cubit.state.draft.workspaceId, 'workspace-b');
+    expect(cubit.state.draft.name, '');
+  });
+
+  test('loading an existing connection preserves its workspace id', () {
+    const workspaceConnection = Connection(
+      id: 'workspace-connection',
+      name: 'Workspace DB',
+      host: '127.0.0.1',
+      port: 5432,
+      user: 'postgres',
+      password: '',
+      database: 'app',
+      workspaceId: 'workspace-a',
+      type: ConnectionType.postgresql,
+      useTls: false,
+    );
+    final cubit = ConnectionEditorCubit()
+      ..load(workspaceConnection, activeWorkspaceId: 'default');
+
+    expect(cubit.state.draft.workspaceId, 'workspace-a');
+    expect(cubit.state.draft.sourceConnectionId, workspaceConnection.id);
+  });
 }

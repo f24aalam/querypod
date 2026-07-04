@@ -4,6 +4,7 @@ import 'package:forui/forui.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../../../../core/presentation/widgets/confirmation_dialog.dart';
 import '../cubit/workspaces_cubit.dart';
 import '../cubit/workspaces_state.dart';
 import '../../../connections/presentation/cubit/connection_cubit.dart';
@@ -24,31 +25,17 @@ class _WorkspacesPageState extends State<WorkspacesPage> {
     context.read<WorkspacesCubit>().loadWorkspaces();
   }
 
-  void _showDeleteDialog(AppWorkspace workspace) {
-    showFDialog(
-      context: context,
-      builder: (context, style, animation) => FDialog(
-        animation: animation,
-        direction: Axis.horizontal,
-        title: const Text('Delete Workspace'),
-        body: Text('Are you sure you want to delete "${workspace.name}"?'),
-        actions: [
-          FButton(
-            variant: FButtonVariant.destructive,
-            onPress: () async {
-              Navigator.of(context).pop();
-              this.context.read<WorkspacesCubit>().deleteWorkspace(workspace.id);
-            },
-            child: const Text('Delete'),
-          ),
-          FButton(
-            variant: FButtonVariant.outline,
-            onPress: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-        ],
-      ),
+  Future<void> _showDeleteDialog(AppWorkspace workspace) async {
+    final shouldDelete = await showConfirmationDialog(
+      context,
+      title: 'Delete Workspace',
+      message: 'Are you sure you want to delete "${workspace.name}"?',
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+      isDestructive: true,
     );
+    if (!shouldDelete || !mounted) return;
+    context.read<WorkspacesCubit>().deleteWorkspace(workspace.id);
   }
 
   void _showRenameDialog(AppWorkspace workspace) {

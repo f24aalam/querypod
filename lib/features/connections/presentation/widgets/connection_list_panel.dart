@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:forui/forui.dart';
 
+import '../../../../core/presentation/widgets/confirmation_dialog.dart';
 import '../../../editor/presentation/cubit/editor_tabs_cubit.dart';
 import '../../../editor/presentation/widgets/sidebar_header.dart';
 import '../cubit/connection_cubit.dart';
@@ -224,31 +225,17 @@ class _ConnectionItem extends StatelessWidget {
     );
   }
 
-  void _showDeleteConfirmation(BuildContext context) {
-    showFDialog(
-      context: context,
-      builder: (context, style, animation) => FDialog(
-        animation: animation,
-        direction: Axis.horizontal,
-        title: const Text('Delete Connection'),
-        body: Text('Are you sure you want to delete "$name"?'),
-        actions: [
-          FButton(
-            variant: FButtonVariant.destructive,
-            onPress: () {
-              Navigator.of(context).pop();
-              context.read<ConnectionCubit>().delete(id);
-            },
-            child: const Text('Delete'),
-          ),
-          FButton(
-            variant: FButtonVariant.outline,
-            onPress: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-        ],
-      ),
+  Future<void> _showDeleteConfirmation(BuildContext context) async {
+    final shouldDelete = await showConfirmationDialog(
+      context,
+      title: 'Delete Connection',
+      message: 'Are you sure you want to delete "$name"?',
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+      isDestructive: true,
     );
+    if (!shouldDelete || !context.mounted) return;
+    context.read<ConnectionCubit>().delete(id);
   }
 }
 

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:forui/forui.dart';
 
+import '../../../../core/presentation/widgets/confirmation_dialog.dart';
 import '../../../connections/presentation/widgets/connection_list_panel.dart';
 import '../cubit/activity_cubit.dart';
 import '../cubit/editor_tabs_cubit.dart';
@@ -201,33 +202,19 @@ class _QueryListItem extends StatelessWidget {
     );
   }
 
-  void _showDeleteDialog(BuildContext context) {
-    showFDialog(
-      context: context,
-      builder: (context, style, animation) => FDialog(
-        animation: animation,
-        direction: Axis.horizontal,
-        title: const Text('Delete Query'),
-        body: Text('Are you sure you want to delete "${query.title}"?'),
-        actions: [
-          FButton(
-            variant: FButtonVariant.destructive,
-            onPress: () async {
-              Navigator.of(context).pop();
-              await context.read<QueryEditorCubit>().deleteQuery(query.id);
-              if (!context.mounted) return;
-              context.read<EditorTabsCubit>().closeQueryTab(query.id);
-            },
-            child: const Text('Delete'),
-          ),
-          FButton(
-            variant: FButtonVariant.outline,
-            onPress: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-        ],
-      ),
+  Future<void> _showDeleteDialog(BuildContext context) async {
+    final shouldDelete = await showConfirmationDialog(
+      context,
+      title: 'Delete Query',
+      message: 'Are you sure you want to delete "${query.title}"?',
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+      isDestructive: true,
     );
+    if (!shouldDelete || !context.mounted) return;
+    await context.read<QueryEditorCubit>().deleteQuery(query.id);
+    if (!context.mounted) return;
+    context.read<EditorTabsCubit>().closeQueryTab(query.id);
   }
 
   void _showRenameDialog(BuildContext context) {
@@ -282,4 +269,3 @@ class _QueryListItem extends StatelessWidget {
     ).whenComplete(controller.dispose);
   }
 }
-

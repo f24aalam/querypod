@@ -299,26 +299,191 @@ void main() {
     expect(session.stagedCellEdits, isEmpty);
     expect(session.stagedDeletedRowIndexes, isEmpty);
   });
+
+  test('opening the same table twice reuses the existing session', () async {
+    final repository = _FakeTableDataRepository(total: 10);
+    final cubit = TableDataCubit(repository: repository);
+
+    await cubit.openTable(connection, key);
+    await cubit.openTable(connection, key);
+
+    expect(repository.countCalls, 1);
+    expect(repository.requests, hasLength(1));
+  });
+
+  test('search query resets pagination and avoids unchanged reloads', () async {
+    final repository = _FakeTableDataRepository(total: 30);
+    final cubit = TableDataCubit(repository: repository);
+    await cubit.openTable(connection, key);
+    await cubit.nextPage(key);
+
+    await cubit.setSearchQuery(key, 'alice');
+
+    final session = cubit.state.session(key)!;
+    expect(session.searchQuery, 'alice');
+    expect(session.pageIndex, 0);
+    expect(repository.countCalls, 2);
+
+    await cubit.setSearchQuery(key, 'alice');
+    expect(repository.countCalls, 2);
+  });
+
+  test('filters reset pagination and avoid unchanged reloads', () async {
+    final repository = _FakeTableDataRepository(total: 30);
+    final cubit = TableDataCubit(repository: repository);
+    await cubit.openTable(connection, key);
+    await cubit.nextPage(key);
+
+    const filters = [TableFilter(column: 'name', operator: '=', value: 'Alice')];
+    await cubit.setFilters(key, filters);
+
+    final session = cubit.state.session(key)!;
+    expect(session.filters, filters);
+    expect(session.pageIndex, 0);
+    expect(repository.countCalls, 2);
+
+    await cubit.setFilters(key, filters);
+    expect(repository.countCalls, 2);
+  });
+
+  test('showing and hiding table structure clears transient state', () async {
+    final repository = _FakeTableDataRepository(total: 10, structure: _multiColumn);
+    final cubit = TableDataCubit(repository: repository);
+    await cubit.openTable(connection, key);
+    cubit.selectSingleRow(key, 0);
+    cubit.beginCellEdit(key, 0, 1);
+
+    cubit.showTableStructure(key);
+    final shown = cubit.state.session(key)!;
+    expect(shown.isShowingStructure, isTrue);
+    expect(shown.selectedRowIndexes, isEmpty);
+    expect(shown.activeCellEdit, isNull);
+
+    cubit.hideTableStructure(key);
+    expect(cubit.state.session(key)!.isShowingStructure, isFalse);
+  });
+
+  test('foreign row preview stores result clears on close and surfaces errors', () async {
+    final repository = _FakeTableDataRepository(
+      total: 1,
+      structure: TableStructure(
+        columns: const [
+          TableDataColumn(
+            name: 'id',
+            databaseType: 'int',
+            length: 11,
+            isPrimaryKey: true,
+            isNullable: false,
+          ),
+          TableDataColumn(
+            name: 'profile_id',
+            databaseType: 'int',
+            length: 11,
+            isPrimaryKey: false,
+            isNullable: true,
+            foreignKey: TableForeignKey(targetTable: 'profiles', targetColumn: 'id'),
+          ),
+        ],
+        orderColumn: 'id',
+      ),
+      foreignPreviewStructure: TableStructure(
+        columns: const [
+          TableDataColumn(
+            name: 'id',
+            databaseType: 'int',
+            length: 11,
+            isPrimaryKey: true,
+            isNullable: false,
+          ),
+          TableDataColumn(
+            name: 'bio',
+            databaseType: 'text',
+            length: 0,
+            isPrimaryKey: false,
+            isNullable: true,
+          ),
+        ],
+        orderColumn: 'id',
+      ),
+      foreignPreviewRows: [
+        TableDataRow([TableCellValue.text('1'), TableCellValue.text('Builder')]),
+      ],
+    );
+    final cubit = TableDataCubit(repository: repository);
+    await cubit.openTable(connection, key);
+
+    await cubit.previewForeignRow(
+      key,
+      const TableForeignKey(targetTable: 'profiles', targetColumn: 'id'),
+      '1',
+    );
+
+    final previewed = cubit.state.session(key)!;
+    expect(previewed.foreignRowPreview, isNotNull);
+    expect(previewed.foreignRowPreview!.tableName, 'profiles');
+
+    cubit.clearForeignRowPreview(key);
+    expect(cubit.state.session(key)!.foreignRowPreview, isNull);
+
+    repository.foreignPreviewError = Exception('preview failed');
+    await cubit.previewForeignRow(
+      key,
+      const TableForeignKey(targetTable: 'profiles', targetColumn: 'id'),
+      '1',
+    );
+    expect(cubit.state.session(key)!.errorMessage, contains('preview failed'));
+  });
+
+  test('supported operators fall back before a connection is opened', () {
+    final cubit = TableDataCubit(repository: _FakeTableDataRepository(total: 1));
+
+    expect(cubit.supportedOperators(key), ['=', '!=', '>', '<', 'LIKE']);
+  });
+
+  test('closeSession and clear remove cached table sessions', () async {
+    final repository = _FakeTableDataRepository(total: 10);
+    final cubit = TableDataCubit(repository: repository);
+    await cubit.openTable(connection, key);
+
+    cubit.closeSession(key);
+    expect(cubit.state.session(key), isNull);
+
+    await cubit.openTable(connection, key);
+    cubit.clear();
+    expect(cubit.state.sessions, isEmpty);
+  });
 }
 
 class _FakeTableDataRepository implements TableDataRepository {
   int total;
   final TableStructure structure;
+  final TableStructure? foreignPreviewStructure;
+  final List<TableDataRow>? foreignPreviewRows;
   int countCalls = 0;
   bool failNextPage = false;
   final List<_PageRequest> requests = [];
   final List<_CommitRequest> commitRequests = [];
   Object? commitError;
+  Object? foreignPreviewError;
 
-  _FakeTableDataRepository({required this.total, TableStructure? structure})
-    : structure = structure ?? _structure;
+  _FakeTableDataRepository({
+    required this.total,
+    TableStructure? structure,
+    this.foreignPreviewStructure,
+    this.foreignPreviewRows,
+  }) : structure = structure ?? _structure;
 
   @override
   Future<TableStructure> inspectTable(
     Connection connection,
     String database,
     String table,
-  ) async => structure;
+  ) async {
+    if (table == 'profiles' && foreignPreviewStructure != null) {
+      return foreignPreviewStructure!;
+    }
+    return structure;
+  }
 
   @override
   Future<List<QueryResult>> executeQuery(
@@ -353,6 +518,13 @@ class _FakeTableDataRepository implements TableDataRepository {
     String? searchQuery,
     List<TableFilter>? filters,
   }) async {
+    if (table == 'profiles') {
+      if (foreignPreviewError case final error?) throw error;
+      return TableRowsPage(
+        rows: foreignPreviewRows ?? const [],
+        queryDuration: const Duration(milliseconds: 2),
+      );
+    }
     requests.add(_PageRequest(offset: offset, limit: limit));
     if (failNextPage) {
       failNextPage = false;

@@ -41,7 +41,9 @@ class ConnectionCubit extends Cubit<ConnectionsState> {
     try {
       final allConnections = await _repository.getAll();
       final connections = state.activeWorkspaceId != null
-          ? allConnections.where((c) => c.workspaceId == state.activeWorkspaceId).toList()
+          ? allConnections
+                .where((c) => c.workspaceId == state.activeWorkspaceId)
+                .toList()
           : allConnections;
 
       final persistedSelectedId = await _repository.getSelectedId();
@@ -72,13 +74,16 @@ class ConnectionCubit extends Cubit<ConnectionsState> {
   Future<bool> save(Connection connection) async {
     emit(state.copyWith(status: ConnectionStatus.saving));
     try {
-      await _repository.save(connection);
-      await _repository.setSelectedId(connection.id);
+      final connectionToSave = state.activeWorkspaceId != null
+          ? connection.copyWith(workspaceId: state.activeWorkspaceId)
+          : connection;
+      await _repository.save(connectionToSave);
+      await _repository.setSelectedId(connectionToSave.id);
       await load();
       emit(
         _feedback('Connection saved', isError: false).copyWith(
-          selectedId: () => connection.id,
-          activeConnection: () => connection,
+          selectedId: () => connectionToSave.id,
+          activeConnection: () => connectionToSave,
         ),
       );
       return true;

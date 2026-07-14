@@ -221,6 +221,7 @@ class _MockTableDataRepository implements TableDataRepository {
     String table, {
     required TableStructure structure,
     String? searchQuery,
+    String? searchColumn,
     List<TableFilter>? filters,
   }) async => 0;
 
@@ -242,11 +243,9 @@ class _MockTableDataRepository implements TableDataRepository {
     required int offset,
     required int limit,
     String? searchQuery,
+    String? searchColumn,
     List<TableFilter>? filters,
-  }) async => TableRowsPage(
-    rows: [],
-    queryDuration: Duration.zero,
-  );
+  }) async => TableRowsPage(rows: [], queryDuration: Duration.zero);
 
   @override
   Future<TableStructure> inspectTable(
@@ -261,7 +260,8 @@ class _MockHistoryRepository implements QueryHistoryRepository {
   Future<void> clearHistory(String connectionId) async {}
 
   @override
-  Future<List<QueryHistory>> getAllForConnection(String connectionId) async => [];
+  Future<List<QueryHistory>> getAllForConnection(String connectionId) async =>
+      [];
 
   @override
   Future<QueryHistory> save(QueryHistory history) async => history;

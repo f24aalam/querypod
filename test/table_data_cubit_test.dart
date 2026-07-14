@@ -300,6 +300,81 @@ void main() {
     expect(session.stagedDeletedRowIndexes, isEmpty);
   });
 
+  test('pinning a column is local UI state and survives reloads', () async {
+    final repository = _FakeTableDataRepository(
+      total: 100,
+      structure: _threeColumn,
+    );
+    final cubit = TableDataCubit(repository: repository);
+    await cubit.openTable(connection, key);
+
+    cubit.pinColumn(key, 1);
+    expect(cubit.state.session(key)!.pinnedColumnIndexes, [1]);
+
+    cubit.pinColumn(key, 0);
+    expect(cubit.state.session(key)!.pinnedColumnIndexes, [1, 0]);
+
+    cubit.pinColumn(key, 2);
+    expect(cubit.state.session(key)!.pinnedColumnIndexes, [1, 0, 2]);
+
+    cubit.pinColumn(key, -1);
+    cubit.pinColumn(key, 20);
+    expect(cubit.state.session(key)!.pinnedColumnIndexes, [1, 0, 2]);
+
+    await cubit.nextPage(key);
+    expect(cubit.state.session(key)!.pinnedColumnIndexes, [1, 0, 2]);
+
+    cubit.movePinnedColumnLeft(key, 2);
+    expect(cubit.state.session(key)!.pinnedColumnIndexes, [1, 2, 0]);
+
+    cubit.movePinnedColumnRight(key, 1);
+    expect(cubit.state.session(key)!.pinnedColumnIndexes, [2, 1, 0]);
+
+    cubit.movePinnedColumnLeft(key, 2);
+    cubit.movePinnedColumnRight(key, 0);
+    expect(cubit.state.session(key)!.pinnedColumnIndexes, [2, 1, 0]);
+
+    cubit.unpinColumn(key, 1);
+    expect(cubit.state.session(key)!.pinnedColumnIndexes, [2, 0]);
+
+    cubit.unpinColumn(key);
+    expect(cubit.state.session(key)!.pinnedColumnIndexes, isEmpty);
+  });
+
+  test('resizing a column clamps and survives reloads', () async {
+    final repository = _FakeTableDataRepository(
+      total: 100,
+      structure: _threeColumn,
+    );
+    final cubit = TableDataCubit(repository: repository);
+    await cubit.openTable(connection, key);
+
+    cubit.resizeColumn(key, 1, 320);
+    expect(cubit.state.session(key)!.columnWidthOverrides, {1: 320});
+
+    cubit.resizeColumn(key, 1, 20);
+    expect(
+      cubit.state.session(key)!.columnWidthOverrides[1],
+      TableDataCubit.minColumnWidth,
+    );
+
+    cubit.resizeColumn(key, 2, 900);
+    expect(
+      cubit.state.session(key)!.columnWidthOverrides[2],
+      TableDataCubit.maxColumnWidth,
+    );
+
+    cubit.resizeColumn(key, -1, 240);
+    cubit.resizeColumn(key, 20, 240);
+    expect(cubit.state.session(key)!.columnWidthOverrides.keys, {1, 2});
+
+    await cubit.nextPage(key);
+    expect(cubit.state.session(key)!.columnWidthOverrides.keys, {1, 2});
+
+    cubit.resetColumnWidth(key, 1);
+    expect(cubit.state.session(key)!.columnWidthOverrides.keys, {2});
+  });
+
   test('opening the same table twice reuses the existing session', () async {
     final repository = _FakeTableDataRepository(total: 10);
     final cubit = TableDataCubit(repository: repository);
@@ -311,21 +386,29 @@ void main() {
     expect(repository.requests, hasLength(1));
   });
 
-  test('search query resets pagination and avoids unchanged reloads', () async {
+  test('search resets pagination and avoids unchanged reloads', () async {
     final repository = _FakeTableDataRepository(total: 30);
     final cubit = TableDataCubit(repository: repository);
     await cubit.openTable(connection, key);
     await cubit.nextPage(key);
 
-    await cubit.setSearchQuery(key, 'alice');
+    await cubit.setSearch(key, query: 'alice');
 
-    final session = cubit.state.session(key)!;
+    var session = cubit.state.session(key)!;
     expect(session.searchQuery, 'alice');
+    expect(session.searchColumn, isNull);
     expect(session.pageIndex, 0);
     expect(repository.countCalls, 2);
 
-    await cubit.setSearchQuery(key, 'alice');
+    await cubit.setSearch(key, query: 'alice');
     expect(repository.countCalls, 2);
+
+    await cubit.setSearch(key, query: 'alice', column: 'name');
+    session = cubit.state.session(key)!;
+    expect(session.searchQuery, 'alice');
+    expect(session.searchColumn, 'name');
+    expect(session.pageIndex, 0);
+    expect(repository.countCalls, 3);
   });
 
   test('filters reset pagination and avoid unchanged reloads', () async {
@@ -334,7 +417,9 @@ void main() {
     await cubit.openTable(connection, key);
     await cubit.nextPage(key);
 
-    const filters = [TableFilter(column: 'name', operator: '=', value: 'Alice')];
+    const filters = [
+      TableFilter(column: 'name', operator: '=', value: 'Alice'),
+    ];
     await cubit.setFilters(key, filters);
 
     final session = cubit.state.session(key)!;
@@ -347,7 +432,10 @@ void main() {
   });
 
   test('showing and hiding table structure clears transient state', () async {
-    final repository = _FakeTableDataRepository(total: 10, structure: _multiColumn);
+    final repository = _FakeTableDataRepository(
+      total: 10,
+      structure: _multiColumn,
+    );
     final cubit = TableDataCubit(repository: repository);
     await cubit.openTable(connection, key);
     cubit.selectSingleRow(key, 0);
@@ -363,79 +451,93 @@ void main() {
     expect(cubit.state.session(key)!.isShowingStructure, isFalse);
   });
 
-  test('foreign row preview stores result clears on close and surfaces errors', () async {
-    final repository = _FakeTableDataRepository(
-      total: 1,
-      structure: TableStructure(
-        columns: const [
-          TableDataColumn(
-            name: 'id',
-            databaseType: 'int',
-            length: 11,
-            isPrimaryKey: true,
-            isNullable: false,
-          ),
-          TableDataColumn(
-            name: 'profile_id',
-            databaseType: 'int',
-            length: 11,
-            isPrimaryKey: false,
-            isNullable: true,
-            foreignKey: TableForeignKey(targetTable: 'profiles', targetColumn: 'id'),
-          ),
+  test(
+    'foreign row preview stores result clears on close and surfaces errors',
+    () async {
+      final repository = _FakeTableDataRepository(
+        total: 1,
+        structure: TableStructure(
+          columns: const [
+            TableDataColumn(
+              name: 'id',
+              databaseType: 'int',
+              length: 11,
+              isPrimaryKey: true,
+              isNullable: false,
+            ),
+            TableDataColumn(
+              name: 'profile_id',
+              databaseType: 'int',
+              length: 11,
+              isPrimaryKey: false,
+              isNullable: true,
+              foreignKey: TableForeignKey(
+                targetTable: 'profiles',
+                targetColumn: 'id',
+              ),
+            ),
+          ],
+          orderColumn: 'id',
+        ),
+        foreignPreviewStructure: TableStructure(
+          columns: const [
+            TableDataColumn(
+              name: 'id',
+              databaseType: 'int',
+              length: 11,
+              isPrimaryKey: true,
+              isNullable: false,
+            ),
+            TableDataColumn(
+              name: 'bio',
+              databaseType: 'text',
+              length: 0,
+              isPrimaryKey: false,
+              isNullable: true,
+            ),
+          ],
+          orderColumn: 'id',
+        ),
+        foreignPreviewRows: [
+          TableDataRow([
+            TableCellValue.text('1'),
+            TableCellValue.text('Builder'),
+          ]),
         ],
-        orderColumn: 'id',
-      ),
-      foreignPreviewStructure: TableStructure(
-        columns: const [
-          TableDataColumn(
-            name: 'id',
-            databaseType: 'int',
-            length: 11,
-            isPrimaryKey: true,
-            isNullable: false,
-          ),
-          TableDataColumn(
-            name: 'bio',
-            databaseType: 'text',
-            length: 0,
-            isPrimaryKey: false,
-            isNullable: true,
-          ),
-        ],
-        orderColumn: 'id',
-      ),
-      foreignPreviewRows: [
-        TableDataRow([TableCellValue.text('1'), TableCellValue.text('Builder')]),
-      ],
-    );
-    final cubit = TableDataCubit(repository: repository);
-    await cubit.openTable(connection, key);
+      );
+      final cubit = TableDataCubit(repository: repository);
+      await cubit.openTable(connection, key);
 
-    await cubit.previewForeignRow(
-      key,
-      const TableForeignKey(targetTable: 'profiles', targetColumn: 'id'),
-      '1',
-    );
+      await cubit.previewForeignRow(
+        key,
+        const TableForeignKey(targetTable: 'profiles', targetColumn: 'id'),
+        '1',
+      );
 
-    final previewed = cubit.state.session(key)!;
-    expect(previewed.foreignRowPreview, isNotNull);
-    expect(previewed.foreignRowPreview!.tableName, 'profiles');
+      final previewed = cubit.state.session(key)!;
+      expect(previewed.foreignRowPreview, isNotNull);
+      expect(previewed.foreignRowPreview!.tableName, 'profiles');
 
-    cubit.clearForeignRowPreview(key);
-    expect(cubit.state.session(key)!.foreignRowPreview, isNull);
+      cubit.clearForeignRowPreview(key);
+      expect(cubit.state.session(key)!.foreignRowPreview, isNull);
 
-    repository.foreignPreviewError = Exception('preview failed');
-    await cubit.previewForeignRow(
-      key,
-      const TableForeignKey(targetTable: 'profiles', targetColumn: 'id'),
-      '1',
-    );
-    expect(cubit.state.session(key)!.errorMessage, contains('preview failed'));
-  });
+      repository.foreignPreviewError = Exception('preview failed');
+      await cubit.previewForeignRow(
+        key,
+        const TableForeignKey(targetTable: 'profiles', targetColumn: 'id'),
+        '1',
+      );
+      expect(
+        cubit.state.session(key)!.errorMessage,
+        contains('preview failed'),
+      );
+    },
+  );
 
   test('supported operators fall back before a connection is opened', () {
-    final cubit = TableDataCubit(repository: _FakeTableDataRepository(total: 1));
+    final cubit = TableDataCubit(
+      repository: _FakeTableDataRepository(total: 1),
+    );
 
     expect(cubit.supportedOperators(key), ['=', '!=', '>', '<', 'LIKE']);
   });
@@ -501,6 +603,7 @@ class _FakeTableDataRepository implements TableDataRepository {
     String table, {
     required TableStructure structure,
     String? searchQuery,
+    String? searchColumn,
     List<TableFilter>? filters,
   }) async {
     countCalls++;
@@ -516,6 +619,7 @@ class _FakeTableDataRepository implements TableDataRepository {
     required int offset,
     required int limit,
     String? searchQuery,
+    String? searchColumn,
     List<TableFilter>? filters,
   }) async {
     if (table == 'profiles') {
@@ -581,6 +685,7 @@ class _ControlledPageRepository implements TableDataRepository {
     String table, {
     required TableStructure structure,
     String? searchQuery,
+    String? searchColumn,
     List<TableFilter>? filters,
   }) async => 120;
 
@@ -593,6 +698,7 @@ class _ControlledPageRepository implements TableDataRepository {
     required int offset,
     required int limit,
     String? searchQuery,
+    String? searchColumn,
     List<TableFilter>? filters,
   }) {
     final request = _PageRequest(offset: offset, limit: limit);
@@ -644,6 +750,20 @@ final _multiColumn = TableStructure(
     ),
     TableDataColumn(
       name: 'name',
+      databaseType: 'varchar(255)',
+      length: 255,
+      isPrimaryKey: false,
+      isNullable: true,
+    ),
+  ],
+  orderColumn: 'id',
+);
+
+final _threeColumn = TableStructure(
+  columns: [
+    ..._multiColumn.columns,
+    TableDataColumn(
+      name: 'email',
       databaseType: 'varchar(255)',
       length: 255,
       isPrimaryKey: false,

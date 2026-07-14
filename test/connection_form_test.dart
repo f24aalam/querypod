@@ -6,7 +6,6 @@ import 'package:querypod/features/connections/domain/entities/connection.dart';
 import 'package:querypod/features/connections/domain/repositories/connection_repository.dart';
 import 'package:querypod/features/connections/presentation/cubit/connection_cubit.dart';
 import 'package:querypod/features/connections/presentation/cubit/connection_editor_cubit.dart';
-import 'package:querypod/features/connections/presentation/cubit/connection_state.dart';
 import 'package:querypod/features/connections/presentation/widgets/connection_form.dart';
 import 'package:querypod/features/editor/domain/entities/connection_query.dart';
 import 'package:querypod/features/editor/domain/repositories/query_repository.dart';
@@ -17,7 +16,8 @@ void main() {
 
   testWidgets('save marks the editor draft saved on success', (tester) async {
     final cubit = _SpyConnectionCubit(saveResult: true);
-    final editorCubit = ConnectionEditorCubit()..load(null, activeWorkspaceId: 'default');
+    final editorCubit = ConnectionEditorCubit()
+      ..load(null, activeWorkspaceId: 'default');
     final tabs = EditorTabsCubit();
 
     await tester.pumpWidget(
@@ -39,9 +39,33 @@ void main() {
     expect(editorCubit.state.draft.name, 'Primary DB');
   });
 
+  testWidgets('save uses active workspace for new drafts', (tester) async {
+    final cubit = _SpyConnectionCubit(saveResult: true);
+    await cubit.setWorkspace('workspace-a');
+    final editorCubit = ConnectionEditorCubit();
+
+    await tester.pumpWidget(
+      _ConnectionFormHarness(
+        connectionCubit: cubit,
+        editorCubit: editorCubit,
+        tabsCubit: EditorTabsCubit(),
+      ),
+    );
+
+    editorCubit.updateName('Workspace DB');
+    await tester.pump();
+    await tester.ensureVisible(find.text('Save'));
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+
+    expect(cubit.savedConnections.single.workspaceId, 'workspace-a');
+    expect(editorCubit.state.draft.workspaceId, 'workspace-a');
+  });
+
   testWidgets('failed save keeps the draft dirty', (tester) async {
     final cubit = _SpyConnectionCubit(saveResult: false);
-    final editorCubit = ConnectionEditorCubit()..load(null, activeWorkspaceId: 'default');
+    final editorCubit = ConnectionEditorCubit()
+      ..load(null, activeWorkspaceId: 'default');
 
     await tester.pumpWidget(
       _ConnectionFormHarness(
@@ -62,28 +86,30 @@ void main() {
     expect(editorCubit.state.draft.name, 'Broken DB');
   });
 
-  testWidgets('test button forwards the current draft to ConnectionCubit.test', (
-    tester,
-  ) async {
-    final cubit = _SpyConnectionCubit();
-    final editorCubit = ConnectionEditorCubit()..load(null, activeWorkspaceId: 'default');
+  testWidgets(
+    'test button forwards the current draft to ConnectionCubit.test',
+    (tester) async {
+      final cubit = _SpyConnectionCubit();
+      final editorCubit = ConnectionEditorCubit()
+        ..load(null, activeWorkspaceId: 'default');
 
-    await tester.pumpWidget(
-      _ConnectionFormHarness(
-        connectionCubit: cubit,
-        editorCubit: editorCubit,
-        tabsCubit: EditorTabsCubit(),
-      ),
-    );
+      await tester.pumpWidget(
+        _ConnectionFormHarness(
+          connectionCubit: cubit,
+          editorCubit: editorCubit,
+          tabsCubit: EditorTabsCubit(),
+        ),
+      );
 
-    editorCubit.updateName('Smoke Test DB');
-    await tester.pump();
-    await tester.ensureVisible(find.text('Test'));
-    await tester.tap(find.text('Test'));
-    await tester.pumpAndSettle();
+      editorCubit.updateName('Smoke Test DB');
+      await tester.pump();
+      await tester.ensureVisible(find.text('Test'));
+      await tester.tap(find.text('Test'));
+      await tester.pumpAndSettle();
 
-    expect(cubit.testedConnections.single.name, 'Smoke Test DB');
-  });
+      expect(cubit.testedConnections.single.name, 'Smoke Test DB');
+    },
+  );
 }
 
 class _ConnectionFormHarness extends StatelessWidget {
@@ -116,12 +142,11 @@ class _ConnectionFormHarness extends StatelessWidget {
 }
 
 class _SpyConnectionCubit extends ConnectionCubit {
-  _SpyConnectionCubit({
-    this.saveResult = true,
-  }) : super(
-         repository: _FakeConnectionRepository(),
-         queryRepository: _FakeQueryRepository(),
-       );
+  _SpyConnectionCubit({this.saveResult = true})
+    : super(
+        repository: _FakeConnectionRepository(),
+        queryRepository: _FakeQueryRepository(),
+      );
 
   final bool saveResult;
   final List<Connection> savedConnections = [];
@@ -167,8 +192,9 @@ class _FakeQueryRepository implements QueryRepository {
   Future<void> deleteByConnection(String connectionId) async {}
 
   @override
-  Future<List<ConnectionQuery>> getAllForConnection(String connectionId) async =>
-      [];
+  Future<List<ConnectionQuery>> getAllForConnection(
+    String connectionId,
+  ) async => [];
 
   @override
   Future<ConnectionQuery> save(ConnectionQuery query) async => query;

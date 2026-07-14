@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -37,7 +38,7 @@ class TableDataEditor extends StatelessWidget {
         builder: (context, session) {
           if (session == null ||
               (session.status == TableDataStatus.initialLoading &&
-                  !session.hasRows)) {
+                  session.structure == null)) {
             return const _LoadingState();
           }
 
@@ -63,9 +64,14 @@ class _TableBrowser extends StatelessWidget {
     final isLoading =
         session.status == TableDataStatus.pageLoading ||
         session.status == TableDataStatus.refreshing;
+    final showLoadingLine =
+        session.status == TableDataStatus.initialLoading ||
+        session.status == TableDataStatus.pageLoading ||
+        session.status == TableDataStatus.refreshing;
 
     return Column(
       children: [
+        if (showLoadingLine) const _TableLoadingLine(),
         _TableActionBar(tableKey: tableKey, session: session),
         if (session.status == TableDataStatus.error)
           _ErrorBanner(tableKey: tableKey, message: session.errorMessage),
@@ -78,6 +84,20 @@ class _TableBrowser extends StatelessWidget {
         ),
         _PaginationBar(tableKey: tableKey, session: session),
       ],
+    );
+  }
+}
+
+class _TableLoadingLine extends StatelessWidget {
+  const _TableLoadingLine();
+
+  @override
+  Widget build(BuildContext context) {
+    return const SizedBox(
+      key: ValueKey('active-table-loading-line'),
+      height: 2,
+      width: double.infinity,
+      child: LinearProgressIndicator(minHeight: 2),
     );
   }
 }
@@ -882,15 +902,52 @@ class _DataGrid extends StatefulWidget {
 
 class _DataGridState extends State<_DataGrid> {
   final _horizontal = ScrollController();
+  final _pinnedVertical = ScrollController();
+  final _scrollVertical = ScrollController();
+  final _focusNode = FocusNode(debugLabel: 'table-data-grid');
+  bool _syncingVerticalScroll = false;
+  int? _resizingColumnIndex;
+  double? _resizingColumnStartWidth;
+  double _resizingColumnDelta = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _pinnedVertical.addListener(
+      () => _syncVerticalScroll(_pinnedVertical, _scrollVertical),
+    );
+    _scrollVertical.addListener(
+      () => _syncVerticalScroll(_scrollVertical, _pinnedVertical),
+    );
+  }
 
   @override
   void dispose() {
     _horizontal.dispose();
+    _pinnedVertical.dispose();
+    _scrollVertical.dispose();
+    _focusNode.dispose();
     super.dispose();
   }
 
+  void _syncVerticalScroll(ScrollController source, ScrollController target) {
+    if (_syncingVerticalScroll || !source.hasClients || !target.hasClients) {
+      return;
+    }
+    final targetPosition = source.offset.clamp(
+      target.position.minScrollExtent,
+      target.position.maxScrollExtent,
+    );
+    if ((target.offset - targetPosition).abs() < 0.5) return;
+
+    _syncingVerticalScroll = true;
+    target.jumpTo(targetPosition);
+    _syncingVerticalScroll = false;
+  }
+
   void _moveSelection(int delta) {
-    final idx = widget.session.singleSelectedRowIndex ??
+    final idx =
+        widget.session.singleSelectedRowIndex ??
         widget.session.selectionAnchorRowIndex;
     if (idx != null) {
       final nextIdx = (idx + delta).clamp(0, widget.session.rows.length - 1);
@@ -900,81 +957,183 @@ class _DataGridState extends State<_DataGrid> {
     }
   }
 
+  Future<void> _copySelectedRows() async {
+    if (widget.session.selectedRowIndexes.isEmpty) return;
+
+    final rowIndex = widget.session.selectedRowIndexes.reduce(
+      (a, b) => a < b ? a : b,
+    );
+    await _copyRows(rowIndex);
+  }
+
   @override
   Widget build(BuildContext context) {
     final columns = widget.session.structure!.columns;
-    final widths = columns.map(_columnWidth).toList();
-    final totalWidth = widths.fold<double>(0, (sum, width) => sum + width);
+    final widths = [
+      for (var index = 0; index < columns.length; index++)
+        _activeColumnWidth(index, columns[index]),
+    ];
+    final pinnedColumnIndexes = [
+      for (final index in widget.session.pinnedColumnIndexes)
+        if (index >= 0 && index < columns.length) index,
+    ];
+    final hasPinnedColumns = pinnedColumnIndexes.isNotEmpty;
+    final scrollColumnIndexes = [
+      for (var index = 0; index < columns.length; index++)
+        if (!widget.session.pinnedColumnIndexes.contains(index)) index,
+    ];
+    final pinnedWidth = pinnedColumnIndexes.fold<double>(
+      0,
+      (sum, index) => sum + widths[index],
+    );
+    final scrollWidth = scrollColumnIndexes.fold<double>(
+      0,
+      (sum, index) => sum + widths[index],
+    );
 
     return CallbackShortcuts(
       bindings: {
-        const SingleActivator(LogicalKeyboardKey.arrowUp): () => _moveSelection(-1),
-        const SingleActivator(LogicalKeyboardKey.arrowDown): () => _moveSelection(1),
+        const SingleActivator(LogicalKeyboardKey.arrowUp): () =>
+            _moveSelection(-1),
+        const SingleActivator(LogicalKeyboardKey.arrowDown): () =>
+            _moveSelection(1),
+        KeyboardShortcuts.copy: _copySelectedRows,
         const SingleActivator(LogicalKeyboardKey.enter): () {
           final idx = widget.session.singleSelectedRowIndex;
           if (idx != null) {
-            context.read<TableDataCubit>().beginCellEdit(widget.tableKey, idx, 0);
+            context.read<TableDataCubit>().beginCellEdit(
+              widget.tableKey,
+              idx,
+              0,
+            );
           }
         },
       },
       child: Focus(
+        focusNode: _focusNode,
         autofocus: true,
         child: LayoutBuilder(
-          builder: (context, constraints) => Scrollbar(
-            controller: _horizontal,
-            thumbVisibility: true,
-            child: SingleChildScrollView(
-              controller: _horizontal,
-              scrollDirection: Axis.horizontal,
-              child: SizedBox(
-                width: totalWidth < constraints.maxWidth
-                    ? constraints.maxWidth
-                    : totalWidth,
-                height: constraints.maxHeight,
-                child: Column(
-                  children: [
-                    _HeaderRow(columns: columns, widths: widths),
-                    Expanded(
-                      child: widget.session.rows.isEmpty
-                          ? const _NoRows()
-                          : ListView.builder(
-                              itemExtent: 34,
-                              itemCount: widget.session.rows.length,
-                              itemBuilder: (context, index) => _GridRow(
-                                tableKey: widget.tableKey,
-                                rowIndex: index,
-                                row: widget.session.rows[index],
-                                widths: widths,
-                                selected: widget.session.selectedRowIndexes
-                                    .contains(index),
-                                activeEdit: widget.session.activeCellEdit,
-                                stagedEdits: widget.session.stagedCellEdits,
-                                stagedDelete: widget.session.stagedDeletedRowIndexes
-                                    .contains(index),
-                                stagedInsert: widget
-                                    .session
-                                    .stagedInsertedRowIndexes
-                                    .contains(index),
-                                editable: widget.session.isEditable,
-                                columns: columns,
-                                onOpenForeignKey: (fk, value) {
-                                  context.read<TableDataCubit>().previewForeignRow(
-                                    widget.tableKey,
-                                    fk,
-                                    value.rawValue?.toString() ?? value.display,
-                                  );
-                                },
-                              ),
-                            ),
+          builder: (context, constraints) {
+            final availableScrollWidth = (constraints.maxWidth - pinnedWidth)
+                .clamp(0.0, double.infinity);
+            final contentWidth = scrollWidth < availableScrollWidth
+                ? availableScrollWidth
+                : scrollWidth;
+
+            return Row(
+              children: [
+                if (hasPinnedColumns)
+                  SizedBox(
+                    width: pinnedWidth,
+                    height: constraints.maxHeight,
+                    child: _GridColumnGroup(
+                      tableKey: widget.tableKey,
+                      session: widget.session,
+                      columns: columns,
+                      widths: widths,
+                      columnIndexes: pinnedColumnIndexes,
+                      verticalController: _pinnedVertical,
+                      onRequestKeyboardFocus: _focusNode.requestFocus,
+                      onCopyRows: _copyRows,
+                      onOpenForeignKey: _openForeignKey,
+                      onResizeColumnStart: _startResizeColumn,
+                      onResizeColumnUpdate: _updateResizeColumn,
+                      onResizeColumnEnd: _endResizeColumn,
                     ),
-                  ],
+                  ),
+                Expanded(
+                  child: Scrollbar(
+                    controller: _horizontal,
+                    thumbVisibility: true,
+                    child: SingleChildScrollView(
+                      controller: _horizontal,
+                      scrollDirection: Axis.horizontal,
+                      child: SizedBox(
+                        width: contentWidth,
+                        height: constraints.maxHeight,
+                        child: _GridColumnGroup(
+                          tableKey: widget.tableKey,
+                          session: widget.session,
+                          columns: columns,
+                          widths: widths,
+                          columnIndexes: scrollColumnIndexes,
+                          verticalController: hasPinnedColumns
+                              ? _scrollVertical
+                              : null,
+                          onRequestKeyboardFocus: _focusNode.requestFocus,
+                          onCopyRows: _copyRows,
+                          onOpenForeignKey: _openForeignKey,
+                          onResizeColumnStart: _startResizeColumn,
+                          onResizeColumnUpdate: _updateResizeColumn,
+                          onResizeColumnEnd: _endResizeColumn,
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
-              ),
-            ),
-          ),
+              ],
+            );
+          },
         ),
       ),
     );
+  }
+
+  void _openForeignKey(TableForeignKey fk, TableCellValue value) {
+    context.read<TableDataCubit>().previewForeignRow(
+      widget.tableKey,
+      fk,
+      value.rawValue?.toString() ?? value.display,
+    );
+  }
+
+  void _resizeColumn(int columnIndex, double width) {
+    context.read<TableDataCubit>().resizeColumn(
+      widget.tableKey,
+      columnIndex,
+      width,
+    );
+  }
+
+  double _activeColumnWidth(int columnIndex, TableDataColumn column) {
+    final baseWidth =
+        widget.session.columnWidthOverrides[columnIndex] ??
+        _columnWidth(column);
+    if (_resizingColumnIndex != columnIndex) return baseWidth;
+    return ((_resizingColumnStartWidth ?? baseWidth) + _resizingColumnDelta)
+        .clamp(TableDataCubit.minColumnWidth, TableDataCubit.maxColumnWidth)
+        .toDouble();
+  }
+
+  void _startResizeColumn(int columnIndex, double width) {
+    setState(() {
+      _resizingColumnIndex = columnIndex;
+      _resizingColumnStartWidth = width;
+      _resizingColumnDelta = 0;
+    });
+  }
+
+  void _updateResizeColumn(double delta) {
+    if (_resizingColumnIndex == null) return;
+    setState(() {
+      _resizingColumnDelta += delta;
+    });
+  }
+
+  void _endResizeColumn() {
+    final columnIndex = _resizingColumnIndex;
+    final startWidth = _resizingColumnStartWidth;
+    if (columnIndex == null || startWidth == null) return;
+
+    final finalWidth = (startWidth + _resizingColumnDelta)
+        .clamp(TableDataCubit.minColumnWidth, TableDataCubit.maxColumnWidth)
+        .toDouble();
+    setState(() {
+      _resizingColumnIndex = null;
+      _resizingColumnStartWidth = null;
+      _resizingColumnDelta = 0;
+    });
+    _resizeColumn(columnIndex, finalWidth);
   }
 
   double _columnWidth(TableDataColumn column) {
@@ -982,13 +1141,328 @@ class _DataGridState extends State<_DataGrid> {
     final dataWidth = column.length.clamp(8, 28) * 7.0 + 24;
     return (nameWidth > dataWidth ? nameWidth : dataWidth).clamp(120, 280);
   }
+
+  Future<void> _copyRows(int rowIndex, [_CopyRowsFormat? format]) async {
+    final text = switch (format) {
+      _CopyRowsFormat.csv => formatCopiedTableRowsAsCsv(
+        widget.session,
+        rowIndex,
+      ),
+      _CopyRowsFormat.sql => formatCopiedTableRowsAsSql(
+        widget.session,
+        rowIndex,
+        tableName: widget.tableKey.tableName,
+      ),
+      _CopyRowsFormat.json => formatCopiedTableRowsAsJson(
+        widget.session,
+        rowIndex,
+      ),
+      null => formatCopiedTableRows(widget.session, rowIndex),
+    };
+    await Clipboard.setData(ClipboardData(text: text));
+    if (!mounted) return;
+    showFToast(
+      context: context,
+      variant: FToastVariant.primary,
+      title: const Text('Copied to clipboard'),
+    );
+  }
+}
+
+enum _CopyRowsFormat { csv, sql, json }
+
+String formatCopiedTableRows(TableDataSession session, int rowIndex) {
+  final rowLines = _copyTargetRows(session, rowIndex)
+      .where((index) => index >= 0 && index < session.rows.length)
+      .map((index) {
+        final row = session.rows[index];
+        return [
+          for (
+            var columnIndex = 0;
+            columnIndex < row.cells.length;
+            columnIndex++
+          )
+            _quotedCopyCell(
+              session
+                      .stagedCellEdits[TableCellCoordinate(
+                        rowIndex: index,
+                        columnIndex: columnIndex,
+                      )]
+                      ?.draftText ??
+                  row.cells[columnIndex].display,
+            ),
+        ].join(' ');
+      })
+      .toList();
+  final header = session.structure?.columns
+      .map((column) => _quotedCopyCell(column.name))
+      .join(' ');
+  return [
+    if (header != null && header.isNotEmpty) header,
+    ...rowLines,
+  ].join('\n');
+}
+
+String formatCopiedTableRowsAsCsv(TableDataSession session, int rowIndex) {
+  final columns = session.structure?.columns ?? const <TableDataColumn>[];
+  final lines = <String>[
+    if (columns.isNotEmpty)
+      columns.map((column) => _csvCell(column.name)).join(','),
+    for (final index in _copyTargetRows(session, rowIndex))
+      if (index >= 0 && index < session.rows.length)
+        [
+          for (
+            var columnIndex = 0;
+            columnIndex < session.rows[index].cells.length;
+            columnIndex++
+          )
+            _csvCell(_copyCellText(session, index, columnIndex)),
+        ].join(','),
+  ];
+  return lines.join('\n');
+}
+
+String formatCopiedTableRowsAsSql(
+  TableDataSession session,
+  int rowIndex, {
+  required String tableName,
+}) {
+  final columns = session.structure?.columns ?? const <TableDataColumn>[];
+  final rows = _copyTargetRows(
+    session,
+    rowIndex,
+  ).where((index) => index >= 0 && index < session.rows.length).toList();
+  if (columns.isEmpty || rows.isEmpty) return '';
+
+  final identifiers = columns
+      .map((column) => _sqlIdentifier(column.name))
+      .join(', ');
+  final values = rows
+      .map((rowIndex) {
+        final row = session.rows[rowIndex];
+        return '(${[for (var columnIndex = 0; columnIndex < row.cells.length; columnIndex++) _sqlValue(session, rowIndex, columnIndex)].join(', ')})';
+      })
+      .join(',\n');
+  return 'INSERT INTO ${_sqlIdentifier(tableName)} ($identifiers) VALUES\n$values;';
+}
+
+String formatCopiedTableRowsAsJson(TableDataSession session, int rowIndex) {
+  final columns = session.structure?.columns ?? const <TableDataColumn>[];
+  final rows = [
+    for (final rowIndex in _copyTargetRows(session, rowIndex))
+      if (rowIndex >= 0 && rowIndex < session.rows.length)
+        {
+          for (
+            var columnIndex = 0;
+            columnIndex < columns.length &&
+                columnIndex < session.rows[rowIndex].cells.length;
+            columnIndex++
+          )
+            columns[columnIndex].name: _jsonValue(
+              session,
+              rowIndex,
+              columnIndex,
+            ),
+        },
+  ];
+  return const JsonEncoder.withIndent('  ').convert(rows);
+}
+
+List<int> _copyTargetRows(TableDataSession session, int rowIndex) {
+  return session.selectedRowIndexes.contains(rowIndex)
+      ? (session.selectedRowIndexes.toList()..sort())
+      : [rowIndex];
+}
+
+String _copyCellText(TableDataSession session, int rowIndex, int columnIndex) {
+  return session
+          .stagedCellEdits[TableCellCoordinate(
+            rowIndex: rowIndex,
+            columnIndex: columnIndex,
+          )]
+          ?.draftText ??
+      session.rows[rowIndex].cells[columnIndex].display;
+}
+
+bool _copyCellIsNull(TableDataSession session, int rowIndex, int columnIndex) {
+  return !session.stagedCellEdits.containsKey(
+        TableCellCoordinate(rowIndex: rowIndex, columnIndex: columnIndex),
+      ) &&
+      session.rows[rowIndex].cells[columnIndex].kind == TableCellKind.nullValue;
+}
+
+String _quotedCopyCell(String value) {
+  final trimmed = value.trimLeft();
+  final looksLikeJson =
+      (trimmed.startsWith('{') && value.trimRight().endsWith('}')) ||
+      (trimmed.startsWith('[') && value.trimRight().endsWith(']'));
+  final hasWhitespace = RegExp(r'\s').hasMatch(value);
+  if (!looksLikeJson && !hasWhitespace) return value;
+
+  final escaped = value.replaceAll(r'\', r'\\').replaceAll('"', r'\"');
+  return '"$escaped"';
+}
+
+String _csvCell(String value) {
+  final mustQuote =
+      value.contains(',') ||
+      value.contains('"') ||
+      value.contains('\n') ||
+      RegExp(r'\s').hasMatch(value) ||
+      _looksLikeJson(value);
+  if (!mustQuote) return value;
+  return '"${value.replaceAll('"', '""')}"';
+}
+
+String _sqlIdentifier(String value) => '"${value.replaceAll('"', '""')}"';
+
+String _sqlValue(TableDataSession session, int rowIndex, int columnIndex) {
+  if (_copyCellIsNull(session, rowIndex, columnIndex)) return 'NULL';
+  return "'${_copyCellText(session, rowIndex, columnIndex).replaceAll("'", "''")}'";
+}
+
+Object? _jsonValue(TableDataSession session, int rowIndex, int columnIndex) {
+  if (_copyCellIsNull(session, rowIndex, columnIndex)) return null;
+  return _structuredJsonValue(_copyCellText(session, rowIndex, columnIndex));
+}
+
+Object? _structuredJsonValue(String value) {
+  if (!_looksLikeJson(value)) return value;
+
+  final trimmed = value.trim();
+  try {
+    return jsonDecode(trimmed);
+  } on FormatException {
+    final looseMap = _parseLooseMap(trimmed);
+    return looseMap ?? value;
+  }
+}
+
+Map<String, String>? _parseLooseMap(String value) {
+  if (!value.startsWith('{') || !value.endsWith('}')) return null;
+
+  final body = value.substring(1, value.length - 1).trim();
+  if (body.isEmpty) return <String, String>{};
+
+  final entries = <String, String>{};
+  for (final part in body.split(',')) {
+    final separator = part.indexOf(':');
+    if (separator <= 0) return null;
+
+    final key = part.substring(0, separator).trim();
+    final parsedValue = part.substring(separator + 1).trim();
+    if (key.isEmpty) return null;
+
+    entries[key] = parsedValue;
+  }
+  return entries;
+}
+
+bool _looksLikeJson(String value) {
+  final trimmed = value.trimLeft();
+  return (trimmed.startsWith('{') && value.trimRight().endsWith('}')) ||
+      (trimmed.startsWith('[') && value.trimRight().endsWith(']'));
+}
+
+class _GridColumnGroup extends StatelessWidget {
+  final TableTabKey tableKey;
+  final TableDataSession session;
+  final List<TableDataColumn> columns;
+  final List<double> widths;
+  final List<int> columnIndexes;
+  final ScrollController? verticalController;
+  final VoidCallback onRequestKeyboardFocus;
+  final Future<void> Function(int rowIndex, [_CopyRowsFormat? format])
+  onCopyRows;
+  final void Function(TableForeignKey, TableCellValue)? onOpenForeignKey;
+  final void Function(int columnIndex, double width) onResizeColumnStart;
+  final ValueChanged<double> onResizeColumnUpdate;
+  final VoidCallback onResizeColumnEnd;
+
+  const _GridColumnGroup({
+    required this.tableKey,
+    required this.session,
+    required this.columns,
+    required this.widths,
+    required this.columnIndexes,
+    required this.verticalController,
+    required this.onRequestKeyboardFocus,
+    required this.onCopyRows,
+    required this.onResizeColumnStart,
+    required this.onResizeColumnUpdate,
+    required this.onResizeColumnEnd,
+    this.onOpenForeignKey,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        _HeaderRow(
+          tableKey: tableKey,
+          columns: columns,
+          widths: widths,
+          columnIndexes: columnIndexes,
+          pinnedColumnIndexes: session.pinnedColumnIndexes,
+          onResizeColumnStart: onResizeColumnStart,
+          onResizeColumnUpdate: onResizeColumnUpdate,
+          onResizeColumnEnd: onResizeColumnEnd,
+        ),
+        Expanded(
+          child: session.rows.isEmpty
+              ? const _NoRows()
+              : ListView.builder(
+                  controller: verticalController,
+                  itemExtent: 34,
+                  itemCount: session.rows.length,
+                  itemBuilder: (context, index) => _GridRow(
+                    tableKey: tableKey,
+                    rowIndex: index,
+                    row: session.rows[index],
+                    widths: widths,
+                    columnIndexes: columnIndexes,
+                    selected: session.selectedRowIndexes.contains(index),
+                    activeEdit: session.activeCellEdit,
+                    stagedEdits: session.stagedCellEdits,
+                    stagedDelete: session.stagedDeletedRowIndexes.contains(
+                      index,
+                    ),
+                    stagedInsert: session.stagedInsertedRowIndexes.contains(
+                      index,
+                    ),
+                    editable: session.isEditable,
+                    columns: columns,
+                    onRequestKeyboardFocus: onRequestKeyboardFocus,
+                    onCopyRows: (format) => onCopyRows(index, format),
+                    onOpenForeignKey: onOpenForeignKey,
+                  ),
+                ),
+        ),
+      ],
+    );
+  }
 }
 
 class _HeaderRow extends StatelessWidget {
+  final TableTabKey tableKey;
   final List<TableDataColumn> columns;
   final List<double> widths;
+  final List<int> columnIndexes;
+  final List<int> pinnedColumnIndexes;
+  final void Function(int columnIndex, double width) onResizeColumnStart;
+  final ValueChanged<double> onResizeColumnUpdate;
+  final VoidCallback onResizeColumnEnd;
 
-  const _HeaderRow({required this.columns, required this.widths});
+  const _HeaderRow({
+    required this.tableKey,
+    required this.columns,
+    required this.widths,
+    required this.columnIndexes,
+    required this.pinnedColumnIndexes,
+    required this.onResizeColumnStart,
+    required this.onResizeColumnUpdate,
+    required this.onResizeColumnEnd,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -998,50 +1472,215 @@ class _HeaderRow extends StatelessWidget {
       color: theme.colors.secondary,
       child: Row(
         children: [
-          for (var index = 0; index < columns.length; index++)
-            Container(
+          for (final index in columnIndexes)
+            _HeaderCell(
+              tableKey: tableKey,
+              column: columns[index],
+              columnIndex: index,
               width: widths[index],
-              padding: const EdgeInsets.symmetric(horizontal: 10),
-              alignment: Alignment.centerLeft,
-              decoration: BoxDecoration(
-                border: Border(
-                  right: BorderSide(color: theme.colors.border, width: 1),
-                  bottom: BorderSide(color: theme.colors.border, width: 1),
-                ),
-              ),
-              child: Row(
-                children: [
-                  if (columns[index].isPrimaryKey) ...[
-                    Icon(
-                      Icons.key_outlined,
-                      size: 12,
-                      color: theme.colors.mutedForeground,
-                    ),
-                    const SizedBox(width: 5),
-                  ],
-                  if (columns[index].foreignKey != null) ...[
-                    Icon(
-                      Icons.link,
-                      size: 12,
-                      color: theme.colors.mutedForeground,
-                    ),
-                    const SizedBox(width: 5),
-                  ],
-                  Expanded(
-                    child: Text(
-                      columns[index].name,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: theme.colors.foreground,
+              pinned: pinnedColumnIndexes.contains(index),
+              pinnedColumnIndexes: pinnedColumnIndexes,
+              onResizeStart: () => onResizeColumnStart(index, widths[index]),
+              onResizeUpdate: onResizeColumnUpdate,
+              onResizeEnd: onResizeColumnEnd,
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HeaderCell extends StatelessWidget {
+  final TableTabKey tableKey;
+  final TableDataColumn column;
+  final int columnIndex;
+  final double width;
+  final bool pinned;
+  final List<int> pinnedColumnIndexes;
+  final VoidCallback onResizeStart;
+  final ValueChanged<double> onResizeUpdate;
+  final VoidCallback onResizeEnd;
+
+  const _HeaderCell({
+    required this.tableKey,
+    required this.column,
+    required this.columnIndex,
+    required this.width,
+    required this.pinned,
+    required this.pinnedColumnIndexes,
+    required this.onResizeStart,
+    required this.onResizeUpdate,
+    required this.onResizeEnd,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = context.theme;
+    final pinnedPosition = pinnedColumnIndexes.indexOf(columnIndex);
+    return FContextMenu(
+      menuBuilder: (context, controller, menu) => [
+        FItemGroup(
+          children: [
+            if (pinned)
+              FSubmenuItem(
+                prefix: const Icon(Icons.swap_horiz, size: 14),
+                title: const Text('Move to'),
+                submenu: [
+                  FItemGroup(
+                    children: [
+                      FItem(
+                        enabled: pinnedPosition > 0,
+                        title: const Text('Left'),
+                        onPress: pinnedPosition > 0
+                            ? () {
+                                controller.hide();
+                                context
+                                    .read<TableDataCubit>()
+                                    .movePinnedColumnLeft(
+                                      tableKey,
+                                      columnIndex,
+                                    );
+                              }
+                            : null,
                       ),
-                    ),
+                      FItem(
+                        enabled:
+                            pinnedPosition >= 0 &&
+                            pinnedPosition < pinnedColumnIndexes.length - 1,
+                        title: const Text('Right'),
+                        onPress:
+                            pinnedPosition >= 0 &&
+                                pinnedPosition < pinnedColumnIndexes.length - 1
+                            ? () {
+                                controller.hide();
+                                context
+                                    .read<TableDataCubit>()
+                                    .movePinnedColumnRight(
+                                      tableKey,
+                                      columnIndex,
+                                    );
+                              }
+                            : null,
+                      ),
+                    ],
                   ),
                 ],
               ),
+            FItem(
+              prefix: Icon(
+                pinned ? Icons.push_pin : Icons.push_pin_outlined,
+                size: 14,
+              ),
+              title: Text(pinned ? 'Unpin column' : 'Pin column'),
+              onPress: () {
+                controller.hide();
+                if (pinned) {
+                  context.read<TableDataCubit>().unpinColumn(
+                    tableKey,
+                    columnIndex,
+                  );
+                } else {
+                  context.read<TableDataCubit>().pinColumn(
+                    tableKey,
+                    columnIndex,
+                  );
+                }
+              },
             ),
-        ],
+          ],
+        ),
+      ],
+      child: SizedBox(
+        width: width,
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: Container(
+                padding: const EdgeInsets.only(left: 10, right: 14),
+                alignment: Alignment.centerLeft,
+                decoration: BoxDecoration(
+                  color: pinned
+                      ? theme.colors.primary.withValues(alpha: 0.08)
+                      : null,
+                  border: Border(
+                    right: BorderSide(
+                      color: pinned
+                          ? theme.colors.primary
+                          : theme.colors.border,
+                      width: pinned ? 1.5 : 1,
+                    ),
+                    bottom: BorderSide(color: theme.colors.border, width: 1),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    if (pinned) ...[
+                      Icon(
+                        Icons.push_pin,
+                        size: 12,
+                        color: theme.colors.primary,
+                      ),
+                      const SizedBox(width: 5),
+                    ],
+                    if (column.isPrimaryKey) ...[
+                      Icon(
+                        Icons.key_outlined,
+                        size: 12,
+                        color: theme.colors.mutedForeground,
+                      ),
+                      const SizedBox(width: 5),
+                    ],
+                    if (column.foreignKey != null) ...[
+                      Icon(
+                        Icons.link,
+                        size: 12,
+                        color: theme.colors.mutedForeground,
+                      ),
+                      const SizedBox(width: 5),
+                    ],
+                    Expanded(
+                      child: Text(
+                        column.name,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: theme.colors.foreground,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            Positioned(
+              top: 0,
+              right: 0,
+              bottom: 0,
+              width: 8,
+              child: MouseRegion(
+                cursor: SystemMouseCursors.resizeColumn,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onHorizontalDragStart: (_) => onResizeStart(),
+                  onHorizontalDragUpdate: (details) {
+                    onResizeUpdate(details.delta.dx);
+                  },
+                  onHorizontalDragEnd: (_) => onResizeEnd(),
+                  onHorizontalDragCancel: onResizeEnd,
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: Container(
+                      width: 2,
+                      height: double.infinity,
+                      color: Colors.transparent,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1052,6 +1691,7 @@ class _GridRow extends StatelessWidget {
   final int rowIndex;
   final TableDataRow row;
   final List<double> widths;
+  final List<int> columnIndexes;
   final bool selected;
   final TableCellEdit? activeEdit;
   final Map<TableCellCoordinate, TableCellEdit> stagedEdits;
@@ -1059,6 +1699,8 @@ class _GridRow extends StatelessWidget {
   final bool stagedInsert;
   final bool editable;
   final List<TableDataColumn> columns;
+  final VoidCallback onRequestKeyboardFocus;
+  final void Function(_CopyRowsFormat? format) onCopyRows;
   final void Function(TableForeignKey, TableCellValue)? onOpenForeignKey;
 
   const _GridRow({
@@ -1066,6 +1708,7 @@ class _GridRow extends StatelessWidget {
     required this.rowIndex,
     required this.row,
     required this.widths,
+    required this.columnIndexes,
     required this.selected,
     required this.activeEdit,
     required this.stagedEdits,
@@ -1073,6 +1716,8 @@ class _GridRow extends StatelessWidget {
     required this.stagedInsert,
     required this.editable,
     required this.columns,
+    required this.onRequestKeyboardFocus,
+    required this.onCopyRows,
     this.onOpenForeignKey,
   });
 
@@ -1084,8 +1729,47 @@ class _GridRow extends StatelessWidget {
         FItemGroup(
           children: [
             FItem(
-              enabled: editable,
               prefix: const Icon(Icons.copy_outlined, size: 14),
+              title: const Text('Copy'),
+              onPress: () {
+                controller.hide();
+                onCopyRows(null);
+              },
+            ),
+            FSubmenuItem(
+              prefix: const Icon(Icons.file_copy_outlined, size: 14),
+              title: const Text('Copy as'),
+              submenu: [
+                FItemGroup(
+                  children: [
+                    FItem(
+                      title: const Text('CSV'),
+                      onPress: () {
+                        controller.hide();
+                        onCopyRows(_CopyRowsFormat.csv);
+                      },
+                    ),
+                    FItem(
+                      title: const Text('SQL'),
+                      onPress: () {
+                        controller.hide();
+                        onCopyRows(_CopyRowsFormat.sql);
+                      },
+                    ),
+                    FItem(
+                      title: const Text('JSON'),
+                      onPress: () {
+                        controller.hide();
+                        onCopyRows(_CopyRowsFormat.json);
+                      },
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            FItem(
+              enabled: editable,
+              prefix: const Icon(Icons.control_point_duplicate, size: 14),
               title: const Text('Duplicate'),
               onPress: editable
                   ? () {
@@ -1125,7 +1809,7 @@ class _GridRow extends StatelessWidget {
             : Colors.transparent,
         child: Row(
           children: [
-            for (var index = 0; index < row.cells.length; index++)
+            for (final index in columnIndexes)
               _GridCell(
                 rowIndex: rowIndex,
                 columnIndex: index,
@@ -1144,6 +1828,7 @@ class _GridRow extends StatelessWidget {
                 deleted: stagedDelete,
                 inserted: stagedInsert,
                 onActivate: () {
+                  onRequestKeyboardFocus();
                   final keyboard = HardwareKeyboard.instance;
                   context.read<TableDataCubit>().activateCell(
                     tableKey,
@@ -1158,31 +1843,56 @@ class _GridRow extends StatelessWidget {
                     .read<TableDataCubit>()
                     .updateCellDraft(tableKey, value),
                 onNavigate: (reverse) {
-                  final session = context.read<TableDataCubit>().state.session(tableKey);
+                  final session = context.read<TableDataCubit>().state.session(
+                    tableKey,
+                  );
                   if (session == null) return;
-                  final nextCol = reverse ? activeEdit!.columnIndex - 1 : activeEdit!.columnIndex + 1;
-                  if (nextCol >= 0 && nextCol < session.structure!.columns.length) {
-                    context.read<TableDataCubit>().beginCellEdit(tableKey, activeEdit!.rowIndex, nextCol);
+                  final nextCol = reverse
+                      ? activeEdit!.columnIndex - 1
+                      : activeEdit!.columnIndex + 1;
+                  if (nextCol >= 0 &&
+                      nextCol < session.structure!.columns.length) {
+                    context.read<TableDataCubit>().beginCellEdit(
+                      tableKey,
+                      activeEdit!.rowIndex,
+                      nextCol,
+                    );
                   } else if (nextCol >= session.structure!.columns.length) {
                     // wrap to next row
                     final nextRow = activeEdit!.rowIndex + 1;
                     if (nextRow < session.rows.length) {
-                      context.read<TableDataCubit>().beginCellEdit(tableKey, nextRow, 0);
+                      context.read<TableDataCubit>().beginCellEdit(
+                        tableKey,
+                        nextRow,
+                        0,
+                      );
                     }
                   } else if (nextCol < 0) {
                     // wrap to prev row
                     final prevRow = activeEdit!.rowIndex - 1;
                     if (prevRow >= 0) {
-                      context.read<TableDataCubit>().beginCellEdit(tableKey, prevRow, session.structure!.columns.length - 1);
+                      context.read<TableDataCubit>().beginCellEdit(
+                        tableKey,
+                        prevRow,
+                        session.structure!.columns.length - 1,
+                      );
                     }
                   }
                 },
                 onNavigateRow: (reverse) {
-                  final session = context.read<TableDataCubit>().state.session(tableKey);
+                  final session = context.read<TableDataCubit>().state.session(
+                    tableKey,
+                  );
                   if (session == null) return;
-                  final nextRow = reverse ? activeEdit!.rowIndex - 1 : activeEdit!.rowIndex + 1;
+                  final nextRow = reverse
+                      ? activeEdit!.rowIndex - 1
+                      : activeEdit!.rowIndex + 1;
                   if (nextRow >= 0 && nextRow < session.rows.length) {
-                    context.read<TableDataCubit>().beginCellEdit(tableKey, nextRow, activeEdit!.columnIndex);
+                    context.read<TableDataCubit>().beginCellEdit(
+                      tableKey,
+                      nextRow,
+                      activeEdit!.columnIndex,
+                    );
                   }
                 },
                 foreignKey: columns[index].foreignKey,
@@ -1371,7 +2081,8 @@ class _CellTextFieldState extends State<_CellTextField> {
             final shift = HardwareKeyboard.instance.isShiftPressed;
             widget.onNavigate?.call(shift);
             return KeyEventResult.handled;
-          } else if (event.logicalKey == LogicalKeyboardKey.enter && !HardwareKeyboard.instance.isShiftPressed) {
+          } else if (event.logicalKey == LogicalKeyboardKey.enter &&
+              !HardwareKeyboard.instance.isShiftPressed) {
             widget.onNavigateRow?.call(false);
             return KeyEventResult.handled;
           }
@@ -1540,7 +2251,9 @@ class _PaginationBar extends StatelessWidget {
                   ],
                   if (session.hasPendingChanges) ...[
                     FTooltip(
-                      tipBuilder: (context, controller) => Text('Commit changes (${KeyboardShortcuts.format('Cmd-S')})'),
+                      tipBuilder: (context, controller) => Text(
+                        'Commit changes (${KeyboardShortcuts.format('Cmd-S')})',
+                      ),
                       child: FButton(
                         size: FButtonSizeVariant.xs,
                         variant: session.hasPendingDeletes
@@ -1552,13 +2265,16 @@ class _PaginationBar extends StatelessWidget {
                                   .read<TableDataCubit>()
                                   .commitPendingChanges(tableKey),
                         child: Text(
-                          session.isCommittingChanges ? 'Committing…' : 'Commit',
+                          session.isCommittingChanges
+                              ? 'Committing…'
+                              : 'Commit',
                         ),
                       ),
                     ),
                     const SizedBox(width: 6),
                     FTooltip(
-                      tipBuilder: (context, controller) => const Text('Cancel changes (Esc)'),
+                      tipBuilder: (context, controller) =>
+                          const Text('Cancel changes (Esc)'),
                       child: FButton(
                         size: FButtonSizeVariant.xs,
                         variant: FButtonVariant.outline,
@@ -1795,19 +2511,30 @@ class _TableActionBar extends StatefulWidget {
 
 class _TableActionBarState extends State<_TableActionBar> {
   late final TextEditingController _searchController;
+  late String _lastSessionSearchQuery;
   Timer? _debounce;
 
   @override
   void initState() {
     super.initState();
-    _searchController = TextEditingController(text: widget.session.searchQuery);
+    _lastSessionSearchQuery = widget.session.searchQuery ?? '';
+    _searchController = TextEditingController(text: _lastSessionSearchQuery);
   }
 
   @override
   void didUpdateWidget(covariant _TableActionBar oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.session.searchQuery != _searchController.text) {
-      _searchController.text = widget.session.searchQuery ?? '';
+    final sessionSearchQuery = widget.session.searchQuery ?? '';
+    if (sessionSearchQuery == _lastSessionSearchQuery) return;
+
+    _lastSessionSearchQuery = sessionSearchQuery;
+    if (_debounce?.isActive ?? false) return;
+
+    if (sessionSearchQuery != _searchController.text) {
+      _searchController.value = TextEditingValue(
+        text: sessionSearchQuery,
+        selection: TextSelection.collapsed(offset: sessionSearchQuery.length),
+      );
     }
   }
 
@@ -1822,7 +2549,15 @@ class _TableActionBarState extends State<_TableActionBar> {
     if (_debounce?.isActive ?? false) _debounce!.cancel();
     _debounce = Timer(const Duration(milliseconds: 400), () {
       if (!mounted) return;
-      context.read<TableDataCubit>().setSearchQuery(widget.tableKey, query);
+      final selectedColumn =
+          widget.session.searchColumn ??
+          widget.session.structure?.columns.firstOrNull?.name ??
+          '__ALL__';
+      context.read<TableDataCubit>().setSearch(
+        widget.tableKey,
+        query: query,
+        column: selectedColumn,
+      );
     });
   }
 
@@ -1845,10 +2580,87 @@ class _TableActionBarState extends State<_TableActionBar> {
                 controller: _searchController,
                 onChange: (value) => _onSearchChanged(value.text),
               ),
-              hint: 'Search all columns...',
+              hint: 'Search...',
               maxLines: 1,
               size: FTextFieldSizeVariant.sm,
               clearable: (value) => value.text.isNotEmpty,
+              suffixBuilder: (context, fieldStyle, widgetWidget) {
+                final columns = widget.session.structure?.columns ?? [];
+                if (columns.isEmpty) return const SizedBox.shrink();
+
+                final items = {
+                  '__ALL__': 'All',
+                  for (final col in columns) col.name: col.name,
+                };
+
+                final selectedValue =
+                    widget.session.searchColumn ??
+                    columns.firstOrNull?.name ??
+                    '__ALL__';
+
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: FPopoverMenu(
+                    menuBuilder: (context, controller, menu) => [
+                      FItemGroup(
+                        children: [
+                          for (final entry in items.entries)
+                            FItem(
+                              title: Text(entry.value),
+                              onPress: () {
+                                controller.hide();
+                                context.read<TableDataCubit>().setSearch(
+                                  widget.tableKey,
+                                  column: entry.key,
+                                );
+                              },
+                            ),
+                        ],
+                      ),
+                    ],
+                    builder: (context, controller, child) {
+                      return MouseRegion(
+                        cursor: SystemMouseCursors.click,
+                        child: GestureDetector(
+                          onTap: controller.toggle,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: theme.colors.secondary,
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(
+                                color: theme.colors.border,
+                                width: 1,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  items[selectedValue] ?? 'All',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: theme.colors.mutedForeground,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                Icon(
+                                  Icons.arrow_drop_down,
+                                  size: 14,
+                                  color: theme.colors.mutedForeground,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                );
+              },
             ),
           ),
           const SizedBox(width: 8),

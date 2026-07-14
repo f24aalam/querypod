@@ -11,6 +11,7 @@ import '../features/connections/presentation/cubit/connection_cubit.dart';
 import '../features/editor/data/repositories/query_history_repository_impl.dart';
 import '../features/editor/data/repositories/query_repository_impl.dart';
 import '../features/editor/data/repositories/connection_metadata_repository_impl.dart';
+import '../features/editor/data/repositories/pinned_tables_repository_impl.dart';
 import '../features/editor/data/repositories/table_data_repository_impl.dart';
 import '../features/workspaces/data/repositories/workspace_repository_impl.dart';
 import '../features/editor/domain/repositories/query_history_repository.dart';
@@ -18,6 +19,7 @@ import '../features/workspaces/domain/repositories/workspace_repository.dart';
 import '../features/editor/domain/repositories/query_repository.dart';
 import '../features/editor/domain/repositories/table_data_repository.dart';
 import '../features/editor/domain/repositories/connection_metadata_repository.dart';
+import '../features/editor/domain/repositories/pinned_tables_repository.dart';
 import '../features/editor/presentation/cubit/query_editor_cubit.dart';
 import '../features/editor/presentation/cubit/connection_metadata_cubit.dart';
 import '../features/editor/presentation/cubit/table_data_cubit.dart';
@@ -45,6 +47,10 @@ Future<void> configureDependencies({
     prefs: prefs,
     keyNamespace: launchBootstrap.profileNamespace,
   );
+  final pinnedTablesRepository = PinnedTablesRepositoryImpl(
+    prefs,
+    keyNamespace: launchBootstrap.profileNamespace,
+  );
 
   getIt.registerLazySingleton<ConnectionRepository>(() => connectionRepository);
   getIt.registerLazySingleton<QueryRepository>(
@@ -55,6 +61,9 @@ Future<void> configureDependencies({
   );
   getIt.registerLazySingleton<ConnectionMetadataRepository>(
     () => ConnectionMetadataRepositoryImpl(),
+  );
+  getIt.registerLazySingleton<PinnedTablesRepository>(
+    () => pinnedTablesRepository,
   );
   getIt.registerLazySingleton<WorkspaceRepository>(() => workspaceRepository);
   getIt.registerLazySingleton<TableDataRepository>(
@@ -71,7 +80,12 @@ Future<void> configureDependencies({
       tableDataRepository: getIt(),
     ),
   );
-  getIt.registerFactory(() => ConnectionMetadataCubit(repository: getIt()));
+  getIt.registerFactory(
+    () => ConnectionMetadataCubit(
+      repository: getIt(),
+      pinnedTablesRepository: getIt(),
+    ),
+  );
   getIt.registerFactory(() => TableDataCubit(repository: getIt()));
   getIt.registerFactory(() => WorkspacesCubit(repository: getIt()));
 

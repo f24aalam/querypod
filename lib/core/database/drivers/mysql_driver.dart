@@ -320,6 +320,7 @@ class MySQLDriver implements DatabaseDriver {
     String table, {
     required TableStructure structure,
     String? searchQuery,
+    String? searchColumn,
     List<TableFilter>? filters,
     void Function(QueryHistory)? onHistory,
   }) async {
@@ -333,14 +334,19 @@ class MySQLDriver implements DatabaseDriver {
       final whereClauses = <String>[];
 
       if (searchQuery != null && searchQuery.isNotEmpty) {
-        final searchClauses = <String>[];
-        for (int i = 0; i < structure.columns.length; i++) {
-          searchClauses.add(
-            '${_quoteIdentifier(structure.columns[i].name)} LIKE :search$i',
-          );
-          queryParams['search$i'] = '%$searchQuery%';
+        if (searchColumn != null && searchColumn != '__ALL__') {
+          whereClauses.add('${_quoteIdentifier(searchColumn)} LIKE :search0');
+          queryParams['search0'] = '%$searchQuery%';
+        } else {
+          final searchClauses = <String>[];
+          for (int i = 0; i < structure.columns.length; i++) {
+            searchClauses.add(
+              '${_quoteIdentifier(structure.columns[i].name)} LIKE :search$i',
+            );
+            queryParams['search$i'] = '%$searchQuery%';
+          }
+          whereClauses.add('(${searchClauses.join(' OR ')})');
         }
-        whereClauses.add('(${searchClauses.join(' OR ')})');
       }
 
       if (filters != null && filters.isNotEmpty) {
@@ -389,6 +395,7 @@ class MySQLDriver implements DatabaseDriver {
     required int offset,
     required int limit,
     String? searchQuery,
+    String? searchColumn,
     List<TableFilter>? filters,
     void Function(QueryHistory)? onHistory,
   }) async {
@@ -402,14 +409,19 @@ class MySQLDriver implements DatabaseDriver {
       final whereClauses = <String>[];
 
       if (searchQuery != null && searchQuery.isNotEmpty) {
-        final searchClauses = <String>[];
-        for (int i = 0; i < structure.columns.length; i++) {
-          searchClauses.add(
-            '${_quoteIdentifier(structure.columns[i].name)} LIKE :search$i',
-          );
-          queryParams['search$i'] = '%$searchQuery%';
+        if (searchColumn != null && searchColumn != '__ALL__') {
+          whereClauses.add('${_quoteIdentifier(searchColumn)} LIKE :search0');
+          queryParams['search0'] = '%$searchQuery%';
+        } else {
+          final searchClauses = <String>[];
+          for (int i = 0; i < structure.columns.length; i++) {
+            searchClauses.add(
+              '${_quoteIdentifier(structure.columns[i].name)} LIKE :search$i',
+            );
+            queryParams['search$i'] = '%$searchQuery%';
+          }
+          whereClauses.add('(${searchClauses.join(' OR ')})');
         }
-        whereClauses.add('(${searchClauses.join(' OR ')})');
       }
 
       if (filters != null && filters.isNotEmpty) {

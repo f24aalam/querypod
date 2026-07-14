@@ -223,17 +223,52 @@ class _TableListBody extends StatelessWidget {
       return _EmptyState(message: 'No matching tables', theme: theme);
     }
 
-    return ListView(
-      padding: EdgeInsets.zero,
-      children: state.filteredTables
-          .map(
-            (table) => _TableItem(
-              table: table,
-              isSelected: table.name == state.selectedTable?.name,
-              theme: theme,
-            ),
-          )
-          .toList(),
+    final pinnedTables = state.pinnedFilteredTables;
+    final unpinnedTables = state.unpinnedFilteredTables;
+
+    if (pinnedTables.isEmpty) {
+      return ListView(
+        padding: EdgeInsets.zero,
+        children: unpinnedTables
+            .map(
+              (table) => _TableItem(
+                table: table,
+                isSelected: table.name == state.selectedTable?.name,
+                isPinned: state.pinnedTableNames.contains(table.name),
+                theme: theme,
+              ),
+            )
+            .toList(),
+      );
+    }
+
+    return Column(
+      children: [
+        ...pinnedTables.map(
+          (table) => _TableItem(
+            table: table,
+            isSelected: table.name == state.selectedTable?.name,
+            isPinned: true,
+            theme: theme,
+          ),
+        ),
+        Divider(height: 1, thickness: 1, color: theme.colors.border),
+        Expanded(
+          child: ListView(
+            padding: EdgeInsets.zero,
+            children: unpinnedTables
+                .map(
+                  (table) => _TableItem(
+                    table: table,
+                    isSelected: table.name == state.selectedTable?.name,
+                    isPinned: false,
+                    theme: theme,
+                  ),
+                )
+                .toList(),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -326,10 +361,9 @@ class _DatabasePicker extends StatelessWidget {
                           if (value == null || selectedConnection == null) {
                             return;
                           }
-                          context.read<ConnectionMetadataCubit>().selectDatabase(
-                            selectedConnection,
-                            value,
-                          );
+                          context
+                              .read<ConnectionMetadataCubit>()
+                              .selectDatabase(selectedConnection, value);
                         },
                       ),
                     ),
@@ -356,11 +390,13 @@ class _DatabasePicker extends StatelessWidget {
 class _TableItem extends StatelessWidget {
   final ConnectionTable table;
   final bool isSelected;
+  final bool isPinned;
   final FThemeData theme;
 
   const _TableItem({
     required this.table,
     required this.isSelected,
+    required this.isPinned,
     required this.theme,
   });
 
@@ -370,6 +406,17 @@ class _TableItem extends StatelessWidget {
       menuBuilder: (context, controller, menu) => [
         FItemGroup(
           children: [
+            FItem(
+              title: Text(isPinned ? 'Unpin' : 'Pin'),
+              prefix: Icon(
+                isPinned ? Icons.push_pin : Icons.push_pin_outlined,
+                size: 14,
+              ),
+              onPress: () {
+                controller.hide();
+                context.read<ConnectionMetadataCubit>().toggleTablePin(table);
+              },
+            ),
             FItem(
               title: const Text('Edit'),
               prefix: const Icon(Icons.edit_outlined, size: 14),
@@ -455,34 +502,45 @@ class _TableItem extends StatelessWidget {
           ],
         ),
       ],
-      child: GestureDetector(
-        onTap: () => _open(context, pin: false),
-        onDoubleTap: () => _open(context, pin: true),
-        child: Container(
-          color: isSelected ? theme.colors.secondary : Colors.transparent,
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          child: Row(
-            children: [
-              Icon(
-                table.type == ConnectionTableType.view
-                    ? Icons.visibility_outlined
-                    : Icons.table_chart_outlined,
-                size: 14,
-                color: theme.colors.mutedForeground,
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  table.name,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: theme.colors.foreground,
-                  ),
-                  overflow: TextOverflow.ellipsis,
+      child: Container(
+        color: isSelected ? theme.colors.secondary : Colors.transparent,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        child: Row(
+          children: [
+            Expanded(
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => _open(context, pin: false),
+                onDoubleTap: () => _open(context, pin: true),
+                child: Row(
+                  children: [
+                    Icon(
+                      table.type == ConnectionTableType.view
+                          ? Icons.visibility_outlined
+                          : Icons.table_chart_outlined,
+                      size: 14,
+                      color: theme.colors.mutedForeground,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        table.name,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: theme.colors.foreground,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
                 ),
               ),
+            ),
+            if (isPinned) ...[
+              const SizedBox(width: 4),
+              Icon(Icons.push_pin, size: 14, color: theme.colors.primary),
             ],
-          ),
+          ],
         ),
       ),
     );

@@ -21,11 +21,14 @@ class TableDataSession {
   final TableDataStatus status;
   final String? errorMessage;
   final String? searchQuery;
+  final String? searchColumn;
   final List<TableFilter> filters;
   final int feedbackNonce;
   final bool isShowingStructure;
   final ForeignRowPreview? foreignRowPreview;
   final bool isFetchingForeignRow;
+  final List<int> pinnedColumnIndexes;
+  final Map<int, double> columnWidthOverrides;
 
   TableDataSession({
     required this.key,
@@ -45,17 +48,22 @@ class TableDataSession {
     this.status = TableDataStatus.initialLoading,
     this.errorMessage,
     this.searchQuery,
+    this.searchColumn,
     List<TableFilter> filters = const [],
     this.feedbackNonce = 0,
     this.isShowingStructure = false,
     this.foreignRowPreview,
     this.isFetchingForeignRow = false,
+    List<int> pinnedColumnIndexes = const [],
+    Map<int, double> columnWidthOverrides = const {},
   }) : rows = List.unmodifiable(rows),
        filters = List.unmodifiable(filters),
        selectedRowIndexes = Set.unmodifiable(selectedRowIndexes),
        stagedCellEdits = Map.unmodifiable(stagedCellEdits),
        stagedDeletedRowIndexes = Set.unmodifiable(stagedDeletedRowIndexes),
-       stagedInsertedRowIndexes = Set.unmodifiable(stagedInsertedRowIndexes);
+       stagedInsertedRowIndexes = Set.unmodifiable(stagedInsertedRowIndexes),
+       pinnedColumnIndexes = List.unmodifiable(pinnedColumnIndexes),
+       columnWidthOverrides = Map.unmodifiable(columnWidthOverrides);
 
   int get pageCount => totalCount == 0 ? 0 : (totalCount / pageSize).ceil();
   int get rangeStart => rows.isEmpty ? 0 : pageIndex * pageSize + 1;
@@ -74,7 +82,8 @@ class TableDataSession {
   bool get hasPendingEdits => stagedCellEdits.isNotEmpty;
   bool get hasPendingDeletes => stagedDeletedRowIndexes.isNotEmpty;
   bool get hasPendingInserts => stagedInsertedRowIndexes.isNotEmpty;
-  bool get hasPendingChanges => hasPendingEdits || hasPendingDeletes || hasPendingInserts;
+  bool get hasPendingChanges =>
+      hasPendingEdits || hasPendingDeletes || hasPendingInserts;
 
   TableDataSession copyWith({
     TableStructure? Function()? structure,
@@ -93,11 +102,14 @@ class TableDataSession {
     TableDataStatus? status,
     String? Function()? errorMessage,
     String? Function()? searchQuery,
+    String? Function()? searchColumn,
     List<TableFilter>? filters,
     int? feedbackNonce,
     bool? isShowingStructure,
     ForeignRowPreview? Function()? foreignRowPreview,
     bool? isFetchingForeignRow,
+    List<int>? pinnedColumnIndexes,
+    Map<int, double>? columnWidthOverrides,
   }) {
     return TableDataSession(
       key: key,
@@ -123,6 +135,7 @@ class TableDataSession {
       status: status ?? this.status,
       errorMessage: errorMessage != null ? errorMessage() : this.errorMessage,
       searchQuery: searchQuery != null ? searchQuery() : this.searchQuery,
+      searchColumn: searchColumn != null ? searchColumn() : this.searchColumn,
       filters: filters ?? this.filters,
       feedbackNonce: feedbackNonce ?? this.feedbackNonce,
       isShowingStructure: isShowingStructure ?? this.isShowingStructure,
@@ -130,6 +143,8 @@ class TableDataSession {
           ? foreignRowPreview()
           : this.foreignRowPreview,
       isFetchingForeignRow: isFetchingForeignRow ?? this.isFetchingForeignRow,
+      pinnedColumnIndexes: pinnedColumnIndexes ?? this.pinnedColumnIndexes,
+      columnWidthOverrides: columnWidthOverrides ?? this.columnWidthOverrides,
     );
   }
 }

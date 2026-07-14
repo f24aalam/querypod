@@ -5,14 +5,18 @@ import '../../../connections/domain/entities/connection.dart';
 import '../../domain/entities/connection_table.dart';
 import '../../domain/entities/table_data.dart';
 import '../../domain/repositories/connection_metadata_repository.dart';
+import '../../domain/repositories/pinned_tables_repository.dart';
 import 'connection_metadata_state.dart';
 
 class ConnectionMetadataCubit extends Cubit<ConnectionMetadataState> {
-  final ConnectionMetadataRepository _repository;
+  final ConnectionMetadataRepository repository;
+  final PinnedTablesRepository pinnedTablesRepository;
   int _requestGeneration = 0;
 
-  ConnectionMetadataCubit({required this._repository})
-    : super(const ConnectionMetadataState());
+  ConnectionMetadataCubit({
+    required this.repository,
+    required this.pinnedTablesRepository,
+  }) : super(const ConnectionMetadataState());
 
   ConnectionMetadataState _feedback(
     String message, {
@@ -51,6 +55,7 @@ class ConnectionMetadataCubit extends Cubit<ConnectionMetadataState> {
         selectedDatabase: () => null,
         tables: const [],
         filteredTables: const [],
+        pinnedTableNames: const [],
         selectedTable: () => null,
         query: '',
         status: ConnectionMetadataStatus.loadingDatabases,
@@ -58,7 +63,7 @@ class ConnectionMetadataCubit extends Cubit<ConnectionMetadataState> {
     );
 
     try {
-      final databases = await _repository.listDatabases(connection);
+      final databases = await repository.listDatabases(connection);
       if (!_isCurrent(request, session)) return;
       final savedDatabase = connection.database;
       final initialDatabase = databases.any((db) => db.name == savedDatabase)
@@ -95,6 +100,7 @@ class ConnectionMetadataCubit extends Cubit<ConnectionMetadataState> {
           selectedDatabase: () => null,
           tables: const [],
           filteredTables: const [],
+          pinnedTableNames: const [],
           selectedTable: () => null,
         ),
       );
@@ -113,6 +119,7 @@ class ConnectionMetadataCubit extends Cubit<ConnectionMetadataState> {
         query: '',
         tables: const [],
         filteredTables: const [],
+        pinnedTableNames: const [],
         selectedTable: () => null,
         status: ConnectionMetadataStatus.loadingTables,
       ),
@@ -189,6 +196,26 @@ class ConnectionMetadataCubit extends Cubit<ConnectionMetadataState> {
     emit(state.copyWith(selectedTable: () => table));
   }
 
+  Future<void> toggleTablePin(ConnectionTable table) async {
+    final connectionId = state.connectionId;
+    final database = state.selectedDatabase;
+    if (connectionId == null || database == null) return;
+
+    final pinned = List<String>.from(state.pinnedTableNames);
+    if (pinned.contains(table.name)) {
+      pinned.remove(table.name);
+    } else {
+      pinned.add(table.name);
+    }
+
+    emit(state.copyWith(pinnedTableNames: pinned));
+    await pinnedTablesRepository.setPinnedTables(
+      connectionId: connectionId,
+      database: database,
+      tableNames: pinned,
+    );
+  }
+
   void clear() {
     _requestGeneration++;
     emit(const ConnectionMetadataState());
@@ -201,7 +228,7 @@ class ConnectionMetadataCubit extends Cubit<ConnectionMetadataState> {
     String? collation,
   }) async {
     try {
-      await _repository.createDatabase(
+      await repository.createDatabase(
         connection,
         name,
         charset: charset,
@@ -209,9 +236,9 @@ class ConnectionMetadataCubit extends Cubit<ConnectionMetadataState> {
       );
 
       // Refresh databases
-      final databases = await _repository.listDatabases(connection);
+      final databases = await repository.listDatabases(connection);
       final session = connection.sessionIdentity;
-      
+
       if (state.connectionSession != session) return;
 
       emit(state.copyWith(databases: databases));
@@ -221,10 +248,7 @@ class ConnectionMetadataCubit extends Cubit<ConnectionMetadataState> {
     } catch (e) {
       emit(
         _feedback(
-          _metadataErrorMessage(
-            e,
-            fallback: 'Failed to create database $name',
-          ),
+          _metadataErrorMessage(e, fallback: 'Failed to create database $name'),
           isError: true,
           status: state.status, // Preserve current status
         ),
@@ -241,8 +265,8 @@ class ConnectionMetadataCubit extends Cubit<ConnectionMetadataState> {
     List<TableColumnDefinition> columns,
   ) async {
     try {
-      await _repository.createTable(connection, database, tableName, columns);
-      
+      await repository.createTable(connection, database, tableName, columns);
+
       // Refresh tables
       await refreshTables(connection, database);
     } catch (e) {
@@ -266,7 +290,7 @@ class ConnectionMetadataCubit extends Cubit<ConnectionMetadataState> {
     String table,
   ) async {
     try {
-      return await _repository.getTableSchema(connection, database, table);
+      return await repository.getTableSchema(connection, database, table);
     } catch (e) {
       emit(
         _feedback(
@@ -291,8 +315,15 @@ class ConnectionMetadataCubit extends Cubit<ConnectionMetadataState> {
     List<TableColumnDefinition> newColumns,
   ) async {
     try {
-      await _repository.alterTable(connection, database, oldTableName, newTableName, oldColumns, newColumns);
-      
+      await repository.alterTable(
+        connection,
+        database,
+        oldTableName,
+        newTableName,
+        oldColumns,
+        newColumns,
+      );
+
       await refreshTables(connection, database);
     } catch (e) {
       emit(
@@ -316,21 +347,13 @@ class ConnectionMetadataCubit extends Cubit<ConnectionMetadataState> {
     bool cascade = false,
   }) async {
     try {
-      await _repository.dropTable(
-        connection,
-        database,
-        table,
-        cascade: cascade,
-      );
-      
+      await repository.dropTable(connection, database, table, cascade: cascade);
+
       await refreshTables(connection, database);
     } catch (e) {
       emit(
         _feedback(
-          _metadataErrorMessage(
-            e,
-            fallback: 'Failed to drop table $table',
-          ),
+          _metadataErrorMessage(e, fallback: 'Failed to drop table $table'),
           isError: true,
           status: state.status,
         ),
@@ -346,23 +369,20 @@ class ConnectionMetadataCubit extends Cubit<ConnectionMetadataState> {
     bool cascade = false,
   }) async {
     try {
-      await _repository.truncateTable(
+      await repository.truncateTable(
         connection,
         database,
         table,
         cascade: cascade,
       );
-      
+
       // we usually don't need to refresh tables after truncate because the table still exists
       // but if the data view is open it might need to refresh its data,
       // which is handled by the data view's own cubit, not the metadata cubit.
     } catch (e) {
       emit(
         _feedback(
-          _metadataErrorMessage(
-            e,
-            fallback: 'Failed to truncate table $table',
-          ),
+          _metadataErrorMessage(e, fallback: 'Failed to truncate table $table'),
           isError: true,
           status: state.status,
         ),
@@ -377,7 +397,13 @@ class ConnectionMetadataCubit extends Cubit<ConnectionMetadataState> {
     required int request,
     required ConnectionSessionIdentity session,
   }) async {
-    final tables = await _repository.listTables(connection, database);
+    final pinnedFuture = pinnedTablesRepository.getPinnedTables(
+      connectionId: connection.id,
+      database: database,
+    );
+    final tables = await repository.listTables(connection, database);
+    if (!_isCurrent(request, session, database: database)) return;
+    final pinnedTableNames = await pinnedFuture;
     if (!_isCurrent(request, session, database: database)) return;
     final filteredTables = _filter(tables, state.query);
 
@@ -385,6 +411,12 @@ class ConnectionMetadataCubit extends Cubit<ConnectionMetadataState> {
       state.copyWith(
         tables: tables,
         filteredTables: filteredTables,
+        pinnedTableNames: await _prunedPinnedTables(
+          connection.id,
+          database,
+          tables,
+          pinnedTableNames,
+        ),
         selectedTable: () =>
             filteredTables.isNotEmpty ? filteredTables.first : null,
         status: ConnectionMetadataStatus.idle,
@@ -409,5 +441,25 @@ class ConnectionMetadataCubit extends Cubit<ConnectionMetadataState> {
     return tables
         .where((table) => table.name.toLowerCase().contains(q))
         .toList();
+  }
+
+  Future<List<String>> _prunedPinnedTables(
+    String connectionId,
+    String database,
+    List<ConnectionTable> tables,
+    List<String> pinnedTableNames,
+  ) async {
+    final existingNames = tables.map((table) => table.name).toSet();
+    final pinned = pinnedTableNames.where(existingNames.contains).toList();
+
+    if (pinned.length != pinnedTableNames.length) {
+      await pinnedTablesRepository.setPinnedTables(
+        connectionId: connectionId,
+        database: database,
+        tableNames: pinned,
+      );
+    }
+
+    return pinned;
   }
 }

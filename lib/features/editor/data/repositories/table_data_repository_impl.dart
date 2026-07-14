@@ -36,6 +36,7 @@ class TableDataRepositoryImpl implements TableDataRepository {
     String table, {
     required TableStructure structure,
     String? searchQuery,
+    String? searchColumn,
     List<TableFilter>? filters,
   }) async {
     final driver = DatabaseDriverFactory.getDriver(connection.type);
@@ -45,6 +46,7 @@ class TableDataRepositoryImpl implements TableDataRepository {
       table,
       structure: structure,
       searchQuery: searchQuery,
+      searchColumn: searchColumn,
       filters: filters,
       onHistory: _historyRepository.save,
     );
@@ -59,6 +61,7 @@ class TableDataRepositoryImpl implements TableDataRepository {
     required int offset,
     required int limit,
     String? searchQuery,
+    String? searchColumn,
     List<TableFilter>? filters,
   }) async {
     final driver = DatabaseDriverFactory.getDriver(connection.type);
@@ -70,6 +73,7 @@ class TableDataRepositoryImpl implements TableDataRepository {
       offset: offset,
       limit: limit,
       searchQuery: searchQuery,
+      searchColumn: searchColumn,
       filters: filters,
       onHistory: _historyRepository.save,
     );

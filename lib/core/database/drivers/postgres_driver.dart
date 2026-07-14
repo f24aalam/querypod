@@ -325,6 +325,7 @@ class PostgresDriver implements DatabaseDriver {
     String table, {
     required TableStructure structure,
     String? searchQuery,
+    String? searchColumn,
     List<TableFilter>? filters,
     void Function(QueryHistory)? onHistory,
   }) async {
@@ -336,14 +337,19 @@ class PostgresDriver implements DatabaseDriver {
       final whereClauses = <String>[];
 
       if (searchQuery != null && searchQuery.isNotEmpty) {
-        final searchClauses = structure.columns
-            .map(
-              (col) =>
-                  'CAST(${_quoteIdentifier(col.name)} AS TEXT) ILIKE @search',
-            )
-            .join(' OR ');
-        whereClauses.add('($searchClauses)');
-        parameters['search'] = '%$searchQuery%';
+        if (searchColumn != null && searchColumn != '__ALL__') {
+          whereClauses.add('CAST(${_quoteIdentifier(searchColumn)} AS TEXT) ILIKE @search');
+          parameters['search'] = '%$searchQuery%';
+        } else {
+          final searchClauses = structure.columns
+              .map(
+                (col) =>
+                    'CAST(${_quoteIdentifier(col.name)} AS TEXT) ILIKE @search',
+              )
+              .join(' OR ');
+          whereClauses.add('($searchClauses)');
+          parameters['search'] = '%$searchQuery%';
+        }
       }
 
       if (filters != null && filters.isNotEmpty) {
@@ -396,6 +402,7 @@ class PostgresDriver implements DatabaseDriver {
     required int offset,
     required int limit,
     String? searchQuery,
+    String? searchColumn,
     List<TableFilter>? filters,
     void Function(QueryHistory)? onHistory,
   }) async {
@@ -408,14 +415,19 @@ class PostgresDriver implements DatabaseDriver {
       final whereClauses = <String>[];
 
       if (searchQuery != null && searchQuery.isNotEmpty) {
-        final searchClauses = structure.columns
-            .map(
-              (col) =>
-                  'CAST(${_quoteIdentifier(col.name)} AS TEXT) ILIKE @search',
-            )
-            .join(' OR ');
-        whereClauses.add('($searchClauses)');
-        parameters['search'] = '%$searchQuery%';
+        if (searchColumn != null && searchColumn != '__ALL__') {
+          whereClauses.add('CAST(${_quoteIdentifier(searchColumn)} AS TEXT) ILIKE @search');
+          parameters['search'] = '%$searchQuery%';
+        } else {
+          final searchClauses = structure.columns
+              .map(
+                (col) =>
+                    'CAST(${_quoteIdentifier(col.name)} AS TEXT) ILIKE @search',
+              )
+              .join(' OR ');
+          whereClauses.add('($searchClauses)');
+          parameters['search'] = '%$searchQuery%';
+        }
       }
 
       if (filters != null && filters.isNotEmpty) {

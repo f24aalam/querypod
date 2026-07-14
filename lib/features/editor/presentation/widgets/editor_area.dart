@@ -214,86 +214,154 @@ class _EditorTabBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = context.theme;
+    final tabsState = context.watch<EditorTabsCubit>().state;
+    final hasWorkTabs = tabsState.tabs.any(_isWorkTab);
+    final tabIndex = tabsState.tabs.indexWhere((item) => item.key == tab.key);
+    final hasWorkTabsToLeft =
+        tabIndex > 0 && tabsState.tabs.take(tabIndex).any(_isWorkTab);
+    final hasWorkTabsToRight =
+        tabIndex >= 0 && tabsState.tabs.skip(tabIndex + 1).any(_isWorkTab);
 
-    return Material(
-      key: ValueKey<(String, EditorTabKey)>(('tab-strip', tab.key)),
-      color: isActive ? theme.colors.background : Colors.transparent,
-      child: Container(
-        height: 34,
-        width: 180,
-        decoration: BoxDecoration(
-          border: Border(
-            right: BorderSide(color: theme.colors.border, width: 1),
-            top: BorderSide(
-              color: isActive ? theme.colors.primary : Colors.transparent,
-              width: 1,
+    return FContextMenu(
+      longPress: true,
+      secondaryPress: true,
+      menuBuilder: (context, controller, menu) => [
+        FItemGroup(
+          children: [
+            FItem(
+              title: const Text('Close'),
+              prefix: const Icon(Icons.close, size: 14),
+              onPress: () {
+                controller.hide();
+                onClose();
+              },
+            ),
+          ],
+        ),
+        FItemGroup(
+          children: [
+            FItem(
+              enabled: hasWorkTabs,
+              title: const Text('Close All'),
+              prefix: const Icon(Icons.close_fullscreen, size: 14),
+              onPress: hasWorkTabs
+                  ? () {
+                      controller.hide();
+                      context.read<EditorTabsCubit>().closeWorkTabs();
+                    }
+                  : null,
+            ),
+            FItem(
+              enabled: hasWorkTabsToRight,
+              title: const Text('Close All to Right'),
+              prefix: const Icon(Icons.keyboard_tab_outlined, size: 14),
+              onPress: hasWorkTabsToRight
+                  ? () {
+                      controller.hide();
+                      context.read<EditorTabsCubit>().closeWorkTabsToRight(
+                        tab.key,
+                      );
+                    }
+                  : null,
+            ),
+            FItem(
+              enabled: hasWorkTabsToLeft,
+              title: const Text('Close All to Left'),
+              prefix: const Icon(Icons.keyboard_tab_outlined, size: 14),
+              onPress: hasWorkTabsToLeft
+                  ? () {
+                      controller.hide();
+                      context.read<EditorTabsCubit>().closeWorkTabsToLeft(
+                        tab.key,
+                      );
+                    }
+                  : null,
+            ),
+          ],
+        ),
+      ],
+      child: Material(
+        key: ValueKey<(String, EditorTabKey)>(('tab-strip', tab.key)),
+        color: isActive ? theme.colors.background : Colors.transparent,
+        child: Container(
+          height: 34,
+          width: 180,
+          decoration: BoxDecoration(
+            border: Border(
+              right: BorderSide(color: theme.colors.border, width: 1),
+              top: BorderSide(
+                color: isActive ? theme.colors.primary : Colors.transparent,
+                width: 1,
+              ),
             ),
           ),
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: InkWell(
-                onTapDown: (_) =>
-                    context.read<EditorTabsCubit>().activate(tab.key),
-                onDoubleTap: () =>
-                    context.read<EditorTabsCubit>().pinTab(tab.key),
-                child: SizedBox.expand(
-                  child: Padding(
-                    padding: const EdgeInsets.only(left: 10),
-                    child: Row(
-                      children: [
-                        Icon(
-                          tab.type == EditorTabType.connection
-                              ? Icons.storage_outlined
-                              : tab.type == EditorTabType.query
-                              ? Icons.code_outlined
-                              : tab.type == EditorTabType.createTable
-                              ? Icons.add_box_outlined
-                              : (tab.tableType == ConnectionTableType.view
-                                    ? Icons.visibility_outlined
-                                    : Icons.table_chart_outlined),
-                          size: 14,
-                          color: theme.colors.mutedForeground,
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: tab.type != EditorTabType.connection
-                              ? FTooltip(
-                                  tipBuilder: (context, controller) =>
-                                      Text(tab.title),
-                                  child: _TabTitle(tab: tab, theme: theme),
-                                )
-                              : _TabTitle(tab: tab, theme: theme),
-                        ),
-                      ],
+          child: Row(
+            children: [
+              Expanded(
+                child: InkWell(
+                  onTapDown: (_) =>
+                      context.read<EditorTabsCubit>().activate(tab.key),
+                  onDoubleTap: () =>
+                      context.read<EditorTabsCubit>().pinTab(tab.key),
+                  child: SizedBox.expand(
+                    child: Padding(
+                      padding: const EdgeInsets.only(left: 10),
+                      child: Row(
+                        children: [
+                          Icon(
+                            tab.type == EditorTabType.connection
+                                ? Icons.storage_outlined
+                                : tab.type == EditorTabType.query
+                                ? Icons.code_outlined
+                                : tab.type == EditorTabType.createTable
+                                ? Icons.add_box_outlined
+                                : (tab.tableType == ConnectionTableType.view
+                                      ? Icons.visibility_outlined
+                                      : Icons.table_chart_outlined),
+                            size: 14,
+                            color: theme.colors.mutedForeground,
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: tab.type != EditorTabType.connection
+                                ? FTooltip(
+                                    tipBuilder: (context, controller) =>
+                                        Text(tab.title),
+                                    child: _TabTitle(tab: tab, theme: theme),
+                                  )
+                                : _TabTitle(tab: tab, theme: theme),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
-            const SizedBox(width: 4),
-            SizedBox(
-              width: 24,
-              height: 24,
-              child: IconButton(
-                padding: EdgeInsets.zero,
-                splashRadius: 12,
-                tooltip: 'Close',
-                onPressed: onClose,
-                icon: Icon(
-                  Icons.close,
-                  size: 14,
-                  color: theme.colors.mutedForeground,
+              const SizedBox(width: 4),
+              SizedBox(
+                width: 24,
+                height: 24,
+                child: IconButton(
+                  padding: EdgeInsets.zero,
+                  splashRadius: 12,
+                  tooltip: 'Close',
+                  onPressed: onClose,
+                  icon: Icon(
+                    Icons.close,
+                    size: 14,
+                    color: theme.colors.mutedForeground,
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(width: 4),
-          ],
+              const SizedBox(width: 4),
+            ],
+          ),
         ),
       ),
     );
   }
+
+  bool _isWorkTab(EditorTab tab) => tab.type != EditorTabType.connection;
 }
 
 class _TabTitle extends StatelessWidget {

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter/services.dart';
 import 'package:forui/forui.dart';
 
 import '../../../connections/domain/entities/connection.dart';
@@ -18,6 +19,7 @@ import '../cubit/connection_metadata_state.dart';
 import '../widgets/activity_bar.dart';
 import '../widgets/context_sidebar.dart';
 import '../widgets/editor_area.dart';
+import '../widgets/table_data_editor.dart';
 import '../widgets/status_bar.dart';
 import '../widgets/app_title_bar.dart';
 import '../../../../core/keyboard/keyboard_shortcuts.dart';
@@ -65,6 +67,25 @@ class _ConnectionPageState extends State<ConnectionPage> {
     // If a text field or code editor has focus, don't hijack its shortcuts (unless it's something they don't consume).
     // CallbackShortcuts automatically only fires if no child consumed the event, which is exactly what we want.
     action();
+  }
+
+  Future<void> _copyActiveTableSelection() async {
+    final activeTab = context.read<EditorTabsCubit>().state.activeTabKey;
+    if (activeTab is! TableTabKey) return;
+
+    final session = context.read<TableDataCubit>().state.session(activeTab);
+    if (session == null || session.selectedRowIndexes.isEmpty) return;
+
+    final rowIndex = session.selectedRowIndexes.reduce((a, b) => a < b ? a : b);
+    await Clipboard.setData(
+      ClipboardData(text: formatCopiedTableRows(session, rowIndex)),
+    );
+    if (!mounted) return;
+    showFToast(
+      context: context,
+      variant: FToastVariant.primary,
+      title: const Text('Copied to clipboard'),
+    );
   }
 
   @override
@@ -162,13 +183,19 @@ class _ConnectionPageState extends State<ConnectionPage> {
       child: CallbackShortcuts(
         bindings: {
           KeyboardShortcuts.commit: () => _handleShortcut(() {
-            final activeTab = context.read<EditorTabsCubit>().state.activeTabKey;
+            final activeTab = context
+                .read<EditorTabsCubit>()
+                .state
+                .activeTabKey;
             if (activeTab is TableTabKey) {
               context.read<TableDataCubit>().commitPendingChanges(activeTab);
             }
           }),
           KeyboardShortcuts.cancel: () => _handleShortcut(() {
-            final activeTab = context.read<EditorTabsCubit>().state.activeTabKey;
+            final activeTab = context
+                .read<EditorTabsCubit>()
+                .state
+                .activeTabKey;
             if (activeTab is TableTabKey) {
               final tableCubit = context.read<TableDataCubit>();
               final session = tableCubit.state.sessions[activeTab];
@@ -187,14 +214,22 @@ class _ConnectionPageState extends State<ConnectionPage> {
               }
             }
           }),
+          KeyboardShortcuts.copy: () =>
+              _handleShortcut(() => unawaited(_copyActiveTableSelection())),
           KeyboardShortcuts.newRow: () => _handleShortcut(() {
-            final activeTab = context.read<EditorTabsCubit>().state.activeTabKey;
+            final activeTab = context
+                .read<EditorTabsCubit>()
+                .state
+                .activeTabKey;
             if (activeTab is TableTabKey) {
               context.read<TableDataCubit>().stageInsert(activeTab);
             }
           }),
           KeyboardShortcuts.createTable: () => _handleShortcut(() {
-            final connection = context.read<ConnectionCubit>().state.activeConnection;
+            final connection = context
+                .read<ConnectionCubit>()
+                .state
+                .activeConnection;
             if (connection != null) {
               context.read<EditorTabsCubit>().openCreateTableTab(
                 connectionId: connection.id,
@@ -203,7 +238,10 @@ class _ConnectionPageState extends State<ConnectionPage> {
             }
           }),
           KeyboardShortcuts.refresh: () => _handleShortcut(() {
-            final activeTab = context.read<EditorTabsCubit>().state.activeTabKey;
+            final activeTab = context
+                .read<EditorTabsCubit>()
+                .state
+                .activeTabKey;
             if (activeTab is TableTabKey) {
               context.read<TableDataCubit>().refresh(activeTab);
             } else if (activeTab is QueryTabKey) {
@@ -211,7 +249,10 @@ class _ConnectionPageState extends State<ConnectionPage> {
             }
           }),
           KeyboardShortcuts.refreshF5: () => _handleShortcut(() {
-            final activeTab = context.read<EditorTabsCubit>().state.activeTabKey;
+            final activeTab = context
+                .read<EditorTabsCubit>()
+                .state
+                .activeTabKey;
             if (activeTab is TableTabKey) {
               context.read<TableDataCubit>().refresh(activeTab);
             } else if (activeTab is QueryTabKey) {
@@ -221,10 +262,7 @@ class _ConnectionPageState extends State<ConnectionPage> {
           KeyboardShortcuts.newQuery: () => _handleShortcut(() async {
             final tabsCubit = context.read<EditorTabsCubit>();
             final query = await context.read<QueryEditorCubit>().createQuery();
-            tabsCubit.openQuery(
-              queryId: query.id,
-              title: query.title,
-            );
+            tabsCubit.openQuery(queryId: query.id, title: query.title);
           }),
           KeyboardShortcuts.connectionsSidebar: () => _handleShortcut(() {
             context.read<ActivityCubit>().select(WorkbenchActivity.connections);
@@ -245,7 +283,10 @@ class _ConnectionPageState extends State<ConnectionPage> {
             context.read<EditorTabsCubit>().activatePreviousTab();
           }),
           KeyboardShortcuts.closeTab: () => _handleShortcut(() {
-            final activeTab = context.read<EditorTabsCubit>().state.activeTabKey;
+            final activeTab = context
+                .read<EditorTabsCubit>()
+                .state
+                .activeTabKey;
             if (activeTab != null) {
               context.read<EditorTabsCubit>().closeTab(activeTab);
             }
@@ -257,7 +298,6 @@ class _ConnectionPageState extends State<ConnectionPage> {
             color: context.theme.colors.background,
             child: Column(
               children: [
-
                 const AppTitleBar(),
                 Expanded(
                   child: Row(

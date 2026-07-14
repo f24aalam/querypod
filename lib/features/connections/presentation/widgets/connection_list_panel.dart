@@ -247,9 +247,11 @@ Future<void> _openNewConnection(BuildContext context) async {
   }
   if (!context.mounted) return;
 
-  if (!isCurrentNewDraft) {
-    final activeWorkspaceId =
-        context.read<ConnectionCubit>().state.activeWorkspaceId ?? 'default';
+  final activeWorkspaceId =
+      context.read<ConnectionCubit>().state.activeWorkspaceId ?? 'default';
+  final needsWorkspaceDraft =
+      !isCurrentNewDraft || editor.state.draft.workspaceId != activeWorkspaceId;
+  if (needsWorkspaceDraft) {
     editor.load(null, activeWorkspaceId: activeWorkspaceId);
   }
   await context.read<ConnectionCubit>().select(null);

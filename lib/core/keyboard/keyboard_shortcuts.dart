@@ -41,6 +41,12 @@ class KeyboardShortcuts {
     LogicalKeyboardKey.f5,
   );
 
+  static SingleActivator copy = SingleActivator(
+    LogicalKeyboardKey.keyC,
+    control: !isMacOS,
+    meta: isMacOS,
+  );
+
   // Query Editor
   static SingleActivator newQuery = SingleActivator(
     LogicalKeyboardKey.keyQ,

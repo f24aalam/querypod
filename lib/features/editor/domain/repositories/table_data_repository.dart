@@ -15,6 +15,7 @@ abstract class TableDataRepository {
     String table, {
     required TableStructure structure,
     String? searchQuery,
+    String? searchColumn,
     List<TableFilter>? filters,
   });
 
@@ -26,6 +27,7 @@ abstract class TableDataRepository {
     required int offset,
     required int limit,
     String? searchQuery,
+    String? searchColumn,
     List<TableFilter>? filters,
   });
 

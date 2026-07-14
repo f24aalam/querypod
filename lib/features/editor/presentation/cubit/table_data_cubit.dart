@@ -9,6 +9,9 @@ import 'editor_tabs_state.dart';
 import 'table_data_state.dart';
 
 class TableDataCubit extends Cubit<TableDataState> {
+  static const double minColumnWidth = 80;
+  static const double maxColumnWidth = 520;
+
   final TableDataRepository repository;
   final Map<TableTabKey, Connection> _connections = {};
   final Map<TableTabKey, int> _generations = {};
@@ -48,12 +51,28 @@ class TableDataCubit extends Cubit<TableDataState> {
     await _loadPage(key, 0);
   }
 
-  Future<void> setSearchQuery(TableTabKey key, String query) async {
+  Future<void> setSearch(
+    TableTabKey key, {
+    String? query,
+    String? column,
+  }) async {
     final session = state.session(key);
-    if (session == null || session.searchQuery == query) return;
+    if (session == null) return;
+
+    final newQuery = query ?? session.searchQuery;
+    final newColumn = column ?? session.searchColumn;
+
+    if (session.searchQuery == newQuery && session.searchColumn == newColumn) {
+      return;
+    }
+
     _setSession(
       _clearTransientState(
-        session.copyWith(searchQuery: () => query, pageIndex: 0),
+        session.copyWith(
+          searchQuery: () => newQuery,
+          searchColumn: () => newColumn,
+          pageIndex: 0,
+        ),
         clearError: false,
       ),
     );
@@ -63,7 +82,7 @@ class TableDataCubit extends Cubit<TableDataState> {
   Future<void> setFilters(TableTabKey key, List<TableFilter> filters) async {
     final session = state.session(key);
     if (session == null) return;
-    
+
     // Check if filters changed
     if (session.filters.length == filters.length) {
       bool changed = false;
@@ -97,6 +116,99 @@ class TableDataCubit extends Cubit<TableDataState> {
     await _loadInitial(key, refreshing: true);
   }
 
+  void pinColumn(TableTabKey key, int columnIndex) {
+    final session = state.session(key);
+    final columns = session?.structure?.columns;
+    if (session == null ||
+        columns == null ||
+        columnIndex < 0 ||
+        columnIndex >= columns.length ||
+        session.pinnedColumnIndexes.contains(columnIndex)) {
+      return;
+    }
+    _setSession(
+      session.copyWith(
+        pinnedColumnIndexes: [...session.pinnedColumnIndexes, columnIndex],
+      ),
+    );
+  }
+
+  void unpinColumn(TableTabKey key, [int? columnIndex]) {
+    final session = state.session(key);
+    if (session == null || session.pinnedColumnIndexes.isEmpty) return;
+    if (columnIndex == null) {
+      _setSession(session.copyWith(pinnedColumnIndexes: const []));
+      return;
+    }
+    if (!session.pinnedColumnIndexes.contains(columnIndex)) return;
+    _setSession(
+      session.copyWith(
+        pinnedColumnIndexes: [
+          for (final index in session.pinnedColumnIndexes)
+            if (index != columnIndex) index,
+        ],
+      ),
+    );
+  }
+
+  void movePinnedColumnLeft(TableTabKey key, int columnIndex) {
+    _movePinnedColumn(key, columnIndex, -1);
+  }
+
+  void movePinnedColumnRight(TableTabKey key, int columnIndex) {
+    _movePinnedColumn(key, columnIndex, 1);
+  }
+
+  void _movePinnedColumn(TableTabKey key, int columnIndex, int delta) {
+    final session = state.session(key);
+    if (session == null) return;
+    final currentIndex = session.pinnedColumnIndexes.indexOf(columnIndex);
+    if (currentIndex < 0) return;
+    final nextIndex = currentIndex + delta;
+    if (nextIndex < 0 || nextIndex >= session.pinnedColumnIndexes.length) {
+      return;
+    }
+    final pinned = List<int>.from(session.pinnedColumnIndexes);
+    final moved = pinned.removeAt(currentIndex);
+    pinned.insert(nextIndex, moved);
+    _setSession(session.copyWith(pinnedColumnIndexes: pinned));
+  }
+
+  void resizeColumn(TableTabKey key, int columnIndex, double width) {
+    final session = state.session(key);
+    final columns = session?.structure?.columns;
+    if (session == null ||
+        columns == null ||
+        columnIndex < 0 ||
+        columnIndex >= columns.length) {
+      return;
+    }
+    _setSession(
+      session.copyWith(
+        columnWidthOverrides: {
+          ...session.columnWidthOverrides,
+          columnIndex: width.clamp(minColumnWidth, maxColumnWidth).toDouble(),
+        },
+      ),
+    );
+  }
+
+  void resetColumnWidth(TableTabKey key, int columnIndex) {
+    final session = state.session(key);
+    if (session == null ||
+        !session.columnWidthOverrides.containsKey(columnIndex)) {
+      return;
+    }
+    _setSession(
+      session.copyWith(
+        columnWidthOverrides: {
+          for (final entry in session.columnWidthOverrides.entries)
+            if (entry.key != columnIndex) entry.key: entry.value,
+        },
+      ),
+    );
+  }
+
   void showTableStructure(TableTabKey key) {
     final session = state.session(key);
     if (session == null) return;
@@ -126,11 +238,7 @@ class TableDataCubit extends Cubit<TableDataState> {
     final connection = _connections[key];
     if (session == null || connection == null) return;
 
-    _setSession(
-      session.copyWith(
-        isFetchingForeignRow: true,
-      ),
-    );
+    _setSession(session.copyWith(isFetchingForeignRow: true));
 
     try {
       final targetStructure = await repository.inspectTable(
@@ -165,12 +273,11 @@ class TableDataCubit extends Cubit<TableDataState> {
               selectionAnchorRowIndex: () => null,
               activeCellEdit: () => null,
               isShowingStructure: false,
-              foreignRowPreview:
-                  () => ForeignRowPreview(
-                    tableName: fk.targetTable,
-                    structure: targetStructure,
-                    row: resultPage.rows.first,
-                  ),
+              foreignRowPreview: () => ForeignRowPreview(
+                tableName: fk.targetTable,
+                structure: targetStructure,
+                row: resultPage.rows.first,
+              ),
             ),
           );
         }
@@ -374,10 +481,13 @@ class TableDataCubit extends Cubit<TableDataState> {
 
   void stageInsert(TableTabKey key) {
     final session = state.session(key);
-    if (session == null || !session.isEditable || session.structure == null) return;
+    if (session == null || !session.isEditable || session.structure == null) {
+      return;
+    }
 
     final newRow = TableDataRow([
-      for (var _ in session.structure!.columns) const TableCellValue.nullValue(),
+      for (var _ in session.structure!.columns)
+        const TableCellValue.nullValue(),
     ]);
 
     final newRows = List<TableDataRow>.from(session.rows)..insert(0, newRow);
@@ -396,7 +506,10 @@ class TableDataCubit extends Cubit<TableDataState> {
     final shiftedEdits = <TableCellCoordinate, TableCellEdit>{};
     for (final edit in session.stagedCellEdits.values) {
       final newEditRowIndex = edit.rowIndex + 1;
-      final newCoord = TableCellCoordinate(rowIndex: newEditRowIndex, columnIndex: edit.columnIndex);
+      final newCoord = TableCellCoordinate(
+        rowIndex: newEditRowIndex,
+        columnIndex: edit.columnIndex,
+      );
       shiftedEdits[newCoord] = edit.copyWith(rowIndex: newEditRowIndex);
     }
 
@@ -417,14 +530,19 @@ class TableDataCubit extends Cubit<TableDataState> {
         foreignRowPreview: () => null,
       ),
     );
-    
+
     // Automatically start editing the first cell
     beginCellEdit(key, newIndex, 0);
   }
 
   void stageDuplicateForRow(TableTabKey key, int rowIndex) {
     final session = state.session(key);
-    if (session == null || !session.isEditable || session.structure == null || !_isValidRow(session, rowIndex)) return;
+    if (session == null ||
+        !session.isEditable ||
+        session.structure == null ||
+        !_isValidRow(session, rowIndex)) {
+      return;
+    }
 
     List<int> targetSelection;
     if (session.selectedRowIndexes.contains(rowIndex)) {
@@ -438,15 +556,18 @@ class TableDataCubit extends Cubit<TableDataState> {
     final newlyDuplicatedRows = <TableDataRow>[];
     for (final idx in targetSelection) {
       final existingRow = session.rows[idx];
-      newlyDuplicatedRows.add(TableDataRow([
-        for (int c = 0; c < existingRow.cells.length; c++)
-          session.structure!.columns[c].isPrimaryKey
-              ? const TableCellValue.nullValue()
-              : existingRow.cells[c],
-      ]));
+      newlyDuplicatedRows.add(
+        TableDataRow([
+          for (int c = 0; c < existingRow.cells.length; c++)
+            session.structure!.columns[c].isPrimaryKey
+                ? const TableCellValue.nullValue()
+                : existingRow.cells[c],
+        ]),
+      );
     }
 
-    final newRows = List<TableDataRow>.from(newlyDuplicatedRows)..addAll(session.rows);
+    final newRows = List<TableDataRow>.from(newlyDuplicatedRows)
+      ..addAll(session.rows);
 
     final shiftedInserts = <int>{};
     for (int i = 0; i < numDuplicates; i++) {
@@ -464,7 +585,10 @@ class TableDataCubit extends Cubit<TableDataState> {
     final shiftedEdits = <TableCellCoordinate, TableCellEdit>{};
     for (final edit in session.stagedCellEdits.values) {
       final newEditRowIndex = edit.rowIndex + numDuplicates;
-      final newCoord = TableCellCoordinate(rowIndex: newEditRowIndex, columnIndex: edit.columnIndex);
+      final newCoord = TableCellCoordinate(
+        rowIndex: newEditRowIndex,
+        columnIndex: edit.columnIndex,
+      );
       shiftedEdits[newCoord] = edit.copyWith(rowIndex: newEditRowIndex);
     }
 
@@ -474,15 +598,24 @@ class TableDataCubit extends Cubit<TableDataState> {
       final existingRow = session.rows[originalIdx];
 
       for (int c = 0; c < session.structure!.columns.length; c++) {
-        final oldCoord = TableCellCoordinate(rowIndex: shiftedOriginalIdx, columnIndex: c);
+        final oldCoord = TableCellCoordinate(
+          rowIndex: shiftedOriginalIdx,
+          columnIndex: c,
+        );
         final existingEdit = shiftedEdits[oldCoord];
         final cell = existingRow.cells[c];
-        
+
         final valueStr = existingEdit?.draftText ?? cell.editText;
         final isPrimaryKey = session.structure!.columns[c].isPrimaryKey;
-        
-        if (!isPrimaryKey && (valueStr.isNotEmpty || cell.kind != TableCellKind.nullValue || existingEdit != null)) {
-          final newCoord = TableCellCoordinate(rowIndex: newIndex, columnIndex: c);
+
+        if (!isPrimaryKey &&
+            (valueStr.isNotEmpty ||
+                cell.kind != TableCellKind.nullValue ||
+                existingEdit != null)) {
+          final newCoord = TableCellCoordinate(
+            rowIndex: newIndex,
+            columnIndex: c,
+          );
           shiftedEdits[newCoord] = TableCellEdit(
             rowIndex: newIndex,
             columnIndex: c,
@@ -522,26 +655,32 @@ class TableDataCubit extends Cubit<TableDataState> {
 
     if (session.stagedInsertedRowIndexes.contains(rowIndex)) {
       final newRows = List<TableDataRow>.from(session.rows)..removeAt(rowIndex);
-      final newInserts = Set<int>.from(session.stagedInsertedRowIndexes)..remove(rowIndex);
-      
+      final newInserts = Set<int>.from(session.stagedInsertedRowIndexes)
+        ..remove(rowIndex);
+
       final shiftedInserts = <int>{};
       for (final i in newInserts) {
         shiftedInserts.add(i > rowIndex ? i - 1 : i);
       }
-      
+
       final shiftedDeletes = <int>{};
       for (final i in session.stagedDeletedRowIndexes) {
         shiftedDeletes.add(i > rowIndex ? i - 1 : i);
       }
-      
+
       final shiftedEdits = <TableCellCoordinate, TableCellEdit>{};
       for (final edit in session.stagedCellEdits.values) {
         if (edit.rowIndex == rowIndex) continue;
-        final newEditRowIndex = edit.rowIndex > rowIndex ? edit.rowIndex - 1 : edit.rowIndex;
-        final newCoord = TableCellCoordinate(rowIndex: newEditRowIndex, columnIndex: edit.columnIndex);
+        final newEditRowIndex = edit.rowIndex > rowIndex
+            ? edit.rowIndex - 1
+            : edit.rowIndex;
+        final newCoord = TableCellCoordinate(
+          rowIndex: newEditRowIndex,
+          columnIndex: edit.columnIndex,
+        );
         shiftedEdits[newCoord] = edit.copyWith(rowIndex: newEditRowIndex);
       }
-      
+
       final shiftedSelected = <int>{};
       for (final i in session.selectedRowIndexes) {
         if (i == rowIndex) continue;
@@ -712,6 +851,7 @@ class TableDataCubit extends Cubit<TableDataState> {
         key.tableName,
         structure: structure,
         searchQuery: current.searchQuery,
+        searchColumn: current.searchColumn,
         filters: current.filters,
       );
       if (!_isCurrent(key, generation)) return;
@@ -728,6 +868,7 @@ class TableDataCubit extends Cubit<TableDataState> {
         offset: pageIndex * latest.pageSize,
         limit: latest.pageSize,
         searchQuery: current.searchQuery,
+        searchColumn: current.searchColumn,
         filters: current.filters,
       );
       if (!_isCurrent(key, generation)) return;
@@ -771,6 +912,7 @@ class TableDataCubit extends Cubit<TableDataState> {
         offset: pageIndex * current.pageSize,
         limit: current.pageSize,
         searchQuery: current.searchQuery,
+        searchColumn: current.searchColumn,
         filters: current.filters,
       );
       if (!_isCurrent(key, generation)) return;

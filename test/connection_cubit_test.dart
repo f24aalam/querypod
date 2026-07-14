@@ -38,52 +38,84 @@ void main() {
     );
   }
 
-  test('load filters by active workspace and clears an invalid selected id', () async {
-    final repository = _FakeConnectionRepository(
-      connections: [
-        connection(id: 'a', workspaceId: 'workspace-a'),
-        connection(id: 'b', workspaceId: 'workspace-b'),
-      ],
-      selectedId: 'a',
-    );
-    final cubit = ConnectionCubit(
-      repository: repository,
-      queryRepository: _FakeQueryRepository(),
-    );
+  test(
+    'load filters by active workspace and clears an invalid selected id',
+    () async {
+      final repository = _FakeConnectionRepository(
+        connections: [
+          connection(id: 'a', workspaceId: 'workspace-a'),
+          connection(id: 'b', workspaceId: 'workspace-b'),
+        ],
+        selectedId: 'a',
+      );
+      final cubit = ConnectionCubit(
+        repository: repository,
+        queryRepository: _FakeQueryRepository(),
+      );
 
-    await cubit.setWorkspace('workspace-b');
+      await cubit.setWorkspace('workspace-b');
 
-    expect(cubit.state.activeWorkspaceId, 'workspace-b');
-    expect(cubit.state.connections.map((item) => item.id).toList(), ['b']);
-    expect(cubit.state.filteredConnections.map((item) => item.id).toList(), ['b']);
-    expect(cubit.state.selectedId, isNull);
-    expect(repository.selectedId, isNull);
-    await cubit.close();
-  });
+      expect(cubit.state.activeWorkspaceId, 'workspace-b');
+      expect(cubit.state.connections.map((item) => item.id).toList(), ['b']);
+      expect(cubit.state.filteredConnections.map((item) => item.id).toList(), [
+        'b',
+      ]);
+      expect(cubit.state.selectedId, isNull);
+      expect(repository.selectedId, isNull);
+      await cubit.close();
+    },
+  );
 
-  test('save selects the connection reloads and emits success feedback', () async {
+  test(
+    'save selects the connection reloads and emits success feedback',
+    () async {
+      final repository = _FakeConnectionRepository();
+      final cubit = ConnectionCubit(
+        repository: repository,
+        queryRepository: _FakeQueryRepository(),
+      );
+      final saved = connection(id: 'saved', name: 'Saved');
+
+      final result = await cubit.save(saved);
+
+      expect(result, isTrue);
+      expect(repository.selectedId, 'saved');
+      expect(cubit.state.selectedId, 'saved');
+      expect(cubit.state.activeConnection?.id, 'saved');
+      expect(cubit.state.feedbackMessage, 'Connection saved');
+      expect(cubit.state.feedbackIsError, isFalse);
+      expect(cubit.state.connections.map((item) => item.id).toList(), [
+        'saved',
+      ]);
+      await cubit.close();
+    },
+  );
+
+  test('save stores connections in the active workspace', () async {
     final repository = _FakeConnectionRepository();
     final cubit = ConnectionCubit(
       repository: repository,
       queryRepository: _FakeQueryRepository(),
     );
-    final saved = connection(id: 'saved', name: 'Saved');
+    await cubit.setWorkspace('workspace-a');
 
-    final result = await cubit.save(saved);
+    final result = await cubit.save(
+      connection(id: 'saved', name: 'Saved', workspaceId: 'default'),
+    );
 
     expect(result, isTrue);
-    expect(repository.selectedId, 'saved');
-    expect(cubit.state.selectedId, 'saved');
-    expect(cubit.state.activeConnection?.id, 'saved');
-    expect(cubit.state.feedbackMessage, 'Connection saved');
-    expect(cubit.state.feedbackIsError, isFalse);
-    expect(cubit.state.connections.map((item) => item.id).toList(), ['saved']);
+    expect(repository.connections.single.workspaceId, 'workspace-a');
+    expect(cubit.state.connections.single.workspaceId, 'workspace-a');
+    expect(cubit.state.filteredConnections.single.id, 'saved');
+    expect(cubit.state.activeConnection?.workspaceId, 'workspace-a');
     await cubit.close();
   });
 
   test('save emits error feedback when repository save fails', () async {
     final cubit = ConnectionCubit(
-      repository: _FakeConnectionRepository(saveError: Exception('save failed')),
+      repository: _FakeConnectionRepository(
+        saveError: Exception('save failed'),
+      ),
       queryRepository: _FakeQueryRepository(),
     );
 
@@ -120,7 +152,9 @@ void main() {
 
   test('delete sets error state when repository delete fails', () async {
     final cubit = ConnectionCubit(
-      repository: _FakeConnectionRepository(deleteError: Exception('delete failed')),
+      repository: _FakeConnectionRepository(
+        deleteError: Exception('delete failed'),
+      ),
       queryRepository: _FakeQueryRepository(),
     );
 
@@ -144,10 +178,14 @@ void main() {
     await cubit.load();
 
     cubit.search('beta');
-    expect(cubit.state.filteredConnections.map((item) => item.id).toList(), ['beta']);
+    expect(cubit.state.filteredConnections.map((item) => item.id).toList(), [
+      'beta',
+    ]);
 
     cubit.search('db-alpha');
-    expect(cubit.state.filteredConnections.map((item) => item.id).toList(), ['alpha']);
+    expect(cubit.state.filteredConnections.map((item) => item.id).toList(), [
+      'alpha',
+    ]);
 
     cubit.search('');
     expect(cubit.state.filteredConnections.map((item) => item.id).toList(), [
@@ -171,24 +209,27 @@ void main() {
     await cubit.close();
   });
 
-  test('openSavedConnection updates selected connection and open nonce', () async {
-    final repository = _FakeConnectionRepository(
-      connections: [connection(id: 'opened')],
-    );
-    final cubit = ConnectionCubit(
-      repository: repository,
-      queryRepository: _FakeQueryRepository(),
-    );
-    await cubit.load();
+  test(
+    'openSavedConnection updates selected connection and open nonce',
+    () async {
+      final repository = _FakeConnectionRepository(
+        connections: [connection(id: 'opened')],
+      );
+      final cubit = ConnectionCubit(
+        repository: repository,
+        queryRepository: _FakeQueryRepository(),
+      );
+      await cubit.load();
 
-    await cubit.openSavedConnection('opened');
+      await cubit.openSavedConnection('opened');
 
-    expect(repository.selectedId, 'opened');
-    expect(cubit.state.selectedId, 'opened');
-    expect(cubit.state.activeConnection?.id, 'opened');
-    expect(cubit.state.openConnectionNonce, 1);
-    await cubit.close();
-  });
+      expect(repository.selectedId, 'opened');
+      expect(cubit.state.selectedId, 'opened');
+      expect(cubit.state.activeConnection?.id, 'opened');
+      expect(cubit.state.openConnectionNonce, 1);
+      await cubit.close();
+    },
+  );
 
   test('validation errors are returned before test execution', () async {
     final cubit = ConnectionCubit(
@@ -199,7 +240,9 @@ void main() {
     await cubit.test(connection(name: '', type: ConnectionType.postgresql));
     expect(cubit.state.feedbackMessage, 'Name is required');
 
-    await cubit.test(connection(type: ConnectionType.mysql, host: '', port: 3306));
+    await cubit.test(
+      connection(type: ConnectionType.mysql, host: '', port: 3306),
+    );
     expect(cubit.state.feedbackMessage, 'Host is required');
 
     await cubit.test(connection(type: ConnectionType.mysql, port: 0));
@@ -276,15 +319,14 @@ class _FakeConnectionRepository implements ConnectionRepository {
     this.selectedId,
     this.saveError,
     this.deleteError,
-    this.getAllError,
   }) : _connections = [...?connections];
 
   final List<Connection> _connections;
-  @override
   String? selectedId;
   final Object? saveError;
   final Object? deleteError;
-  final Object? getAllError;
+
+  List<Connection> get connections => List<Connection>.from(_connections);
 
   @override
   Future<void> delete(String id) async {
@@ -293,10 +335,8 @@ class _FakeConnectionRepository implements ConnectionRepository {
   }
 
   @override
-  Future<List<Connection>> getAll() async {
-    if (getAllError != null) throw getAllError!;
-    return List<Connection>.from(_connections);
-  }
+  Future<List<Connection>> getAll() async =>
+      List<Connection>.from(_connections);
 
   @override
   Future<Connection?> getById(String id) async {

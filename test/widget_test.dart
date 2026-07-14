@@ -386,6 +386,48 @@ void main() {
     expect(context.read<TableDataCubit>().state.sessions, isNotEmpty);
   });
 
+  testWidgets('table header context menu pins and unpins a column', (
+    tester,
+  ) async {
+    final context = await _openWidgetTable(tester);
+    const key = TableTabKey(
+      connectionId: 'connection',
+      database: 'app',
+      tableName: 'users',
+    );
+
+    await tester.longPress(find.text('name'));
+    await tester.pump(const Duration(milliseconds: 250));
+    expect(find.text('Pin column'), findsOneWidget);
+
+    await tester.tap(find.text('Pin column'));
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(
+      context.read<TableDataCubit>().state.session(key)!.pinnedColumnIndexes,
+      {1},
+    );
+
+    await tester.longPress(find.text('id').last);
+    await tester.pump(const Duration(milliseconds: 250));
+    await tester.tap(find.text('Pin column'));
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(
+      context.read<TableDataCubit>().state.session(key)!.pinnedColumnIndexes,
+      {0, 1},
+    );
+
+    await tester.longPress(find.text('name'));
+    await tester.pump(const Duration(milliseconds: 250));
+    expect(find.text('Unpin column'), findsOneWidget);
+
+    await tester.tap(find.text('Unpin column'));
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(
+      context.read<TableDataCubit>().state.session(key)!.pinnedColumnIndexes,
+      {0},
+    );
+  });
+
   testWidgets('table row keyboard copy copies selected rows', (tester) async {
     final context = await _openWidgetTable(tester);
     final tableData = context.read<TableDataCubit>();

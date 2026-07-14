@@ -27,6 +27,7 @@ class TableDataSession {
   final bool isShowingStructure;
   final ForeignRowPreview? foreignRowPreview;
   final bool isFetchingForeignRow;
+  final Set<int> pinnedColumnIndexes;
 
   TableDataSession({
     required this.key,
@@ -52,12 +53,14 @@ class TableDataSession {
     this.isShowingStructure = false,
     this.foreignRowPreview,
     this.isFetchingForeignRow = false,
+    Set<int> pinnedColumnIndexes = const {},
   }) : rows = List.unmodifiable(rows),
        filters = List.unmodifiable(filters),
        selectedRowIndexes = Set.unmodifiable(selectedRowIndexes),
        stagedCellEdits = Map.unmodifiable(stagedCellEdits),
        stagedDeletedRowIndexes = Set.unmodifiable(stagedDeletedRowIndexes),
-       stagedInsertedRowIndexes = Set.unmodifiable(stagedInsertedRowIndexes);
+       stagedInsertedRowIndexes = Set.unmodifiable(stagedInsertedRowIndexes),
+       pinnedColumnIndexes = Set.unmodifiable(pinnedColumnIndexes);
 
   int get pageCount => totalCount == 0 ? 0 : (totalCount / pageSize).ceil();
   int get rangeStart => rows.isEmpty ? 0 : pageIndex * pageSize + 1;
@@ -76,7 +79,8 @@ class TableDataSession {
   bool get hasPendingEdits => stagedCellEdits.isNotEmpty;
   bool get hasPendingDeletes => stagedDeletedRowIndexes.isNotEmpty;
   bool get hasPendingInserts => stagedInsertedRowIndexes.isNotEmpty;
-  bool get hasPendingChanges => hasPendingEdits || hasPendingDeletes || hasPendingInserts;
+  bool get hasPendingChanges =>
+      hasPendingEdits || hasPendingDeletes || hasPendingInserts;
 
   TableDataSession copyWith({
     TableStructure? Function()? structure,
@@ -101,6 +105,7 @@ class TableDataSession {
     bool? isShowingStructure,
     ForeignRowPreview? Function()? foreignRowPreview,
     bool? isFetchingForeignRow,
+    Set<int>? pinnedColumnIndexes,
   }) {
     return TableDataSession(
       key: key,
@@ -134,6 +139,7 @@ class TableDataSession {
           ? foreignRowPreview()
           : this.foreignRowPreview,
       isFetchingForeignRow: isFetchingForeignRow ?? this.isFetchingForeignRow,
+      pinnedColumnIndexes: pinnedColumnIndexes ?? this.pinnedColumnIndexes,
     );
   }
 }

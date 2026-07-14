@@ -902,13 +902,44 @@ class _DataGrid extends StatefulWidget {
 
 class _DataGridState extends State<_DataGrid> {
   final _horizontal = ScrollController();
+  final _pinnedVertical = ScrollController();
+  final _scrollVertical = ScrollController();
   final _focusNode = FocusNode(debugLabel: 'table-data-grid');
+  bool _syncingVerticalScroll = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _pinnedVertical.addListener(
+      () => _syncVerticalScroll(_pinnedVertical, _scrollVertical),
+    );
+    _scrollVertical.addListener(
+      () => _syncVerticalScroll(_scrollVertical, _pinnedVertical),
+    );
+  }
 
   @override
   void dispose() {
     _horizontal.dispose();
+    _pinnedVertical.dispose();
+    _scrollVertical.dispose();
     _focusNode.dispose();
     super.dispose();
+  }
+
+  void _syncVerticalScroll(ScrollController source, ScrollController target) {
+    if (_syncingVerticalScroll || !source.hasClients || !target.hasClients) {
+      return;
+    }
+    final targetPosition = source.offset.clamp(
+      target.position.minScrollExtent,
+      target.position.maxScrollExtent,
+    );
+    if ((target.offset - targetPosition).abs() < 0.5) return;
+
+    _syncingVerticalScroll = true;
+    target.jumpTo(targetPosition);
+    _syncingVerticalScroll = false;
   }
 
   void _moveSelection(int delta) {
@@ -936,7 +967,23 @@ class _DataGridState extends State<_DataGrid> {
   Widget build(BuildContext context) {
     final columns = widget.session.structure!.columns;
     final widths = columns.map(_columnWidth).toList();
-    final totalWidth = widths.fold<double>(0, (sum, width) => sum + width);
+    final pinnedColumnIndexes = [
+      for (var index = 0; index < columns.length; index++)
+        if (widget.session.pinnedColumnIndexes.contains(index)) index,
+    ];
+    final hasPinnedColumns = pinnedColumnIndexes.isNotEmpty;
+    final scrollColumnIndexes = [
+      for (var index = 0; index < columns.length; index++)
+        if (!widget.session.pinnedColumnIndexes.contains(index)) index,
+    ];
+    final pinnedWidth = pinnedColumnIndexes.fold<double>(
+      0,
+      (sum, index) => sum + widths[index],
+    );
+    final scrollWidth = scrollColumnIndexes.fold<double>(
+      0,
+      (sum, index) => sum + widths[index],
+    );
 
     return CallbackShortcuts(
       bindings: {
@@ -960,68 +1007,71 @@ class _DataGridState extends State<_DataGrid> {
         focusNode: _focusNode,
         autofocus: true,
         child: LayoutBuilder(
-          builder: (context, constraints) => Scrollbar(
-            controller: _horizontal,
-            thumbVisibility: true,
-            child: SingleChildScrollView(
-              controller: _horizontal,
-              scrollDirection: Axis.horizontal,
-              child: SizedBox(
-                width: totalWidth < constraints.maxWidth
-                    ? constraints.maxWidth
-                    : totalWidth,
-                height: constraints.maxHeight,
-                child: Column(
-                  children: [
-                    _HeaderRow(columns: columns, widths: widths),
-                    Expanded(
-                      child: widget.session.rows.isEmpty
-                          ? const _NoRows()
-                          : ListView.builder(
-                              itemExtent: 34,
-                              itemCount: widget.session.rows.length,
-                              itemBuilder: (context, index) => _GridRow(
-                                tableKey: widget.tableKey,
-                                rowIndex: index,
-                                row: widget.session.rows[index],
-                                widths: widths,
-                                selected: widget.session.selectedRowIndexes
-                                    .contains(index),
-                                activeEdit: widget.session.activeCellEdit,
-                                stagedEdits: widget.session.stagedCellEdits,
-                                stagedDelete: widget
-                                    .session
-                                    .stagedDeletedRowIndexes
-                                    .contains(index),
-                                stagedInsert: widget
-                                    .session
-                                    .stagedInsertedRowIndexes
-                                    .contains(index),
-                                editable: widget.session.isEditable,
-                                columns: columns,
-                                onRequestKeyboardFocus: _focusNode.requestFocus,
-                                onCopyRows: (format) =>
-                                    _copyRows(index, format),
-                                onOpenForeignKey: (fk, value) {
-                                  context
-                                      .read<TableDataCubit>()
-                                      .previewForeignRow(
-                                        widget.tableKey,
-                                        fk,
-                                        value.rawValue?.toString() ??
-                                            value.display,
-                                      );
-                                },
-                              ),
-                            ),
+          builder: (context, constraints) {
+            final availableScrollWidth = (constraints.maxWidth - pinnedWidth)
+                .clamp(0.0, double.infinity);
+            final contentWidth = scrollWidth < availableScrollWidth
+                ? availableScrollWidth
+                : scrollWidth;
+
+            return Row(
+              children: [
+                if (hasPinnedColumns)
+                  SizedBox(
+                    width: pinnedWidth,
+                    height: constraints.maxHeight,
+                    child: _GridColumnGroup(
+                      tableKey: widget.tableKey,
+                      session: widget.session,
+                      columns: columns,
+                      widths: widths,
+                      columnIndexes: pinnedColumnIndexes,
+                      verticalController: _pinnedVertical,
+                      onRequestKeyboardFocus: _focusNode.requestFocus,
+                      onCopyRows: _copyRows,
+                      onOpenForeignKey: _openForeignKey,
                     ),
-                  ],
+                  ),
+                Expanded(
+                  child: Scrollbar(
+                    controller: _horizontal,
+                    thumbVisibility: true,
+                    child: SingleChildScrollView(
+                      controller: _horizontal,
+                      scrollDirection: Axis.horizontal,
+                      child: SizedBox(
+                        width: contentWidth,
+                        height: constraints.maxHeight,
+                        child: _GridColumnGroup(
+                          tableKey: widget.tableKey,
+                          session: widget.session,
+                          columns: columns,
+                          widths: widths,
+                          columnIndexes: scrollColumnIndexes,
+                          verticalController: hasPinnedColumns
+                              ? _scrollVertical
+                              : null,
+                          onRequestKeyboardFocus: _focusNode.requestFocus,
+                          onCopyRows: _copyRows,
+                          onOpenForeignKey: _openForeignKey,
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
-              ),
-            ),
-          ),
+              ],
+            );
+          },
         ),
       ),
+    );
+  }
+
+  void _openForeignKey(TableForeignKey fk, TableCellValue value) {
+    context.read<TableDataCubit>().previewForeignRow(
+      widget.tableKey,
+      fk,
+      value.rawValue?.toString() ?? value.display,
     );
   }
 
@@ -1253,11 +1303,90 @@ bool _looksLikeJson(String value) {
       (trimmed.startsWith('[') && value.trimRight().endsWith(']'));
 }
 
-class _HeaderRow extends StatelessWidget {
+class _GridColumnGroup extends StatelessWidget {
+  final TableTabKey tableKey;
+  final TableDataSession session;
   final List<TableDataColumn> columns;
   final List<double> widths;
+  final List<int> columnIndexes;
+  final ScrollController? verticalController;
+  final VoidCallback onRequestKeyboardFocus;
+  final Future<void> Function(int rowIndex, [_CopyRowsFormat? format])
+  onCopyRows;
+  final void Function(TableForeignKey, TableCellValue)? onOpenForeignKey;
 
-  const _HeaderRow({required this.columns, required this.widths});
+  const _GridColumnGroup({
+    required this.tableKey,
+    required this.session,
+    required this.columns,
+    required this.widths,
+    required this.columnIndexes,
+    required this.verticalController,
+    required this.onRequestKeyboardFocus,
+    required this.onCopyRows,
+    this.onOpenForeignKey,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        _HeaderRow(
+          tableKey: tableKey,
+          columns: columns,
+          widths: widths,
+          columnIndexes: columnIndexes,
+          pinnedColumnIndexes: session.pinnedColumnIndexes,
+        ),
+        Expanded(
+          child: session.rows.isEmpty
+              ? const _NoRows()
+              : ListView.builder(
+                  controller: verticalController,
+                  itemExtent: 34,
+                  itemCount: session.rows.length,
+                  itemBuilder: (context, index) => _GridRow(
+                    tableKey: tableKey,
+                    rowIndex: index,
+                    row: session.rows[index],
+                    widths: widths,
+                    columnIndexes: columnIndexes,
+                    selected: session.selectedRowIndexes.contains(index),
+                    activeEdit: session.activeCellEdit,
+                    stagedEdits: session.stagedCellEdits,
+                    stagedDelete: session.stagedDeletedRowIndexes.contains(
+                      index,
+                    ),
+                    stagedInsert: session.stagedInsertedRowIndexes.contains(
+                      index,
+                    ),
+                    editable: session.isEditable,
+                    columns: columns,
+                    onRequestKeyboardFocus: onRequestKeyboardFocus,
+                    onCopyRows: (format) => onCopyRows(index, format),
+                    onOpenForeignKey: onOpenForeignKey,
+                  ),
+                ),
+        ),
+      ],
+    );
+  }
+}
+
+class _HeaderRow extends StatelessWidget {
+  final TableTabKey tableKey;
+  final List<TableDataColumn> columns;
+  final List<double> widths;
+  final List<int> columnIndexes;
+  final Set<int> pinnedColumnIndexes;
+
+  const _HeaderRow({
+    required this.tableKey,
+    required this.columns,
+    required this.widths,
+    required this.columnIndexes,
+    required this.pinnedColumnIndexes,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1267,50 +1396,111 @@ class _HeaderRow extends StatelessWidget {
       color: theme.colors.secondary,
       child: Row(
         children: [
-          for (var index = 0; index < columns.length; index++)
-            Container(
+          for (final index in columnIndexes)
+            _HeaderCell(
+              tableKey: tableKey,
+              column: columns[index],
+              columnIndex: index,
               width: widths[index],
-              padding: const EdgeInsets.symmetric(horizontal: 10),
-              alignment: Alignment.centerLeft,
-              decoration: BoxDecoration(
-                border: Border(
-                  right: BorderSide(color: theme.colors.border, width: 1),
-                  bottom: BorderSide(color: theme.colors.border, width: 1),
-                ),
-              ),
-              child: Row(
-                children: [
-                  if (columns[index].isPrimaryKey) ...[
-                    Icon(
-                      Icons.key_outlined,
-                      size: 12,
-                      color: theme.colors.mutedForeground,
-                    ),
-                    const SizedBox(width: 5),
-                  ],
-                  if (columns[index].foreignKey != null) ...[
-                    Icon(
-                      Icons.link,
-                      size: 12,
-                      color: theme.colors.mutedForeground,
-                    ),
-                    const SizedBox(width: 5),
-                  ],
-                  Expanded(
-                    child: Text(
-                      columns[index].name,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: theme.colors.foreground,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+              pinned: pinnedColumnIndexes.contains(index),
             ),
         ],
+      ),
+    );
+  }
+}
+
+class _HeaderCell extends StatelessWidget {
+  final TableTabKey tableKey;
+  final TableDataColumn column;
+  final int columnIndex;
+  final double width;
+  final bool pinned;
+
+  const _HeaderCell({
+    required this.tableKey,
+    required this.column,
+    required this.columnIndex,
+    required this.width,
+    required this.pinned,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = context.theme;
+    return FContextMenu(
+      menuBuilder: (context, controller, menu) => [
+        FItemGroup(
+          children: [
+            FItem(
+              prefix: Icon(
+                pinned ? Icons.push_pin : Icons.push_pin_outlined,
+                size: 14,
+              ),
+              title: Text(pinned ? 'Unpin column' : 'Pin column'),
+              onPress: () {
+                controller.hide();
+                if (pinned) {
+                  context.read<TableDataCubit>().unpinColumn(
+                    tableKey,
+                    columnIndex,
+                  );
+                } else {
+                  context.read<TableDataCubit>().pinColumn(
+                    tableKey,
+                    columnIndex,
+                  );
+                }
+              },
+            ),
+          ],
+        ),
+      ],
+      child: Container(
+        width: width,
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        alignment: Alignment.centerLeft,
+        decoration: BoxDecoration(
+          color: pinned ? theme.colors.primary.withValues(alpha: 0.08) : null,
+          border: Border(
+            right: BorderSide(
+              color: pinned ? theme.colors.primary : theme.colors.border,
+              width: pinned ? 1.5 : 1,
+            ),
+            bottom: BorderSide(color: theme.colors.border, width: 1),
+          ),
+        ),
+        child: Row(
+          children: [
+            if (pinned) ...[
+              Icon(Icons.push_pin, size: 12, color: theme.colors.primary),
+              const SizedBox(width: 5),
+            ],
+            if (column.isPrimaryKey) ...[
+              Icon(
+                Icons.key_outlined,
+                size: 12,
+                color: theme.colors.mutedForeground,
+              ),
+              const SizedBox(width: 5),
+            ],
+            if (column.foreignKey != null) ...[
+              Icon(Icons.link, size: 12, color: theme.colors.mutedForeground),
+              const SizedBox(width: 5),
+            ],
+            Expanded(
+              child: Text(
+                column.name,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: theme.colors.foreground,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1321,6 +1511,7 @@ class _GridRow extends StatelessWidget {
   final int rowIndex;
   final TableDataRow row;
   final List<double> widths;
+  final List<int> columnIndexes;
   final bool selected;
   final TableCellEdit? activeEdit;
   final Map<TableCellCoordinate, TableCellEdit> stagedEdits;
@@ -1337,6 +1528,7 @@ class _GridRow extends StatelessWidget {
     required this.rowIndex,
     required this.row,
     required this.widths,
+    required this.columnIndexes,
     required this.selected,
     required this.activeEdit,
     required this.stagedEdits,
@@ -1437,7 +1629,7 @@ class _GridRow extends StatelessWidget {
             : Colors.transparent,
         child: Row(
           children: [
-            for (var index = 0; index < row.cells.length; index++)
+            for (final index in columnIndexes)
               _GridCell(
                 rowIndex: rowIndex,
                 columnIndex: index,

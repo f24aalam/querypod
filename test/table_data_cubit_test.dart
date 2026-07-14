@@ -300,6 +300,37 @@ void main() {
     expect(session.stagedDeletedRowIndexes, isEmpty);
   });
 
+  test('pinning a column is local UI state and survives reloads', () async {
+    final repository = _FakeTableDataRepository(
+      total: 100,
+      structure: _threeColumn,
+    );
+    final cubit = TableDataCubit(repository: repository);
+    await cubit.openTable(connection, key);
+
+    cubit.pinColumn(key, 1);
+    expect(cubit.state.session(key)!.pinnedColumnIndexes, {1});
+
+    cubit.pinColumn(key, 0);
+    expect(cubit.state.session(key)!.pinnedColumnIndexes, {0, 1});
+
+    cubit.pinColumn(key, 2);
+    expect(cubit.state.session(key)!.pinnedColumnIndexes, {0, 1, 2});
+
+    cubit.pinColumn(key, -1);
+    cubit.pinColumn(key, 20);
+    expect(cubit.state.session(key)!.pinnedColumnIndexes, {0, 1, 2});
+
+    await cubit.nextPage(key);
+    expect(cubit.state.session(key)!.pinnedColumnIndexes, {0, 1, 2});
+
+    cubit.unpinColumn(key, 1);
+    expect(cubit.state.session(key)!.pinnedColumnIndexes, {0, 2});
+
+    cubit.unpinColumn(key);
+    expect(cubit.state.session(key)!.pinnedColumnIndexes, isEmpty);
+  });
+
   test('opening the same table twice reuses the existing session', () async {
     final repository = _FakeTableDataRepository(total: 10);
     final cubit = TableDataCubit(repository: repository);
@@ -327,7 +358,7 @@ void main() {
 
     await cubit.setSearch(key, query: 'alice');
     expect(repository.countCalls, 2);
-    
+
     await cubit.setSearch(key, query: 'alice', column: 'name');
     session = cubit.state.session(key)!;
     expect(session.searchQuery, 'alice');
@@ -342,7 +373,9 @@ void main() {
     await cubit.openTable(connection, key);
     await cubit.nextPage(key);
 
-    const filters = [TableFilter(column: 'name', operator: '=', value: 'Alice')];
+    const filters = [
+      TableFilter(column: 'name', operator: '=', value: 'Alice'),
+    ];
     await cubit.setFilters(key, filters);
 
     final session = cubit.state.session(key)!;
@@ -355,7 +388,10 @@ void main() {
   });
 
   test('showing and hiding table structure clears transient state', () async {
-    final repository = _FakeTableDataRepository(total: 10, structure: _multiColumn);
+    final repository = _FakeTableDataRepository(
+      total: 10,
+      structure: _multiColumn,
+    );
     final cubit = TableDataCubit(repository: repository);
     await cubit.openTable(connection, key);
     cubit.selectSingleRow(key, 0);
@@ -371,79 +407,93 @@ void main() {
     expect(cubit.state.session(key)!.isShowingStructure, isFalse);
   });
 
-  test('foreign row preview stores result clears on close and surfaces errors', () async {
-    final repository = _FakeTableDataRepository(
-      total: 1,
-      structure: TableStructure(
-        columns: const [
-          TableDataColumn(
-            name: 'id',
-            databaseType: 'int',
-            length: 11,
-            isPrimaryKey: true,
-            isNullable: false,
-          ),
-          TableDataColumn(
-            name: 'profile_id',
-            databaseType: 'int',
-            length: 11,
-            isPrimaryKey: false,
-            isNullable: true,
-            foreignKey: TableForeignKey(targetTable: 'profiles', targetColumn: 'id'),
-          ),
+  test(
+    'foreign row preview stores result clears on close and surfaces errors',
+    () async {
+      final repository = _FakeTableDataRepository(
+        total: 1,
+        structure: TableStructure(
+          columns: const [
+            TableDataColumn(
+              name: 'id',
+              databaseType: 'int',
+              length: 11,
+              isPrimaryKey: true,
+              isNullable: false,
+            ),
+            TableDataColumn(
+              name: 'profile_id',
+              databaseType: 'int',
+              length: 11,
+              isPrimaryKey: false,
+              isNullable: true,
+              foreignKey: TableForeignKey(
+                targetTable: 'profiles',
+                targetColumn: 'id',
+              ),
+            ),
+          ],
+          orderColumn: 'id',
+        ),
+        foreignPreviewStructure: TableStructure(
+          columns: const [
+            TableDataColumn(
+              name: 'id',
+              databaseType: 'int',
+              length: 11,
+              isPrimaryKey: true,
+              isNullable: false,
+            ),
+            TableDataColumn(
+              name: 'bio',
+              databaseType: 'text',
+              length: 0,
+              isPrimaryKey: false,
+              isNullable: true,
+            ),
+          ],
+          orderColumn: 'id',
+        ),
+        foreignPreviewRows: [
+          TableDataRow([
+            TableCellValue.text('1'),
+            TableCellValue.text('Builder'),
+          ]),
         ],
-        orderColumn: 'id',
-      ),
-      foreignPreviewStructure: TableStructure(
-        columns: const [
-          TableDataColumn(
-            name: 'id',
-            databaseType: 'int',
-            length: 11,
-            isPrimaryKey: true,
-            isNullable: false,
-          ),
-          TableDataColumn(
-            name: 'bio',
-            databaseType: 'text',
-            length: 0,
-            isPrimaryKey: false,
-            isNullable: true,
-          ),
-        ],
-        orderColumn: 'id',
-      ),
-      foreignPreviewRows: [
-        TableDataRow([TableCellValue.text('1'), TableCellValue.text('Builder')]),
-      ],
-    );
-    final cubit = TableDataCubit(repository: repository);
-    await cubit.openTable(connection, key);
+      );
+      final cubit = TableDataCubit(repository: repository);
+      await cubit.openTable(connection, key);
 
-    await cubit.previewForeignRow(
-      key,
-      const TableForeignKey(targetTable: 'profiles', targetColumn: 'id'),
-      '1',
-    );
+      await cubit.previewForeignRow(
+        key,
+        const TableForeignKey(targetTable: 'profiles', targetColumn: 'id'),
+        '1',
+      );
 
-    final previewed = cubit.state.session(key)!;
-    expect(previewed.foreignRowPreview, isNotNull);
-    expect(previewed.foreignRowPreview!.tableName, 'profiles');
+      final previewed = cubit.state.session(key)!;
+      expect(previewed.foreignRowPreview, isNotNull);
+      expect(previewed.foreignRowPreview!.tableName, 'profiles');
 
-    cubit.clearForeignRowPreview(key);
-    expect(cubit.state.session(key)!.foreignRowPreview, isNull);
+      cubit.clearForeignRowPreview(key);
+      expect(cubit.state.session(key)!.foreignRowPreview, isNull);
 
-    repository.foreignPreviewError = Exception('preview failed');
-    await cubit.previewForeignRow(
-      key,
-      const TableForeignKey(targetTable: 'profiles', targetColumn: 'id'),
-      '1',
-    );
-    expect(cubit.state.session(key)!.errorMessage, contains('preview failed'));
-  });
+      repository.foreignPreviewError = Exception('preview failed');
+      await cubit.previewForeignRow(
+        key,
+        const TableForeignKey(targetTable: 'profiles', targetColumn: 'id'),
+        '1',
+      );
+      expect(
+        cubit.state.session(key)!.errorMessage,
+        contains('preview failed'),
+      );
+    },
+  );
 
   test('supported operators fall back before a connection is opened', () {
-    final cubit = TableDataCubit(repository: _FakeTableDataRepository(total: 1));
+    final cubit = TableDataCubit(
+      repository: _FakeTableDataRepository(total: 1),
+    );
 
     expect(cubit.supportedOperators(key), ['=', '!=', '>', '<', 'LIKE']);
   });
@@ -656,6 +706,20 @@ final _multiColumn = TableStructure(
     ),
     TableDataColumn(
       name: 'name',
+      databaseType: 'varchar(255)',
+      length: 255,
+      isPrimaryKey: false,
+      isNullable: true,
+    ),
+  ],
+  orderColumn: 'id',
+);
+
+final _threeColumn = TableStructure(
+  columns: [
+    ..._multiColumn.columns,
+    TableDataColumn(
+      name: 'email',
       databaseType: 'varchar(255)',
       length: 255,
       isPrimaryKey: false,

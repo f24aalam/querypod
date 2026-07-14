@@ -902,10 +902,12 @@ class _DataGrid extends StatefulWidget {
 
 class _DataGridState extends State<_DataGrid> {
   final _horizontal = ScrollController();
+  final _focusNode = FocusNode(debugLabel: 'table-data-grid');
 
   @override
   void dispose() {
     _horizontal.dispose();
+    _focusNode.dispose();
     super.dispose();
   }
 
@@ -921,6 +923,15 @@ class _DataGridState extends State<_DataGrid> {
     }
   }
 
+  Future<void> _copySelectedRows() async {
+    if (widget.session.selectedRowIndexes.isEmpty) return;
+
+    final rowIndex = widget.session.selectedRowIndexes.reduce(
+      (a, b) => a < b ? a : b,
+    );
+    await _copyRows(rowIndex);
+  }
+
   @override
   Widget build(BuildContext context) {
     final columns = widget.session.structure!.columns;
@@ -933,6 +944,7 @@ class _DataGridState extends State<_DataGrid> {
             _moveSelection(-1),
         const SingleActivator(LogicalKeyboardKey.arrowDown): () =>
             _moveSelection(1),
+        KeyboardShortcuts.copy: _copySelectedRows,
         const SingleActivator(LogicalKeyboardKey.enter): () {
           final idx = widget.session.singleSelectedRowIndex;
           if (idx != null) {
@@ -945,6 +957,7 @@ class _DataGridState extends State<_DataGrid> {
         },
       },
       child: Focus(
+        focusNode: _focusNode,
         autofocus: true,
         child: LayoutBuilder(
           builder: (context, constraints) => Scrollbar(
@@ -986,6 +999,7 @@ class _DataGridState extends State<_DataGrid> {
                                     .contains(index),
                                 editable: widget.session.isEditable,
                                 columns: columns,
+                                onRequestKeyboardFocus: _focusNode.requestFocus,
                                 onCopyRows: (format) =>
                                     _copyRows(index, format),
                                 onOpenForeignKey: (fk, value) {
@@ -1035,6 +1049,12 @@ class _DataGridState extends State<_DataGrid> {
       null => formatCopiedTableRows(widget.session, rowIndex),
     };
     await Clipboard.setData(ClipboardData(text: text));
+    if (!mounted) return;
+    showFToast(
+      context: context,
+      variant: FToastVariant.primary,
+      title: const Text('Copied to clipboard'),
+    );
   }
 }
 
@@ -1308,6 +1328,7 @@ class _GridRow extends StatelessWidget {
   final bool stagedInsert;
   final bool editable;
   final List<TableDataColumn> columns;
+  final VoidCallback onRequestKeyboardFocus;
   final void Function(_CopyRowsFormat? format) onCopyRows;
   final void Function(TableForeignKey, TableCellValue)? onOpenForeignKey;
 
@@ -1323,6 +1344,7 @@ class _GridRow extends StatelessWidget {
     required this.stagedInsert,
     required this.editable,
     required this.columns,
+    required this.onRequestKeyboardFocus,
     required this.onCopyRows,
     this.onOpenForeignKey,
   });
@@ -1434,6 +1456,7 @@ class _GridRow extends StatelessWidget {
                 deleted: stagedDelete,
                 inserted: stagedInsert,
                 onActivate: () {
+                  onRequestKeyboardFocus();
                   final keyboard = HardwareKeyboard.instance;
                   context.read<TableDataCubit>().activateCell(
                     tableKey,

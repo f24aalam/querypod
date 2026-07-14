@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -381,7 +382,57 @@ void main() {
       'id name settings\n'
       r'1 Alice "{\"theme\":\"dark\",\"notifications\":true}"',
     );
+    expect(find.text('Copied to clipboard'), findsOneWidget);
     expect(context.read<TableDataCubit>().state.sessions, isNotEmpty);
+  });
+
+  testWidgets('table row keyboard copy copies selected rows', (tester) async {
+    final context = await _openWidgetTable(tester);
+    final tableData = context.read<TableDataCubit>();
+    const key = TableTabKey(
+      connectionId: 'connection',
+      database: 'app',
+      tableName: 'users',
+    );
+    await tester.tap(find.text('Alice'));
+    await tester.pump();
+    tableData.selectSingleRow(key, 0);
+    tableData.toggleRowSelection(key, 1);
+    await tester.pump();
+
+    await _pressCopyShortcut(tester);
+
+    final data = await Clipboard.getData('text/plain');
+    expect(
+      data?.text,
+      'id name settings\n'
+      r'1 Alice "{\"theme\":\"dark\",\"notifications\":true}"'
+      '\n'
+      r'2 "Bob Smith" "{\"theme\":\"light\"}"',
+    );
+    expect(find.text('Copied to clipboard'), findsOneWidget);
+  });
+
+  testWidgets('table row keyboard copy keeps clipboard without selection', (
+    tester,
+  ) async {
+    final context = await _openWidgetTable(tester);
+    const key = TableTabKey(
+      connectionId: 'connection',
+      database: 'app',
+      tableName: 'users',
+    );
+    await tester.tap(find.text('Alice'));
+    await tester.pump();
+    context.read<TableDataCubit>().clearSelection(key);
+    await tester.pump();
+    await Clipboard.setData(const ClipboardData(text: 'unchanged'));
+
+    await _pressCopyShortcut(tester);
+
+    final data = await Clipboard.getData('text/plain');
+    expect(data?.text, 'unchanged');
+    expect(find.text('Copied to clipboard'), findsNothing);
   });
 
   testWidgets('table row context menu copy as CSV copies one row', (
@@ -582,6 +633,17 @@ void main() {
       ']',
     );
   });
+}
+
+Future<void> _pressCopyShortcut(WidgetTester tester) async {
+  final modifier = Platform.isMacOS
+      ? LogicalKeyboardKey.metaLeft
+      : LogicalKeyboardKey.controlLeft;
+  await tester.sendKeyDownEvent(modifier);
+  await tester.sendKeyDownEvent(LogicalKeyboardKey.keyC);
+  await tester.sendKeyUpEvent(LogicalKeyboardKey.keyC);
+  await tester.sendKeyUpEvent(modifier);
+  await tester.pump(const Duration(milliseconds: 100));
 }
 
 Future<void> _copyRowAs(

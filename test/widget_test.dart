@@ -371,6 +371,7 @@ void main() {
 
     await tester.longPress(find.text('Alice'));
     await tester.pump(const Duration(milliseconds: 250));
+    expect(find.text('Copy as'), findsOneWidget);
     await tester.tap(find.text('Copy'));
     await tester.pump(const Duration(milliseconds: 100));
 
@@ -400,6 +401,132 @@ void main() {
       r'1 Alice "{\"theme\":\"dark\",\"notifications\":true}"'
       '\n'
       r'2 "Bob Smith" "{\"theme\":\"light\"}"',
+    );
+  });
+
+  testWidgets('table row copy as formatters export selected rows', (
+    tester,
+  ) async {
+    final context = await _openWidgetTable(tester);
+    final tableData = context.read<TableDataCubit>();
+    const key = TableTabKey(
+      connectionId: 'connection',
+      database: 'app',
+      tableName: 'users',
+    );
+    tableData.selectSingleRow(key, 0);
+    tableData.toggleRowSelection(key, 1);
+    final session = tableData.state.session(key)!;
+
+    expect(
+      formatCopiedTableRowsAsCsv(session, 1),
+      'id,name,settings\n'
+      '1,Alice,"{""theme"":""dark"",""notifications"":true}"\n'
+      '2,"Bob Smith","{""theme"":""light""}"',
+    );
+    expect(
+      formatCopiedTableRowsAsSql(session, 1, tableName: 'users'),
+      'INSERT INTO "users" ("id", "name", "settings") VALUES\n'
+      '(\'1\', \'Alice\', \'{"theme":"dark","notifications":true}\'),\n'
+      '(\'2\', \'Bob Smith\', \'{"theme":"light"}\');',
+    );
+    expect(
+      formatCopiedTableRowsAsJson(session, 1),
+      '[\n'
+      '  {\n'
+      '    "id": "1",\n'
+      '    "name": "Alice",\n'
+      '    "settings": {\n'
+      '      "theme": "dark",\n'
+      '      "notifications": true\n'
+      '    }\n'
+      '  },\n'
+      '  {\n'
+      '    "id": "2",\n'
+      '    "name": "Bob Smith",\n'
+      '    "settings": {\n'
+      '      "theme": "light"\n'
+      '    }\n'
+      '  }\n'
+      ']',
+    );
+  });
+
+  test('table row copy as JSON structures JSON-like strings', () {
+    final session = TableDataSession(
+      key: const TableTabKey(
+        connectionId: 'connection',
+        database: 'app',
+        tableName: 'places',
+      ),
+      structure: TableStructure(
+        orderColumn: 'name',
+        columns: const [
+          TableDataColumn(
+            name: 'name',
+            databaseType: 'text',
+            length: -1,
+            isPrimaryKey: false,
+            isNullable: false,
+          ),
+          TableDataColumn(
+            name: 'tags',
+            databaseType: 'text',
+            length: -1,
+            isPrimaryKey: false,
+            isNullable: false,
+          ),
+          TableDataColumn(
+            name: 'address',
+            databaseType: 'jsonb',
+            length: -1,
+            isPrimaryKey: false,
+            isNullable: false,
+          ),
+          TableDataColumn(
+            name: 'way_nodes',
+            databaseType: 'jsonb',
+            length: -1,
+            isPrimaryKey: false,
+            isNullable: false,
+          ),
+          TableDataColumn(
+            name: 'geom',
+            databaseType: 'bytea',
+            length: -1,
+            isPrimaryKey: false,
+            isNullable: true,
+          ),
+        ],
+      ),
+      rows: [
+        TableDataRow([
+          const TableCellValue.text('Juma Masjid'),
+          const TableCellValue.text(
+            '{amenity: place_of_worship, religion: muslim}',
+          ),
+          const TableCellValue.text('{}'),
+          const TableCellValue.text('[]'),
+          const TableCellValue.text("Instance of 'UndecodedBytes'"),
+        ]),
+      ],
+      status: TableDataStatus.ready,
+    );
+
+    expect(
+      formatCopiedTableRowsAsJson(session, 0),
+      '[\n'
+      '  {\n'
+      '    "name": "Juma Masjid",\n'
+      '    "tags": {\n'
+      '      "amenity": "place_of_worship",\n'
+      '      "religion": "muslim"\n'
+      '    },\n'
+      '    "address": {},\n'
+      '    "way_nodes": [],\n'
+      '    "geom": "Instance of \'UndecodedBytes\'"\n'
+      '  }\n'
+      ']',
     );
   });
 }

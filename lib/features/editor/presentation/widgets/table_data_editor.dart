@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -985,7 +986,8 @@ class _DataGridState extends State<_DataGrid> {
                                     .contains(index),
                                 editable: widget.session.isEditable,
                                 columns: columns,
-                                onCopyRows: () => _copyRows(index),
+                                onCopyRows: (format) =>
+                                    _copyRows(index, format),
                                 onOpenForeignKey: (fk, value) {
                                   context
                                       .read<TableDataCubit>()
@@ -1015,17 +1017,31 @@ class _DataGridState extends State<_DataGrid> {
     return (nameWidth > dataWidth ? nameWidth : dataWidth).clamp(120, 280);
   }
 
-  Future<void> _copyRows(int rowIndex) async {
-    final text = formatCopiedTableRows(widget.session, rowIndex);
+  Future<void> _copyRows(int rowIndex, [_CopyRowsFormat? format]) async {
+    final text = switch (format) {
+      _CopyRowsFormat.csv => formatCopiedTableRowsAsCsv(
+        widget.session,
+        rowIndex,
+      ),
+      _CopyRowsFormat.sql => formatCopiedTableRowsAsSql(
+        widget.session,
+        rowIndex,
+        tableName: widget.tableKey.tableName,
+      ),
+      _CopyRowsFormat.json => formatCopiedTableRowsAsJson(
+        widget.session,
+        rowIndex,
+      ),
+      null => formatCopiedTableRows(widget.session, rowIndex),
+    };
     await Clipboard.setData(ClipboardData(text: text));
   }
 }
 
+enum _CopyRowsFormat { csv, sql, json }
+
 String formatCopiedTableRows(TableDataSession session, int rowIndex) {
-  final targetRows = session.selectedRowIndexes.contains(rowIndex)
-      ? (session.selectedRowIndexes.toList()..sort())
-      : [rowIndex];
-  final rowLines = targetRows
+  final rowLines = _copyTargetRows(session, rowIndex)
       .where((index) => index >= 0 && index < session.rows.length)
       .map((index) {
         final row = session.rows[index];
@@ -1056,6 +1072,94 @@ String formatCopiedTableRows(TableDataSession session, int rowIndex) {
   ].join('\n');
 }
 
+String formatCopiedTableRowsAsCsv(TableDataSession session, int rowIndex) {
+  final columns = session.structure?.columns ?? const <TableDataColumn>[];
+  final lines = <String>[
+    if (columns.isNotEmpty)
+      columns.map((column) => _csvCell(column.name)).join(','),
+    for (final index in _copyTargetRows(session, rowIndex))
+      if (index >= 0 && index < session.rows.length)
+        [
+          for (
+            var columnIndex = 0;
+            columnIndex < session.rows[index].cells.length;
+            columnIndex++
+          )
+            _csvCell(_copyCellText(session, index, columnIndex)),
+        ].join(','),
+  ];
+  return lines.join('\n');
+}
+
+String formatCopiedTableRowsAsSql(
+  TableDataSession session,
+  int rowIndex, {
+  required String tableName,
+}) {
+  final columns = session.structure?.columns ?? const <TableDataColumn>[];
+  final rows = _copyTargetRows(
+    session,
+    rowIndex,
+  ).where((index) => index >= 0 && index < session.rows.length).toList();
+  if (columns.isEmpty || rows.isEmpty) return '';
+
+  final identifiers = columns
+      .map((column) => _sqlIdentifier(column.name))
+      .join(', ');
+  final values = rows
+      .map((rowIndex) {
+        final row = session.rows[rowIndex];
+        return '(${[for (var columnIndex = 0; columnIndex < row.cells.length; columnIndex++) _sqlValue(session, rowIndex, columnIndex)].join(', ')})';
+      })
+      .join(',\n');
+  return 'INSERT INTO ${_sqlIdentifier(tableName)} ($identifiers) VALUES\n$values;';
+}
+
+String formatCopiedTableRowsAsJson(TableDataSession session, int rowIndex) {
+  final columns = session.structure?.columns ?? const <TableDataColumn>[];
+  final rows = [
+    for (final rowIndex in _copyTargetRows(session, rowIndex))
+      if (rowIndex >= 0 && rowIndex < session.rows.length)
+        {
+          for (
+            var columnIndex = 0;
+            columnIndex < columns.length &&
+                columnIndex < session.rows[rowIndex].cells.length;
+            columnIndex++
+          )
+            columns[columnIndex].name: _jsonValue(
+              session,
+              rowIndex,
+              columnIndex,
+            ),
+        },
+  ];
+  return const JsonEncoder.withIndent('  ').convert(rows);
+}
+
+List<int> _copyTargetRows(TableDataSession session, int rowIndex) {
+  return session.selectedRowIndexes.contains(rowIndex)
+      ? (session.selectedRowIndexes.toList()..sort())
+      : [rowIndex];
+}
+
+String _copyCellText(TableDataSession session, int rowIndex, int columnIndex) {
+  return session
+          .stagedCellEdits[TableCellCoordinate(
+            rowIndex: rowIndex,
+            columnIndex: columnIndex,
+          )]
+          ?.draftText ??
+      session.rows[rowIndex].cells[columnIndex].display;
+}
+
+bool _copyCellIsNull(TableDataSession session, int rowIndex, int columnIndex) {
+  return !session.stagedCellEdits.containsKey(
+        TableCellCoordinate(rowIndex: rowIndex, columnIndex: columnIndex),
+      ) &&
+      session.rows[rowIndex].cells[columnIndex].kind == TableCellKind.nullValue;
+}
+
 String _quotedCopyCell(String value) {
   final trimmed = value.trimLeft();
   final looksLikeJson =
@@ -1066,6 +1170,67 @@ String _quotedCopyCell(String value) {
 
   final escaped = value.replaceAll(r'\', r'\\').replaceAll('"', r'\"');
   return '"$escaped"';
+}
+
+String _csvCell(String value) {
+  final mustQuote =
+      value.contains(',') ||
+      value.contains('"') ||
+      value.contains('\n') ||
+      RegExp(r'\s').hasMatch(value) ||
+      _looksLikeJson(value);
+  if (!mustQuote) return value;
+  return '"${value.replaceAll('"', '""')}"';
+}
+
+String _sqlIdentifier(String value) => '"${value.replaceAll('"', '""')}"';
+
+String _sqlValue(TableDataSession session, int rowIndex, int columnIndex) {
+  if (_copyCellIsNull(session, rowIndex, columnIndex)) return 'NULL';
+  return "'${_copyCellText(session, rowIndex, columnIndex).replaceAll("'", "''")}'";
+}
+
+Object? _jsonValue(TableDataSession session, int rowIndex, int columnIndex) {
+  if (_copyCellIsNull(session, rowIndex, columnIndex)) return null;
+  return _structuredJsonValue(_copyCellText(session, rowIndex, columnIndex));
+}
+
+Object? _structuredJsonValue(String value) {
+  if (!_looksLikeJson(value)) return value;
+
+  final trimmed = value.trim();
+  try {
+    return jsonDecode(trimmed);
+  } on FormatException {
+    final looseMap = _parseLooseMap(trimmed);
+    return looseMap ?? value;
+  }
+}
+
+Map<String, String>? _parseLooseMap(String value) {
+  if (!value.startsWith('{') || !value.endsWith('}')) return null;
+
+  final body = value.substring(1, value.length - 1).trim();
+  if (body.isEmpty) return <String, String>{};
+
+  final entries = <String, String>{};
+  for (final part in body.split(',')) {
+    final separator = part.indexOf(':');
+    if (separator <= 0) return null;
+
+    final key = part.substring(0, separator).trim();
+    final parsedValue = part.substring(separator + 1).trim();
+    if (key.isEmpty) return null;
+
+    entries[key] = parsedValue;
+  }
+  return entries;
+}
+
+bool _looksLikeJson(String value) {
+  final trimmed = value.trimLeft();
+  return (trimmed.startsWith('{') && value.trimRight().endsWith('}')) ||
+      (trimmed.startsWith('[') && value.trimRight().endsWith(']'));
 }
 
 class _HeaderRow extends StatelessWidget {
@@ -1143,7 +1308,7 @@ class _GridRow extends StatelessWidget {
   final bool stagedInsert;
   final bool editable;
   final List<TableDataColumn> columns;
-  final VoidCallback onCopyRows;
+  final void Function(_CopyRowsFormat? format) onCopyRows;
   final void Function(TableForeignKey, TableCellValue)? onOpenForeignKey;
 
   const _GridRow({
@@ -1174,8 +1339,39 @@ class _GridRow extends StatelessWidget {
               title: const Text('Copy'),
               onPress: () {
                 controller.hide();
-                onCopyRows();
+                onCopyRows(null);
               },
+            ),
+            FSubmenuItem(
+              prefix: const Icon(Icons.file_copy_outlined, size: 14),
+              title: const Text('Copy as'),
+              submenu: [
+                FItemGroup(
+                  children: [
+                    FItem(
+                      title: const Text('CSV'),
+                      onPress: () {
+                        controller.hide();
+                        onCopyRows(_CopyRowsFormat.csv);
+                      },
+                    ),
+                    FItem(
+                      title: const Text('SQL'),
+                      onPress: () {
+                        controller.hide();
+                        onCopyRows(_CopyRowsFormat.sql);
+                      },
+                    ),
+                    FItem(
+                      title: const Text('JSON'),
+                      onPress: () {
+                        controller.hide();
+                        onCopyRows(_CopyRowsFormat.json);
+                      },
+                    ),
+                  ],
+                ),
+              ],
             ),
             FItem(
               enabled: editable,

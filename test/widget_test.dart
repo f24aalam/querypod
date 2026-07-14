@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
@@ -21,6 +22,7 @@ import 'package:querypod/features/editor/presentation/cubit/editor_tabs_state.da
 import 'package:querypod/features/editor/presentation/cubit/table_data_cubit.dart';
 import 'package:querypod/features/editor/presentation/cubit/table_data_state.dart';
 import 'package:querypod/features/editor/presentation/pages/connection_page.dart';
+import 'package:querypod/features/editor/presentation/widgets/table_data_editor.dart';
 
 void main() {
   setUpAll(sqfliteFfiInit);
@@ -363,11 +365,110 @@ void main() {
       findsNothing,
     );
   });
+
+  testWidgets('table row context menu copies one row', (tester) async {
+    final context = await _openWidgetTable(tester);
+
+    await tester.longPress(find.text('Alice'));
+    await tester.pump(const Duration(milliseconds: 250));
+    await tester.tap(find.text('Copy'));
+    await tester.pump(const Duration(milliseconds: 100));
+
+    final data = await Clipboard.getData('text/plain');
+    expect(
+      data?.text,
+      'id name settings\n'
+      r'1 Alice "{\"theme\":\"dark\",\"notifications\":true}"',
+    );
+    expect(context.read<TableDataCubit>().state.sessions, isNotEmpty);
+  });
+
+  testWidgets('table row copy formatter copies selected rows', (tester) async {
+    final context = await _openWidgetTable(tester);
+    final tableData = context.read<TableDataCubit>();
+    const key = TableTabKey(
+      connectionId: 'connection',
+      database: 'app',
+      tableName: 'users',
+    );
+    tableData.selectSingleRow(key, 0);
+    tableData.toggleRowSelection(key, 1);
+
+    expect(
+      formatCopiedTableRows(tableData.state.session(key)!, 1),
+      'id name settings\n'
+      r'1 Alice "{\"theme\":\"dark\",\"notifications\":true}"'
+      '\n'
+      r'2 "Bob Smith" "{\"theme\":\"light\"}"',
+    );
+  });
 }
 
 Future<void> _deleteQueryDatabase() async {
   final databasesPath = await databaseFactoryFfi.getDatabasesPath();
   await databaseFactoryFfi.deleteDatabase(p.join(databasesPath, 'querypod.db'));
+}
+
+Future<BuildContext> _openWidgetTable(WidgetTester tester) async {
+  var clipboardText = '';
+  tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+    SystemChannels.platform,
+    (call) async {
+      switch (call.method) {
+        case 'Clipboard.setData':
+          final data = call.arguments as Map<Object?, Object?>;
+          clipboardText = data['text'] as String? ?? '';
+          return null;
+        case 'Clipboard.getData':
+          return <String, dynamic>{'text': clipboardText};
+      }
+      return null;
+    },
+  );
+
+  await getIt.unregister<TableDataCubit>();
+  await getIt.unregister<TableDataRepository>();
+  final repository = _WidgetTableRepository();
+  getIt.registerLazySingleton<TableDataRepository>(() => repository);
+  getIt.registerFactory(
+    () => TableDataCubit(repository: getIt<TableDataRepository>()),
+  );
+
+  await Clipboard.setData(const ClipboardData(text: ''));
+  await tester.pumpWidget(const App(initialLocation: '/workspace/default'));
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 500));
+  final context = tester.element(find.byType(ConnectionPage));
+  final tabs = context.read<EditorTabsCubit>();
+  final tableData = context.read<TableDataCubit>();
+  const key = TableTabKey(
+    connectionId: 'connection',
+    database: 'app',
+    tableName: 'users',
+  );
+  const connection = Connection(
+    id: 'connection',
+    name: 'Local',
+    host: 'localhost',
+    port: 3306,
+    user: 'root',
+    password: '',
+    database: 'app',
+    workspaceId: 'default',
+  );
+
+  tabs.pinTable(
+    connectionId: key.connectionId,
+    database: key.database,
+    table: const ConnectionTable(
+      name: 'users',
+      type: ConnectionTableType.table,
+    ),
+  );
+  await tableData.openTable(connection, key);
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 500));
+  return context;
 }
 
 class _WidgetTableRepository implements TableDataRepository {
@@ -454,7 +555,7 @@ class _WidgetTableRepository implements TableDataRepository {
       ]),
       TableDataRow(const [
         TableCellValue.text('2'),
-        TableCellValue.text('Bob'),
+        TableCellValue.text('Bob Smith'),
         TableCellValue.text('{"theme":"light"}'),
       ]),
     ],

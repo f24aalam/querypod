@@ -985,6 +985,7 @@ class _DataGridState extends State<_DataGrid> {
                                     .contains(index),
                                 editable: widget.session.isEditable,
                                 columns: columns,
+                                onCopyRows: () => _copyRows(index),
                                 onOpenForeignKey: (fk, value) {
                                   context
                                       .read<TableDataCubit>()
@@ -1013,6 +1014,58 @@ class _DataGridState extends State<_DataGrid> {
     final dataWidth = column.length.clamp(8, 28) * 7.0 + 24;
     return (nameWidth > dataWidth ? nameWidth : dataWidth).clamp(120, 280);
   }
+
+  Future<void> _copyRows(int rowIndex) async {
+    final text = formatCopiedTableRows(widget.session, rowIndex);
+    await Clipboard.setData(ClipboardData(text: text));
+  }
+}
+
+String formatCopiedTableRows(TableDataSession session, int rowIndex) {
+  final targetRows = session.selectedRowIndexes.contains(rowIndex)
+      ? (session.selectedRowIndexes.toList()..sort())
+      : [rowIndex];
+  final rowLines = targetRows
+      .where((index) => index >= 0 && index < session.rows.length)
+      .map((index) {
+        final row = session.rows[index];
+        return [
+          for (
+            var columnIndex = 0;
+            columnIndex < row.cells.length;
+            columnIndex++
+          )
+            _quotedCopyCell(
+              session
+                      .stagedCellEdits[TableCellCoordinate(
+                        rowIndex: index,
+                        columnIndex: columnIndex,
+                      )]
+                      ?.draftText ??
+                  row.cells[columnIndex].display,
+            ),
+        ].join(' ');
+      })
+      .toList();
+  final header = session.structure?.columns
+      .map((column) => _quotedCopyCell(column.name))
+      .join(' ');
+  return [
+    if (header != null && header.isNotEmpty) header,
+    ...rowLines,
+  ].join('\n');
+}
+
+String _quotedCopyCell(String value) {
+  final trimmed = value.trimLeft();
+  final looksLikeJson =
+      (trimmed.startsWith('{') && value.trimRight().endsWith('}')) ||
+      (trimmed.startsWith('[') && value.trimRight().endsWith(']'));
+  final hasWhitespace = RegExp(r'\s').hasMatch(value);
+  if (!looksLikeJson && !hasWhitespace) return value;
+
+  final escaped = value.replaceAll(r'\', r'\\').replaceAll('"', r'\"');
+  return '"$escaped"';
 }
 
 class _HeaderRow extends StatelessWidget {
@@ -1090,6 +1143,7 @@ class _GridRow extends StatelessWidget {
   final bool stagedInsert;
   final bool editable;
   final List<TableDataColumn> columns;
+  final VoidCallback onCopyRows;
   final void Function(TableForeignKey, TableCellValue)? onOpenForeignKey;
 
   const _GridRow({
@@ -1104,6 +1158,7 @@ class _GridRow extends StatelessWidget {
     required this.stagedInsert,
     required this.editable,
     required this.columns,
+    required this.onCopyRows,
     this.onOpenForeignKey,
   });
 
@@ -1115,8 +1170,16 @@ class _GridRow extends StatelessWidget {
         FItemGroup(
           children: [
             FItem(
-              enabled: editable,
               prefix: const Icon(Icons.copy_outlined, size: 14),
+              title: const Text('Copy'),
+              onPress: () {
+                controller.hide();
+                onCopyRows();
+              },
+            ),
+            FItem(
+              enabled: editable,
+              prefix: const Icon(Icons.control_point_duplicate, size: 14),
               title: const Text('Duplicate'),
               onPress: editable
                   ? () {

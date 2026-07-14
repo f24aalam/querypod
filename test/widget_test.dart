@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -17,6 +19,7 @@ import 'package:querypod/features/editor/domain/repositories/table_data_reposito
 import 'package:querypod/features/editor/presentation/cubit/editor_tabs_cubit.dart';
 import 'package:querypod/features/editor/presentation/cubit/editor_tabs_state.dart';
 import 'package:querypod/features/editor/presentation/cubit/table_data_cubit.dart';
+import 'package:querypod/features/editor/presentation/cubit/table_data_state.dart';
 import 'package:querypod/features/editor/presentation/pages/connection_page.dart';
 
 void main() {
@@ -295,6 +298,71 @@ void main() {
     await tester.pumpAndSettle();
     expect(tableData.state.session(key), isNull);
   });
+
+  testWidgets('table search shows a loading line below the tab strip', (
+    tester,
+  ) async {
+    await getIt.unregister<TableDataCubit>();
+    await getIt.unregister<TableDataRepository>();
+    final repository = _WidgetTableRepository();
+    getIt.registerLazySingleton<TableDataRepository>(() => repository);
+    getIt.registerFactory(
+      () => TableDataCubit(repository: getIt<TableDataRepository>()),
+    );
+
+    await tester.pumpWidget(const App(initialLocation: '/workspace/default'));
+    await tester.pumpAndSettle();
+    final context = tester.element(find.byType(ConnectionPage));
+    final tabs = context.read<EditorTabsCubit>();
+    final tableData = context.read<TableDataCubit>();
+    const key = TableTabKey(
+      connectionId: 'connection',
+      database: 'app',
+      tableName: 'users',
+    );
+    const connection = Connection(
+      id: 'connection',
+      name: 'Local',
+      host: 'localhost',
+      port: 3306,
+      user: 'root',
+      password: '',
+      database: 'app',
+      workspaceId: 'default',
+    );
+
+    tabs.pinTable(
+      connectionId: key.connectionId,
+      database: key.database,
+      table: const ConnectionTable(
+        name: 'users',
+        type: ConnectionTableType.table,
+      ),
+    );
+    await tableData.openTable(connection, key);
+    await tester.pumpAndSettle();
+
+    repository.searchDelay = const Duration(milliseconds: 100);
+    unawaited(tableData.setSearch(key, query: 'needle'));
+    await tester.pump();
+
+    expect(
+      tableData.state.session(key)!.status,
+      TableDataStatus.initialLoading,
+    );
+    await tester.pump(const Duration(milliseconds: 16));
+    expect(
+      find.byKey(const ValueKey('active-table-loading-line')),
+      findsOneWidget,
+    );
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('active-table-loading-line')),
+      findsNothing,
+    );
+  });
 }
 
 Future<void> _deleteQueryDatabase() async {
@@ -305,6 +373,7 @@ Future<void> _deleteQueryDatabase() async {
 class _WidgetTableRepository implements TableDataRepository {
   String? updatedValue;
   bool deleted = false;
+  Duration searchDelay = Duration.zero;
 
   @override
   Future<List<QueryResult>> executeQuery(
@@ -356,7 +425,14 @@ class _WidgetTableRepository implements TableDataRepository {
     String? searchQuery,
     String? searchColumn,
     List<TableFilter>? filters,
-  }) async => 2;
+  }) async {
+    if (searchQuery != null &&
+        searchQuery.isNotEmpty &&
+        searchDelay > Duration.zero) {
+      await Future<void>.delayed(searchDelay);
+    }
+    return 2;
+  }
 
   @override
   Future<TableRowsPage> fetchRows(

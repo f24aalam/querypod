@@ -37,7 +37,7 @@ class TableDataEditor extends StatelessWidget {
         builder: (context, session) {
           if (session == null ||
               (session.status == TableDataStatus.initialLoading &&
-                  !session.hasRows)) {
+                  session.structure == null)) {
             return const _LoadingState();
           }
 
@@ -63,9 +63,14 @@ class _TableBrowser extends StatelessWidget {
     final isLoading =
         session.status == TableDataStatus.pageLoading ||
         session.status == TableDataStatus.refreshing;
+    final showLoadingLine =
+        session.status == TableDataStatus.initialLoading ||
+        session.status == TableDataStatus.pageLoading ||
+        session.status == TableDataStatus.refreshing;
 
     return Column(
       children: [
+        if (showLoadingLine) const _TableLoadingLine(),
         _TableActionBar(tableKey: tableKey, session: session),
         if (session.status == TableDataStatus.error)
           _ErrorBanner(tableKey: tableKey, message: session.errorMessage),
@@ -78,6 +83,20 @@ class _TableBrowser extends StatelessWidget {
         ),
         _PaginationBar(tableKey: tableKey, session: session),
       ],
+    );
+  }
+}
+
+class _TableLoadingLine extends StatelessWidget {
+  const _TableLoadingLine();
+
+  @override
+  Widget build(BuildContext context) {
+    return const SizedBox(
+      key: ValueKey('active-table-loading-line'),
+      height: 2,
+      width: double.infinity,
+      child: LinearProgressIndicator(minHeight: 2),
     );
   }
 }
@@ -1838,19 +1857,30 @@ class _TableActionBar extends StatefulWidget {
 
 class _TableActionBarState extends State<_TableActionBar> {
   late final TextEditingController _searchController;
+  late String _lastSessionSearchQuery;
   Timer? _debounce;
 
   @override
   void initState() {
     super.initState();
-    _searchController = TextEditingController(text: widget.session.searchQuery);
+    _lastSessionSearchQuery = widget.session.searchQuery ?? '';
+    _searchController = TextEditingController(text: _lastSessionSearchQuery);
   }
 
   @override
   void didUpdateWidget(covariant _TableActionBar oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.session.searchQuery != _searchController.text) {
-      _searchController.text = widget.session.searchQuery ?? '';
+    final sessionSearchQuery = widget.session.searchQuery ?? '';
+    if (sessionSearchQuery == _lastSessionSearchQuery) return;
+
+    _lastSessionSearchQuery = sessionSearchQuery;
+    if (_debounce?.isActive ?? false) return;
+
+    if (sessionSearchQuery != _searchController.text) {
+      _searchController.value = TextEditingValue(
+        text: sessionSearchQuery,
+        selection: TextSelection.collapsed(offset: sessionSearchQuery.length),
+      );
     }
   }
 

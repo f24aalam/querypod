@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -74,6 +76,28 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(cubit.state.session(key)!.foreignRowPreview, isNull);
+    await cubit.close();
+  });
+
+  testWidgets('table search keeps in-progress typing across rebuilds', (
+    tester,
+  ) async {
+    final cubit = TableDataCubit(repository: _EditorRepository());
+    await cubit.openTable(connection, key);
+
+    await tester.pumpWidget(_TableEditorHarness(cubit: cubit, tab: tab));
+    await tester.pumpAndSettle();
+
+    final searchField = find.byType(EditableText).first;
+    await tester.enterText(searchField, 'ali');
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(tester.widget<EditableText>(searchField).controller.text, 'ali');
+
+    unawaited(cubit.refresh(key));
+    await tester.pump();
+
+    expect(tester.widget<EditableText>(searchField).controller.text, 'ali');
     await cubit.close();
   });
 }

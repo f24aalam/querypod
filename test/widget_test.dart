@@ -404,7 +404,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
     expect(
       context.read<TableDataCubit>().state.session(key)!.pinnedColumnIndexes,
-      {1},
+      [1],
     );
 
     await tester.longPress(find.text('id').last);
@@ -413,7 +413,20 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
     expect(
       context.read<TableDataCubit>().state.session(key)!.pinnedColumnIndexes,
-      {0, 1},
+      [1, 0],
+    );
+
+    await tester.longPress(find.text('id').last);
+    await tester.pump(const Duration(milliseconds: 250));
+    expect(find.text('Move to'), findsOneWidget);
+
+    await tester.tap(find.text('Move to'));
+    await tester.pump(const Duration(milliseconds: 250));
+    await tester.tap(find.text('Left'));
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(
+      context.read<TableDataCubit>().state.session(key)!.pinnedColumnIndexes,
+      [0, 1],
     );
 
     await tester.longPress(find.text('name'));
@@ -424,7 +437,35 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
     expect(
       context.read<TableDataCubit>().state.session(key)!.pinnedColumnIndexes,
-      {0},
+      [0],
+    );
+  });
+
+  testWidgets('table header drag resizes a column', (tester) async {
+    final context = await _openWidgetTable(tester);
+    const key = TableTabKey(
+      connectionId: 'connection',
+      database: 'app',
+      tableName: 'users',
+    );
+
+    final nameHeader = find.text('name');
+    final nameRect = tester.getRect(nameHeader);
+    final handleStart = Offset(
+      nameRect.left - 10 + 220 - 2,
+      nameRect.center.dy,
+    );
+
+    await tester.dragFrom(handleStart, const Offset(50, 0));
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(
+      context
+          .read<TableDataCubit>()
+          .state
+          .session(key)!
+          .columnWidthOverrides[1],
+      greaterThan(220),
     );
   });
 

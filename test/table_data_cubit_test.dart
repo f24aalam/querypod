@@ -309,26 +309,70 @@ void main() {
     await cubit.openTable(connection, key);
 
     cubit.pinColumn(key, 1);
-    expect(cubit.state.session(key)!.pinnedColumnIndexes, {1});
+    expect(cubit.state.session(key)!.pinnedColumnIndexes, [1]);
 
     cubit.pinColumn(key, 0);
-    expect(cubit.state.session(key)!.pinnedColumnIndexes, {0, 1});
+    expect(cubit.state.session(key)!.pinnedColumnIndexes, [1, 0]);
 
     cubit.pinColumn(key, 2);
-    expect(cubit.state.session(key)!.pinnedColumnIndexes, {0, 1, 2});
+    expect(cubit.state.session(key)!.pinnedColumnIndexes, [1, 0, 2]);
 
     cubit.pinColumn(key, -1);
     cubit.pinColumn(key, 20);
-    expect(cubit.state.session(key)!.pinnedColumnIndexes, {0, 1, 2});
+    expect(cubit.state.session(key)!.pinnedColumnIndexes, [1, 0, 2]);
 
     await cubit.nextPage(key);
-    expect(cubit.state.session(key)!.pinnedColumnIndexes, {0, 1, 2});
+    expect(cubit.state.session(key)!.pinnedColumnIndexes, [1, 0, 2]);
+
+    cubit.movePinnedColumnLeft(key, 2);
+    expect(cubit.state.session(key)!.pinnedColumnIndexes, [1, 2, 0]);
+
+    cubit.movePinnedColumnRight(key, 1);
+    expect(cubit.state.session(key)!.pinnedColumnIndexes, [2, 1, 0]);
+
+    cubit.movePinnedColumnLeft(key, 2);
+    cubit.movePinnedColumnRight(key, 0);
+    expect(cubit.state.session(key)!.pinnedColumnIndexes, [2, 1, 0]);
 
     cubit.unpinColumn(key, 1);
-    expect(cubit.state.session(key)!.pinnedColumnIndexes, {0, 2});
+    expect(cubit.state.session(key)!.pinnedColumnIndexes, [2, 0]);
 
     cubit.unpinColumn(key);
     expect(cubit.state.session(key)!.pinnedColumnIndexes, isEmpty);
+  });
+
+  test('resizing a column clamps and survives reloads', () async {
+    final repository = _FakeTableDataRepository(
+      total: 100,
+      structure: _threeColumn,
+    );
+    final cubit = TableDataCubit(repository: repository);
+    await cubit.openTable(connection, key);
+
+    cubit.resizeColumn(key, 1, 320);
+    expect(cubit.state.session(key)!.columnWidthOverrides, {1: 320});
+
+    cubit.resizeColumn(key, 1, 20);
+    expect(
+      cubit.state.session(key)!.columnWidthOverrides[1],
+      TableDataCubit.minColumnWidth,
+    );
+
+    cubit.resizeColumn(key, 2, 900);
+    expect(
+      cubit.state.session(key)!.columnWidthOverrides[2],
+      TableDataCubit.maxColumnWidth,
+    );
+
+    cubit.resizeColumn(key, -1, 240);
+    cubit.resizeColumn(key, 20, 240);
+    expect(cubit.state.session(key)!.columnWidthOverrides.keys, {1, 2});
+
+    await cubit.nextPage(key);
+    expect(cubit.state.session(key)!.columnWidthOverrides.keys, {1, 2});
+
+    cubit.resetColumnWidth(key, 1);
+    expect(cubit.state.session(key)!.columnWidthOverrides.keys, {2});
   });
 
   test('opening the same table twice reuses the existing session', () async {

@@ -9,6 +9,9 @@ import 'editor_tabs_state.dart';
 import 'table_data_state.dart';
 
 class TableDataCubit extends Cubit<TableDataState> {
+  static const double minColumnWidth = 80;
+  static const double maxColumnWidth = 520;
+
   final TableDataRepository repository;
   final Map<TableTabKey, Connection> _connections = {};
   final Map<TableTabKey, int> _generations = {};
@@ -125,7 +128,7 @@ class TableDataCubit extends Cubit<TableDataState> {
     }
     _setSession(
       session.copyWith(
-        pinnedColumnIndexes: {...session.pinnedColumnIndexes, columnIndex},
+        pinnedColumnIndexes: [...session.pinnedColumnIndexes, columnIndex],
       ),
     );
   }
@@ -134,15 +137,73 @@ class TableDataCubit extends Cubit<TableDataState> {
     final session = state.session(key);
     if (session == null || session.pinnedColumnIndexes.isEmpty) return;
     if (columnIndex == null) {
-      _setSession(session.copyWith(pinnedColumnIndexes: const {}));
+      _setSession(session.copyWith(pinnedColumnIndexes: const []));
       return;
     }
     if (!session.pinnedColumnIndexes.contains(columnIndex)) return;
     _setSession(
       session.copyWith(
-        pinnedColumnIndexes: {
+        pinnedColumnIndexes: [
           for (final index in session.pinnedColumnIndexes)
             if (index != columnIndex) index,
+        ],
+      ),
+    );
+  }
+
+  void movePinnedColumnLeft(TableTabKey key, int columnIndex) {
+    _movePinnedColumn(key, columnIndex, -1);
+  }
+
+  void movePinnedColumnRight(TableTabKey key, int columnIndex) {
+    _movePinnedColumn(key, columnIndex, 1);
+  }
+
+  void _movePinnedColumn(TableTabKey key, int columnIndex, int delta) {
+    final session = state.session(key);
+    if (session == null) return;
+    final currentIndex = session.pinnedColumnIndexes.indexOf(columnIndex);
+    if (currentIndex < 0) return;
+    final nextIndex = currentIndex + delta;
+    if (nextIndex < 0 || nextIndex >= session.pinnedColumnIndexes.length) {
+      return;
+    }
+    final pinned = List<int>.from(session.pinnedColumnIndexes);
+    final moved = pinned.removeAt(currentIndex);
+    pinned.insert(nextIndex, moved);
+    _setSession(session.copyWith(pinnedColumnIndexes: pinned));
+  }
+
+  void resizeColumn(TableTabKey key, int columnIndex, double width) {
+    final session = state.session(key);
+    final columns = session?.structure?.columns;
+    if (session == null ||
+        columns == null ||
+        columnIndex < 0 ||
+        columnIndex >= columns.length) {
+      return;
+    }
+    _setSession(
+      session.copyWith(
+        columnWidthOverrides: {
+          ...session.columnWidthOverrides,
+          columnIndex: width.clamp(minColumnWidth, maxColumnWidth).toDouble(),
+        },
+      ),
+    );
+  }
+
+  void resetColumnWidth(TableTabKey key, int columnIndex) {
+    final session = state.session(key);
+    if (session == null ||
+        !session.columnWidthOverrides.containsKey(columnIndex)) {
+      return;
+    }
+    _setSession(
+      session.copyWith(
+        columnWidthOverrides: {
+          for (final entry in session.columnWidthOverrides.entries)
+            if (entry.key != columnIndex) entry.key: entry.value,
         },
       ),
     );

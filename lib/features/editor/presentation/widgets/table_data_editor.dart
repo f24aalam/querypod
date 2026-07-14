@@ -906,6 +906,9 @@ class _DataGridState extends State<_DataGrid> {
   final _scrollVertical = ScrollController();
   final _focusNode = FocusNode(debugLabel: 'table-data-grid');
   bool _syncingVerticalScroll = false;
+  int? _resizingColumnIndex;
+  double? _resizingColumnStartWidth;
+  double _resizingColumnDelta = 0;
 
   @override
   void initState() {
@@ -966,10 +969,13 @@ class _DataGridState extends State<_DataGrid> {
   @override
   Widget build(BuildContext context) {
     final columns = widget.session.structure!.columns;
-    final widths = columns.map(_columnWidth).toList();
-    final pinnedColumnIndexes = [
+    final widths = [
       for (var index = 0; index < columns.length; index++)
-        if (widget.session.pinnedColumnIndexes.contains(index)) index,
+        _activeColumnWidth(index, columns[index]),
+    ];
+    final pinnedColumnIndexes = [
+      for (final index in widget.session.pinnedColumnIndexes)
+        if (index >= 0 && index < columns.length) index,
     ];
     final hasPinnedColumns = pinnedColumnIndexes.isNotEmpty;
     final scrollColumnIndexes = [
@@ -1030,6 +1036,9 @@ class _DataGridState extends State<_DataGrid> {
                       onRequestKeyboardFocus: _focusNode.requestFocus,
                       onCopyRows: _copyRows,
                       onOpenForeignKey: _openForeignKey,
+                      onResizeColumnStart: _startResizeColumn,
+                      onResizeColumnUpdate: _updateResizeColumn,
+                      onResizeColumnEnd: _endResizeColumn,
                     ),
                   ),
                 Expanded(
@@ -1054,6 +1063,9 @@ class _DataGridState extends State<_DataGrid> {
                           onRequestKeyboardFocus: _focusNode.requestFocus,
                           onCopyRows: _copyRows,
                           onOpenForeignKey: _openForeignKey,
+                          onResizeColumnStart: _startResizeColumn,
+                          onResizeColumnUpdate: _updateResizeColumn,
+                          onResizeColumnEnd: _endResizeColumn,
                         ),
                       ),
                     ),
@@ -1073,6 +1085,55 @@ class _DataGridState extends State<_DataGrid> {
       fk,
       value.rawValue?.toString() ?? value.display,
     );
+  }
+
+  void _resizeColumn(int columnIndex, double width) {
+    context.read<TableDataCubit>().resizeColumn(
+      widget.tableKey,
+      columnIndex,
+      width,
+    );
+  }
+
+  double _activeColumnWidth(int columnIndex, TableDataColumn column) {
+    final baseWidth =
+        widget.session.columnWidthOverrides[columnIndex] ??
+        _columnWidth(column);
+    if (_resizingColumnIndex != columnIndex) return baseWidth;
+    return ((_resizingColumnStartWidth ?? baseWidth) + _resizingColumnDelta)
+        .clamp(TableDataCubit.minColumnWidth, TableDataCubit.maxColumnWidth)
+        .toDouble();
+  }
+
+  void _startResizeColumn(int columnIndex, double width) {
+    setState(() {
+      _resizingColumnIndex = columnIndex;
+      _resizingColumnStartWidth = width;
+      _resizingColumnDelta = 0;
+    });
+  }
+
+  void _updateResizeColumn(double delta) {
+    if (_resizingColumnIndex == null) return;
+    setState(() {
+      _resizingColumnDelta += delta;
+    });
+  }
+
+  void _endResizeColumn() {
+    final columnIndex = _resizingColumnIndex;
+    final startWidth = _resizingColumnStartWidth;
+    if (columnIndex == null || startWidth == null) return;
+
+    final finalWidth = (startWidth + _resizingColumnDelta)
+        .clamp(TableDataCubit.minColumnWidth, TableDataCubit.maxColumnWidth)
+        .toDouble();
+    setState(() {
+      _resizingColumnIndex = null;
+      _resizingColumnStartWidth = null;
+      _resizingColumnDelta = 0;
+    });
+    _resizeColumn(columnIndex, finalWidth);
   }
 
   double _columnWidth(TableDataColumn column) {
@@ -1314,6 +1375,9 @@ class _GridColumnGroup extends StatelessWidget {
   final Future<void> Function(int rowIndex, [_CopyRowsFormat? format])
   onCopyRows;
   final void Function(TableForeignKey, TableCellValue)? onOpenForeignKey;
+  final void Function(int columnIndex, double width) onResizeColumnStart;
+  final ValueChanged<double> onResizeColumnUpdate;
+  final VoidCallback onResizeColumnEnd;
 
   const _GridColumnGroup({
     required this.tableKey,
@@ -1324,6 +1388,9 @@ class _GridColumnGroup extends StatelessWidget {
     required this.verticalController,
     required this.onRequestKeyboardFocus,
     required this.onCopyRows,
+    required this.onResizeColumnStart,
+    required this.onResizeColumnUpdate,
+    required this.onResizeColumnEnd,
     this.onOpenForeignKey,
   });
 
@@ -1337,6 +1404,9 @@ class _GridColumnGroup extends StatelessWidget {
           widths: widths,
           columnIndexes: columnIndexes,
           pinnedColumnIndexes: session.pinnedColumnIndexes,
+          onResizeColumnStart: onResizeColumnStart,
+          onResizeColumnUpdate: onResizeColumnUpdate,
+          onResizeColumnEnd: onResizeColumnEnd,
         ),
         Expanded(
           child: session.rows.isEmpty
@@ -1378,7 +1448,10 @@ class _HeaderRow extends StatelessWidget {
   final List<TableDataColumn> columns;
   final List<double> widths;
   final List<int> columnIndexes;
-  final Set<int> pinnedColumnIndexes;
+  final List<int> pinnedColumnIndexes;
+  final void Function(int columnIndex, double width) onResizeColumnStart;
+  final ValueChanged<double> onResizeColumnUpdate;
+  final VoidCallback onResizeColumnEnd;
 
   const _HeaderRow({
     required this.tableKey,
@@ -1386,6 +1459,9 @@ class _HeaderRow extends StatelessWidget {
     required this.widths,
     required this.columnIndexes,
     required this.pinnedColumnIndexes,
+    required this.onResizeColumnStart,
+    required this.onResizeColumnUpdate,
+    required this.onResizeColumnEnd,
   });
 
   @override
@@ -1403,6 +1479,10 @@ class _HeaderRow extends StatelessWidget {
               columnIndex: index,
               width: widths[index],
               pinned: pinnedColumnIndexes.contains(index),
+              pinnedColumnIndexes: pinnedColumnIndexes,
+              onResizeStart: () => onResizeColumnStart(index, widths[index]),
+              onResizeUpdate: onResizeColumnUpdate,
+              onResizeEnd: onResizeColumnEnd,
             ),
         ],
       ),
@@ -1416,6 +1496,10 @@ class _HeaderCell extends StatelessWidget {
   final int columnIndex;
   final double width;
   final bool pinned;
+  final List<int> pinnedColumnIndexes;
+  final VoidCallback onResizeStart;
+  final ValueChanged<double> onResizeUpdate;
+  final VoidCallback onResizeEnd;
 
   const _HeaderCell({
     required this.tableKey,
@@ -1423,15 +1507,65 @@ class _HeaderCell extends StatelessWidget {
     required this.columnIndex,
     required this.width,
     required this.pinned,
+    required this.pinnedColumnIndexes,
+    required this.onResizeStart,
+    required this.onResizeUpdate,
+    required this.onResizeEnd,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = context.theme;
+    final pinnedPosition = pinnedColumnIndexes.indexOf(columnIndex);
     return FContextMenu(
       menuBuilder: (context, controller, menu) => [
         FItemGroup(
           children: [
+            if (pinned)
+              FSubmenuItem(
+                prefix: const Icon(Icons.swap_horiz, size: 14),
+                title: const Text('Move to'),
+                submenu: [
+                  FItemGroup(
+                    children: [
+                      FItem(
+                        enabled: pinnedPosition > 0,
+                        title: const Text('Left'),
+                        onPress: pinnedPosition > 0
+                            ? () {
+                                controller.hide();
+                                context
+                                    .read<TableDataCubit>()
+                                    .movePinnedColumnLeft(
+                                      tableKey,
+                                      columnIndex,
+                                    );
+                              }
+                            : null,
+                      ),
+                      FItem(
+                        enabled:
+                            pinnedPosition >= 0 &&
+                            pinnedPosition < pinnedColumnIndexes.length - 1,
+                        title: const Text('Right'),
+                        onPress:
+                            pinnedPosition >= 0 &&
+                                pinnedPosition < pinnedColumnIndexes.length - 1
+                            ? () {
+                                controller.hide();
+                                context
+                                    .read<TableDataCubit>()
+                                    .movePinnedColumnRight(
+                                      tableKey,
+                                      columnIndex,
+                                    );
+                              }
+                            : null,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             FItem(
               prefix: Icon(
                 pinned ? Icons.push_pin : Icons.push_pin_outlined,
@@ -1456,46 +1590,92 @@ class _HeaderCell extends StatelessWidget {
           ],
         ),
       ],
-      child: Container(
+      child: SizedBox(
         width: width,
-        padding: const EdgeInsets.symmetric(horizontal: 10),
-        alignment: Alignment.centerLeft,
-        decoration: BoxDecoration(
-          color: pinned ? theme.colors.primary.withValues(alpha: 0.08) : null,
-          border: Border(
-            right: BorderSide(
-              color: pinned ? theme.colors.primary : theme.colors.border,
-              width: pinned ? 1.5 : 1,
-            ),
-            bottom: BorderSide(color: theme.colors.border, width: 1),
-          ),
-        ),
-        child: Row(
+        child: Stack(
           children: [
-            if (pinned) ...[
-              Icon(Icons.push_pin, size: 12, color: theme.colors.primary),
-              const SizedBox(width: 5),
-            ],
-            if (column.isPrimaryKey) ...[
-              Icon(
-                Icons.key_outlined,
-                size: 12,
-                color: theme.colors.mutedForeground,
+            Positioned.fill(
+              child: Container(
+                padding: const EdgeInsets.only(left: 10, right: 14),
+                alignment: Alignment.centerLeft,
+                decoration: BoxDecoration(
+                  color: pinned
+                      ? theme.colors.primary.withValues(alpha: 0.08)
+                      : null,
+                  border: Border(
+                    right: BorderSide(
+                      color: pinned
+                          ? theme.colors.primary
+                          : theme.colors.border,
+                      width: pinned ? 1.5 : 1,
+                    ),
+                    bottom: BorderSide(color: theme.colors.border, width: 1),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    if (pinned) ...[
+                      Icon(
+                        Icons.push_pin,
+                        size: 12,
+                        color: theme.colors.primary,
+                      ),
+                      const SizedBox(width: 5),
+                    ],
+                    if (column.isPrimaryKey) ...[
+                      Icon(
+                        Icons.key_outlined,
+                        size: 12,
+                        color: theme.colors.mutedForeground,
+                      ),
+                      const SizedBox(width: 5),
+                    ],
+                    if (column.foreignKey != null) ...[
+                      Icon(
+                        Icons.link,
+                        size: 12,
+                        color: theme.colors.mutedForeground,
+                      ),
+                      const SizedBox(width: 5),
+                    ],
+                    Expanded(
+                      child: Text(
+                        column.name,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: theme.colors.foreground,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              const SizedBox(width: 5),
-            ],
-            if (column.foreignKey != null) ...[
-              Icon(Icons.link, size: 12, color: theme.colors.mutedForeground),
-              const SizedBox(width: 5),
-            ],
-            Expanded(
-              child: Text(
-                column.name,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: theme.colors.foreground,
+            ),
+            Positioned(
+              top: 0,
+              right: 0,
+              bottom: 0,
+              width: 8,
+              child: MouseRegion(
+                cursor: SystemMouseCursors.resizeColumn,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onHorizontalDragStart: (_) => onResizeStart(),
+                  onHorizontalDragUpdate: (details) {
+                    onResizeUpdate(details.delta.dx);
+                  },
+                  onHorizontalDragEnd: (_) => onResizeEnd(),
+                  onHorizontalDragCancel: onResizeEnd,
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: Container(
+                      width: 2,
+                      height: double.infinity,
+                      color: Colors.transparent,
+                    ),
+                  ),
                 ),
               ),
             ),

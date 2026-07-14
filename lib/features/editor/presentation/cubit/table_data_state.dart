@@ -27,7 +27,8 @@ class TableDataSession {
   final bool isShowingStructure;
   final ForeignRowPreview? foreignRowPreview;
   final bool isFetchingForeignRow;
-  final Set<int> pinnedColumnIndexes;
+  final List<int> pinnedColumnIndexes;
+  final Map<int, double> columnWidthOverrides;
 
   TableDataSession({
     required this.key,
@@ -53,14 +54,16 @@ class TableDataSession {
     this.isShowingStructure = false,
     this.foreignRowPreview,
     this.isFetchingForeignRow = false,
-    Set<int> pinnedColumnIndexes = const {},
+    List<int> pinnedColumnIndexes = const [],
+    Map<int, double> columnWidthOverrides = const {},
   }) : rows = List.unmodifiable(rows),
        filters = List.unmodifiable(filters),
        selectedRowIndexes = Set.unmodifiable(selectedRowIndexes),
        stagedCellEdits = Map.unmodifiable(stagedCellEdits),
        stagedDeletedRowIndexes = Set.unmodifiable(stagedDeletedRowIndexes),
        stagedInsertedRowIndexes = Set.unmodifiable(stagedInsertedRowIndexes),
-       pinnedColumnIndexes = Set.unmodifiable(pinnedColumnIndexes);
+       pinnedColumnIndexes = List.unmodifiable(pinnedColumnIndexes),
+       columnWidthOverrides = Map.unmodifiable(columnWidthOverrides);
 
   int get pageCount => totalCount == 0 ? 0 : (totalCount / pageSize).ceil();
   int get rangeStart => rows.isEmpty ? 0 : pageIndex * pageSize + 1;
@@ -105,7 +108,8 @@ class TableDataSession {
     bool? isShowingStructure,
     ForeignRowPreview? Function()? foreignRowPreview,
     bool? isFetchingForeignRow,
-    Set<int>? pinnedColumnIndexes,
+    List<int>? pinnedColumnIndexes,
+    Map<int, double>? columnWidthOverrides,
   }) {
     return TableDataSession(
       key: key,
@@ -140,6 +144,7 @@ class TableDataSession {
           : this.foreignRowPreview,
       isFetchingForeignRow: isFetchingForeignRow ?? this.isFetchingForeignRow,
       pinnedColumnIndexes: pinnedColumnIndexes ?? this.pinnedColumnIndexes,
+      columnWidthOverrides: columnWidthOverrides ?? this.columnWidthOverrides,
     );
   }
 }

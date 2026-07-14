@@ -9,6 +9,7 @@ import 'package:querypod/features/editor/domain/entities/connection_database.dar
 import 'package:querypod/features/editor/domain/entities/connection_table.dart';
 import 'package:querypod/features/editor/domain/entities/table_data.dart';
 import 'package:querypod/features/editor/domain/repositories/connection_metadata_repository.dart';
+import 'package:querypod/features/editor/domain/repositories/pinned_tables_repository.dart';
 import 'package:querypod/features/editor/domain/repositories/query_repository.dart';
 import 'package:querypod/features/editor/presentation/cubit/connection_metadata_cubit.dart';
 import 'package:querypod/features/editor/presentation/cubit/connection_metadata_state.dart';
@@ -62,6 +63,38 @@ void main() {
 
     expect(metadataCubit.searchQueries, ['orders']);
   });
+
+  testWidgets('table list panel forwards context menu pin to metadata cubit', (
+    tester,
+  ) async {
+    final metadataCubit = _SpyConnectionMetadataCubit(
+      const ConnectionMetadataState(
+        connectionId: 'connection',
+        databases: [ConnectionDatabase(name: 'app')],
+        selectedDatabase: 'app',
+        tables: [
+          ConnectionTable(name: 'users', type: ConnectionTableType.table),
+        ],
+        filteredTables: [
+          ConnectionTable(name: 'users', type: ConnectionTableType.table),
+        ],
+      ),
+    );
+
+    await tester.pumpWidget(
+      _TableListHarness(
+        connectionCubit: _TestConnectionCubit(),
+        metadataCubit: metadataCubit,
+      ),
+    );
+
+    await tester.longPress(find.text('users'));
+    await tester.pump(const Duration(milliseconds: 250));
+    await tester.tap(find.text('Pin'));
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(metadataCubit.toggledPins, ['users']);
+  });
 }
 
 class _TableListHarness extends StatelessWidget {
@@ -93,10 +126,14 @@ class _TableListHarness extends StatelessWidget {
 class _SpyConnectionMetadataCubit extends ConnectionMetadataCubit {
   _SpyConnectionMetadataCubit(ConnectionMetadataState initialState)
     : _state = initialState,
-      super(repository: _NoopConnectionMetadataRepository());
+      super(
+        repository: _NoopConnectionMetadataRepository(),
+        pinnedTablesRepository: _NoopPinnedTablesRepository(),
+      );
 
   final ConnectionMetadataState _state;
   final List<String> searchQueries = [];
+  final List<String> toggledPins = [];
 
   @override
   ConnectionMetadataState get state => _state;
@@ -108,6 +145,11 @@ class _SpyConnectionMetadataCubit extends ConnectionMetadataCubit {
   @override
   void search(String query) {
     searchQueries.add(query);
+  }
+
+  @override
+  Future<void> toggleTablePin(ConnectionTable table) async {
+    toggledPins.add(table.name);
   }
 }
 
@@ -170,6 +212,21 @@ class _NoopConnectionMetadataRepository
     String database,
     String table, {
     bool cascade = false,
+  }) async {}
+}
+
+class _NoopPinnedTablesRepository implements PinnedTablesRepository {
+  @override
+  Future<List<String>> getPinnedTables({
+    required String connectionId,
+    required String database,
+  }) async => [];
+
+  @override
+  Future<void> setPinnedTables({
+    required String connectionId,
+    required String database,
+    required List<String> tableNames,
   }) async {}
 }
 

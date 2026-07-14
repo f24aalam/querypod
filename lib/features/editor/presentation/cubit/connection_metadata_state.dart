@@ -11,6 +11,7 @@ class ConnectionMetadataState {
   final String? selectedDatabase;
   final List<ConnectionTable> tables;
   final List<ConnectionTable> filteredTables;
+  final List<String> pinnedTableNames;
   final ConnectionTable? selectedTable;
   final String query;
   final ConnectionMetadataStatus status;
@@ -25,6 +26,7 @@ class ConnectionMetadataState {
     this.selectedDatabase,
     this.tables = const [],
     this.filteredTables = const [],
+    this.pinnedTableNames = const [],
     this.selectedTable,
     this.query = '',
     this.status = ConnectionMetadataStatus.idle,
@@ -40,6 +42,7 @@ class ConnectionMetadataState {
     String? Function()? selectedDatabase,
     List<ConnectionTable>? tables,
     List<ConnectionTable>? filteredTables,
+    List<String>? pinnedTableNames,
     ConnectionTable? Function()? selectedTable,
     String? query,
     ConnectionMetadataStatus? status,
@@ -58,6 +61,7 @@ class ConnectionMetadataState {
           : this.selectedDatabase,
       tables: tables ?? this.tables,
       filteredTables: filteredTables ?? this.filteredTables,
+      pinnedTableNames: pinnedTableNames ?? this.pinnedTableNames,
       selectedTable: selectedTable != null
           ? selectedTable()
           : this.selectedTable,
@@ -75,4 +79,19 @@ class ConnectionMetadataState {
       status == ConnectionMetadataStatus.loadingDatabases;
 
   bool get isLoadingTables => status == ConnectionMetadataStatus.loadingTables;
+
+  List<ConnectionTable> get pinnedFilteredTables {
+    final byName = {for (final table in filteredTables) table.name: table};
+    return pinnedTableNames
+        .where(byName.containsKey)
+        .map((name) => byName[name]!)
+        .toList();
+  }
+
+  List<ConnectionTable> get unpinnedFilteredTables {
+    final pinned = pinnedTableNames.toSet();
+    return filteredTables
+        .where((table) => !pinned.contains(table.name))
+        .toList();
+  }
 }

@@ -8,6 +8,7 @@ import 'package:querypod/features/editor/domain/entities/connection_table.dart';
 import 'package:querypod/features/editor/domain/entities/query_result.dart';
 import 'package:querypod/features/editor/domain/entities/table_data.dart';
 import 'package:querypod/features/editor/domain/repositories/connection_metadata_repository.dart';
+import 'package:querypod/features/editor/domain/repositories/pinned_tables_repository.dart';
 import 'package:querypod/features/editor/presentation/cubit/connection_metadata_cubit.dart';
 import 'package:querypod/features/editor/presentation/cubit/editor_tabs_cubit.dart';
 import 'package:querypod/features/editor/presentation/cubit/editor_tabs_state.dart';
@@ -183,7 +184,10 @@ class _OpenTableDialogState extends State<_OpenTableDialog> {
 
 class _SpyMetadataCubit extends ConnectionMetadataCubit {
   _SpyMetadataCubit({this.dropError})
-    : super(repository: _NoopConnectionMetadataRepository());
+    : super(
+        repository: _NoopConnectionMetadataRepository(),
+        pinnedTablesRepository: _NoopPinnedTablesRepository(),
+      );
 
   final Object? dropError;
   final List<(String, bool)> dropCalls = [];
@@ -281,6 +285,21 @@ class _NoopConnectionMetadataRepository
     String database,
     String table, {
     bool cascade = false,
+  }) async {}
+}
+
+class _NoopPinnedTablesRepository implements PinnedTablesRepository {
+  @override
+  Future<List<String>> getPinnedTables({
+    required String connectionId,
+    required String database,
+  }) async => [];
+
+  @override
+  Future<void> setPinnedTables({
+    required String connectionId,
+    required String database,
+    required List<String> tableNames,
   }) async {}
 }
 

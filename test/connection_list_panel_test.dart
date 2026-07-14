@@ -7,8 +7,6 @@ import 'package:querypod/features/connections/domain/repositories/connection_rep
 import 'package:querypod/features/connections/presentation/cubit/connection_cubit.dart';
 import 'package:querypod/features/connections/presentation/cubit/connection_editor_cubit.dart';
 import 'package:querypod/features/connections/presentation/widgets/connection_list_panel.dart';
-import 'package:querypod/features/editor/domain/entities/connection_query.dart';
-import 'package:querypod/features/editor/domain/repositories/query_repository.dart';
 import 'package:querypod/features/editor/presentation/cubit/editor_tabs_cubit.dart';
 
 void main() {
@@ -43,10 +41,7 @@ void main() {
         connection(id: 'beta', name: 'Beta DB', host: 'db-beta'),
       ],
     );
-    final connectionCubit = ConnectionCubit(
-      repository: repository,
-      queryRepository: _FakeQueryRepository(),
-    );
+    final connectionCubit = ConnectionCubit(repository: repository);
     await connectionCubit.load();
 
     await tester.pumpWidget(
@@ -73,10 +68,7 @@ void main() {
     (tester) async {
       final existing = connection(id: 'alpha', name: 'Alpha DB');
       final repository = _MemoryConnectionRepository(connections: [existing]);
-      final connectionCubit = ConnectionCubit(
-        repository: repository,
-        queryRepository: _FakeQueryRepository(),
-      );
+      final connectionCubit = ConnectionCubit(repository: repository);
       final editorCubit = ConnectionEditorCubit()
         ..load(existing, activeWorkspaceId: 'default')
         ..updateName('Changed');
@@ -116,7 +108,6 @@ void main() {
   ) async {
     final connectionCubit = ConnectionCubit(
       repository: _MemoryConnectionRepository(),
-      queryRepository: _FakeQueryRepository(),
     );
     await connectionCubit.setWorkspace('workspace-a');
     final editorCubit = ConnectionEditorCubit();
@@ -202,20 +193,4 @@ class _MemoryConnectionRepository implements ConnectionRepository {
   Future<void> setSelectedId(String? id) async {
     selectedId = id;
   }
-}
-
-class _FakeQueryRepository implements QueryRepository {
-  @override
-  Future<void> delete(String id) async {}
-
-  @override
-  Future<void> deleteByConnection(String connectionId) async {}
-
-  @override
-  Future<List<ConnectionQuery>> getAllForConnection(
-    String connectionId,
-  ) async => [];
-
-  @override
-  Future<ConnectionQuery> save(ConnectionQuery query) async => query;
 }

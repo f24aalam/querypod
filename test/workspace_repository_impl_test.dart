@@ -1,38 +1,33 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:querypod/app/database.dart';
 import 'package:querypod/features/workspaces/data/repositories/workspace_repository_impl.dart';
 import 'package:querypod/features/workspaces/domain/entities/app_workspace.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+
+import 'support/persistence_test_support.dart';
 
 void main() {
-  late SharedPreferences prefs;
+  late QueryPodDatabase database;
+  late MemoryCredentialStore credentials;
   late WorkspaceRepositoryImpl repository;
 
-  AppWorkspace workspace(
-    String id,
-    String name,
-    DateTime createdAt,
-  ) {
-    return AppWorkspace(
-      id: id,
-      name: name,
-      createdAt: createdAt,
-      updatedAt: createdAt,
+  setUp(() {
+    database = createTestDatabase();
+    credentials = MemoryCredentialStore();
+    repository = WorkspaceRepositoryImpl(
+      database: database,
+      credentialStore: credentials,
     );
-  }
-
-  setUp(() async {
-    SharedPreferences.setMockInitialValues({});
-    prefs = await SharedPreferences.getInstance();
-    repository = WorkspaceRepositoryImpl(prefs);
   });
 
-  test('empty storage returns no workspaces', () async {
+  tearDown(() => database.close());
+
+  test('empty database returns no workspaces', () async {
     expect(await repository.getWorkspaces(), isEmpty);
   });
 
   test('getWorkspaces sorts by createdAt descending', () async {
-    final older = workspace('older', 'Older', DateTime(2024, 1, 1));
-    final newer = workspace('newer', 'Newer', DateTime(2025, 1, 1));
+    final older = _workspace('older', 'Older', DateTime(2024, 1, 1));
+    final newer = _workspace('newer', 'Newer', DateTime(2025, 1, 1));
 
     await repository.createWorkspace(older);
     await repository.createWorkspace(newer);
@@ -42,21 +37,18 @@ void main() {
   });
 
   test('getWorkspace returns the matching workspace', () async {
-    final target = workspace('target', 'Target', DateTime(2024, 2, 1));
+    final target = _workspace('target', 'Target', DateTime(2024, 2, 1));
     await repository.createWorkspace(target);
 
     expect(await repository.getWorkspace('target'), target);
   });
 
   test('getWorkspace throws when the workspace is missing', () async {
-    expect(
-      () => repository.getWorkspace('missing'),
-      throwsA(isA<Exception>()),
-    );
+    expect(() => repository.getWorkspace('missing'), throwsA(isA<Exception>()));
   });
 
   test('createWorkspace persists the workspace', () async {
-    final created = workspace('created', 'Created', DateTime(2024, 3, 1));
+    final created = _workspace('created', 'Created', DateTime(2024, 3, 1));
 
     await repository.createWorkspace(created);
 
@@ -64,20 +56,19 @@ void main() {
   });
 
   test('updateWorkspace replaces only the matching workspace', () async {
-    final first = workspace('first', 'First', DateTime(2024, 1, 1));
-    final second = workspace('second', 'Second', DateTime(2024, 2, 1));
+    final first = _workspace('first', 'First', DateTime(2024, 1, 1));
+    final second = _workspace('second', 'Second', DateTime(2024, 2, 1));
     await repository.createWorkspace(first);
     await repository.createWorkspace(second);
     final updatedSecond = second.copyWith(name: 'Renamed');
 
     await repository.updateWorkspace(updatedSecond);
 
-    final workspaces = await repository.getWorkspaces();
-    expect(workspaces, [updatedSecond, first]);
+    expect(await repository.getWorkspaces(), [updatedSecond, first]);
   });
 
   test('updateWorkspace throws when the workspace does not exist', () async {
-    final missing = workspace('missing', 'Missing', DateTime(2024, 1, 1));
+    final missing = _workspace('missing', 'Missing', DateTime(2024, 1, 1));
 
     expect(
       () => repository.updateWorkspace(missing),
@@ -86,8 +77,8 @@ void main() {
   });
 
   test('deleteWorkspace removes only the target workspace', () async {
-    final first = workspace('first', 'First', DateTime(2024, 1, 1));
-    final second = workspace('second', 'Second', DateTime(2024, 2, 1));
+    final first = _workspace('first', 'First', DateTime(2024, 1, 1));
+    final second = _workspace('second', 'Second', DateTime(2024, 2, 1));
     await repository.createWorkspace(first);
     await repository.createWorkspace(second);
 
@@ -96,26 +87,74 @@ void main() {
     expect(await repository.getWorkspaces(), [second]);
   });
 
-  test('keyNamespace isolates workspace storage', () async {
-    final defaultRepository = WorkspaceRepositoryImpl(prefs);
-    final alphaRepository = WorkspaceRepositoryImpl(prefs, keyNamespace: 'alpha');
-    final betaRepository = WorkspaceRepositoryImpl(prefs, keyNamespace: 'beta');
+  test('deleteWorkspace cascades child state and removes passwords', () async {
+    await repository.createWorkspace(
+      _workspace('team', 'Team', DateTime(2024, 1, 1)),
+    );
+    await seedConnection(database, id: 'first', workspaceId: 'team');
+    await seedConnection(database, id: 'second', workspaceId: 'team');
+    await credentials.writePassword('first', 'one');
+    await credentials.writePassword('second', 'two');
+    final now = DateTime(2026, 1, 1);
+    await database
+        .into(database.savedQueries)
+        .insert(
+          SavedQueriesCompanion.insert(
+            id: 'query',
+            connectionId: 'first',
+            title: 'Query',
+            sql: 'SELECT 1',
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
+    await database
+        .into(database.queryHistoryEntries)
+        .insert(
+          QueryHistoryEntriesCompanion.insert(
+            id: 'history',
+            connectionId: 'second',
+            sourceType: 'editor',
+            sql: 'SELECT 1',
+            executionTimeMs: 1,
+            status: 'success',
+            createdAt: now,
+          ),
+        );
+    await database
+        .into(database.pinnedTables)
+        .insert(
+          PinnedTablesCompanion.insert(
+            connectionId: 'first',
+            database: 'app',
+            table: 'users',
+            sortOrder: 0,
+          ),
+        );
+    await database.customStatement(
+      "UPDATE app_state SET selected_connection_id = 'first' WHERE id = 1",
+    );
 
-    await defaultRepository.createWorkspace(
-      workspace('default', 'Default', DateTime(2024, 1, 1)),
-    );
-    await alphaRepository.createWorkspace(
-      workspace('alpha', 'Alpha', DateTime(2024, 2, 1)),
-    );
+    await repository.deleteWorkspace('team');
 
+    expect(await database.select(database.connections).get(), isEmpty);
+    expect(await database.select(database.savedQueries).get(), isEmpty);
+    expect(await database.select(database.queryHistoryEntries).get(), isEmpty);
+    expect(await database.select(database.pinnedTables).get(), isEmpty);
     expect(
-      (await defaultRepository.getWorkspaces()).map((item) => item.id).toList(),
-      ['default'],
+      (await database.select(database.appStateEntries).getSingle())
+          .selectedConnectionId,
+      isNull,
     );
-    expect(
-      (await alphaRepository.getWorkspaces()).map((item) => item.id).toList(),
-      ['alpha'],
-    );
-    expect(await betaRepository.getWorkspaces(), isEmpty);
+    expect(credentials.values, isEmpty);
   });
+}
+
+AppWorkspace _workspace(String id, String name, DateTime createdAt) {
+  return AppWorkspace(
+    id: id,
+    name: name,
+    createdAt: createdAt,
+    updatedAt: createdAt,
+  );
 }

@@ -5,9 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:path/path.dart' as p;
 import 'package:forui/forui.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:querypod/app/app.dart';
 import 'package:querypod/app/injection.dart';
@@ -25,14 +23,17 @@ import 'package:querypod/features/editor/presentation/cubit/table_data_state.dar
 import 'package:querypod/features/editor/presentation/pages/connection_page.dart';
 import 'package:querypod/features/editor/presentation/widgets/table_data_editor.dart';
 
+import 'support/persistence_test_support.dart';
+
 void main() {
   setUpAll(sqfliteFfiInit);
 
   setUp(() async {
-    SharedPreferences.setMockInitialValues({});
     await getIt.reset();
-    await _deleteQueryDatabase();
-    await configureDependencies(databaseFactory: databaseFactoryFfi);
+    await configureDependencies(
+      database: createTestDatabase(),
+      credentialStore: MemoryCredentialStore(),
+    );
   });
 
   testWidgets('App renders', (WidgetTester tester) async {
@@ -740,11 +741,6 @@ Future<void> _copyRowAs(
   await tester.pump(const Duration(milliseconds: 250));
   await tester.tap(find.text(format));
   await tester.pump(const Duration(milliseconds: 100));
-}
-
-Future<void> _deleteQueryDatabase() async {
-  final databasesPath = await databaseFactoryFfi.getDatabasesPath();
-  await databaseFactoryFfi.deleteDatabase(p.join(databasesPath, 'querypod.db'));
 }
 
 Future<BuildContext> _openWidgetTable(WidgetTester tester) async {

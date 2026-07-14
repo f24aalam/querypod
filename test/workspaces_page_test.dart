@@ -6,8 +6,6 @@ import 'package:go_router/go_router.dart';
 import 'package:querypod/features/connections/domain/entities/connection.dart';
 import 'package:querypod/features/connections/domain/repositories/connection_repository.dart';
 import 'package:querypod/features/connections/presentation/cubit/connection_cubit.dart';
-import 'package:querypod/features/editor/domain/entities/connection_query.dart';
-import 'package:querypod/features/editor/domain/repositories/query_repository.dart';
 import 'package:querypod/features/workspaces/domain/entities/app_workspace.dart';
 import 'package:querypod/features/workspaces/domain/repositories/workspace_repository.dart';
 import 'package:querypod/features/workspaces/presentation/cubit/workspaces_cubit.dart';
@@ -227,11 +225,7 @@ class _SpyWorkspacesCubit extends WorkspacesCubit {
 }
 
 class _TestConnectionCubit extends ConnectionCubit {
-  _TestConnectionCubit()
-    : super(
-        repository: _FakeConnectionRepository(),
-        queryRepository: _FakeQueryRepository(),
-      );
+  _TestConnectionCubit() : super(repository: _FakeConnectionRepository());
 
   final List<String?> workspaceIds = [];
 
@@ -280,20 +274,4 @@ class _FakeConnectionRepository implements ConnectionRepository {
 
   @override
   Future<void> setSelectedId(String? id) async {}
-}
-
-class _FakeQueryRepository implements QueryRepository {
-  @override
-  Future<void> delete(String id) async {}
-
-  @override
-  Future<void> deleteByConnection(String connectionId) async {}
-
-  @override
-  Future<List<ConnectionQuery>> getAllForConnection(
-    String connectionId,
-  ) async => [];
-
-  @override
-  Future<ConnectionQuery> save(ConnectionQuery query) async => query;
 }

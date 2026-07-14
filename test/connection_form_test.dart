@@ -7,8 +7,6 @@ import 'package:querypod/features/connections/domain/repositories/connection_rep
 import 'package:querypod/features/connections/presentation/cubit/connection_cubit.dart';
 import 'package:querypod/features/connections/presentation/cubit/connection_editor_cubit.dart';
 import 'package:querypod/features/connections/presentation/widgets/connection_form.dart';
-import 'package:querypod/features/editor/domain/entities/connection_query.dart';
-import 'package:querypod/features/editor/domain/repositories/query_repository.dart';
 import 'package:querypod/features/editor/presentation/cubit/editor_tabs_cubit.dart';
 
 void main() {
@@ -143,10 +141,7 @@ class _ConnectionFormHarness extends StatelessWidget {
 
 class _SpyConnectionCubit extends ConnectionCubit {
   _SpyConnectionCubit({this.saveResult = true})
-    : super(
-        repository: _FakeConnectionRepository(),
-        queryRepository: _FakeQueryRepository(),
-      );
+    : super(repository: _FakeConnectionRepository());
 
   final bool saveResult;
   final List<Connection> savedConnections = [];
@@ -182,20 +177,4 @@ class _FakeConnectionRepository implements ConnectionRepository {
 
   @override
   Future<void> setSelectedId(String? id) async {}
-}
-
-class _FakeQueryRepository implements QueryRepository {
-  @override
-  Future<void> delete(String id) async {}
-
-  @override
-  Future<void> deleteByConnection(String connectionId) async {}
-
-  @override
-  Future<List<ConnectionQuery>> getAllForConnection(
-    String connectionId,
-  ) async => [];
-
-  @override
-  Future<ConnectionQuery> save(ConnectionQuery query) async => query;
 }

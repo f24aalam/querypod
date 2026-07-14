@@ -1,11 +1,9 @@
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:get_it/get_it.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:sqflite_common/sqlite_api.dart';
 
 import '../app/database.dart';
 import '../app/launch_bootstrap.dart';
 import '../features/connections/data/repositories/connection_repository_impl.dart';
+import '../features/connections/data/services/connection_credential_store.dart';
 import '../features/connections/domain/repositories/connection_repository.dart';
 import '../features/connections/presentation/cubit/connection_cubit.dart';
 import '../features/editor/data/repositories/query_history_repository_impl.dart';
@@ -28,36 +26,45 @@ import '../features/workspaces/presentation/cubit/workspaces_cubit.dart';
 final getIt = GetIt.instance;
 
 Future<void> configureDependencies({
-  required DatabaseFactory databaseFactory,
+  QueryPodDatabase? database,
+  ConnectionCredentialStore? credentialStore,
   LaunchBootstrapConfig launchBootstrap = const LaunchBootstrapConfig(
     profileNamespace: '',
     preset: null,
     workspace: null,
   ),
 }) async {
-  final prefs = await SharedPreferences.getInstance();
-  const secureStorage = FlutterSecureStorage();
-  final database = await openAppDatabase(databaseFactory: databaseFactory);
+  final appDatabase =
+      database ??
+      QueryPodDatabase(profileNamespace: launchBootstrap.profileNamespace);
+  final credentials =
+      credentialStore ??
+      SecureConnectionCredentialStore(
+        keyNamespace: launchBootstrap.profileNamespace,
+      );
   final workspaceRepository = WorkspaceRepositoryImpl(
-    prefs,
-    keyNamespace: launchBootstrap.profileNamespace,
+    database: appDatabase,
+    credentialStore: credentials,
   );
   final connectionRepository = ConnectionRepositoryImpl(
-    secureStorage: secureStorage,
-    prefs: prefs,
-    keyNamespace: launchBootstrap.profileNamespace,
+    database: appDatabase,
+    credentialStore: credentials,
   );
   final pinnedTablesRepository = PinnedTablesRepositoryImpl(
-    prefs,
-    keyNamespace: launchBootstrap.profileNamespace,
+    database: appDatabase,
   );
 
+  getIt.registerSingleton<QueryPodDatabase>(
+    appDatabase,
+    dispose: (database) => database.close(),
+  );
+  getIt.registerSingleton<ConnectionCredentialStore>(credentials);
   getIt.registerLazySingleton<ConnectionRepository>(() => connectionRepository);
   getIt.registerLazySingleton<QueryRepository>(
-    () => QueryRepositoryImpl(database: database),
+    () => QueryRepositoryImpl(database: appDatabase),
   );
   getIt.registerLazySingleton<QueryHistoryRepository>(
-    () => QueryHistoryRepositoryImpl(database: database),
+    () => QueryHistoryRepositoryImpl(database: appDatabase),
   );
   getIt.registerLazySingleton<ConnectionMetadataRepository>(
     () => ConnectionMetadataRepositoryImpl(),
@@ -69,9 +76,7 @@ Future<void> configureDependencies({
   getIt.registerLazySingleton<TableDataRepository>(
     () => TableDataRepositoryImpl(historyRepository: getIt()),
   );
-  getIt.registerFactory(
-    () => ConnectionCubit(repository: getIt(), queryRepository: getIt()),
-  );
+  getIt.registerFactory(() => ConnectionCubit(repository: getIt()));
   getIt.registerFactory(
     () => QueryEditorCubit(
       repository: getIt(),

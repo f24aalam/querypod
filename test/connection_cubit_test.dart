@@ -5,8 +5,6 @@ import 'package:querypod/features/connections/domain/entities/connection.dart';
 import 'package:querypod/features/connections/domain/repositories/connection_repository.dart';
 import 'package:querypod/features/connections/presentation/cubit/connection_cubit.dart';
 import 'package:querypod/features/connections/presentation/cubit/connection_state.dart';
-import 'package:querypod/features/editor/domain/entities/connection_query.dart';
-import 'package:querypod/features/editor/domain/repositories/query_repository.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 void main() {
@@ -48,10 +46,7 @@ void main() {
         ],
         selectedId: 'a',
       );
-      final cubit = ConnectionCubit(
-        repository: repository,
-        queryRepository: _FakeQueryRepository(),
-      );
+      final cubit = ConnectionCubit(repository: repository);
 
       await cubit.setWorkspace('workspace-b');
 
@@ -70,10 +65,7 @@ void main() {
     'save selects the connection reloads and emits success feedback',
     () async {
       final repository = _FakeConnectionRepository();
-      final cubit = ConnectionCubit(
-        repository: repository,
-        queryRepository: _FakeQueryRepository(),
-      );
+      final cubit = ConnectionCubit(repository: repository);
       final saved = connection(id: 'saved', name: 'Saved');
 
       final result = await cubit.save(saved);
@@ -93,10 +85,7 @@ void main() {
 
   test('save stores connections in the active workspace', () async {
     final repository = _FakeConnectionRepository();
-    final cubit = ConnectionCubit(
-      repository: repository,
-      queryRepository: _FakeQueryRepository(),
-    );
+    final cubit = ConnectionCubit(repository: repository);
     await cubit.setWorkspace('workspace-a');
 
     final result = await cubit.save(
@@ -116,7 +105,6 @@ void main() {
       repository: _FakeConnectionRepository(
         saveError: Exception('save failed'),
       ),
-      queryRepository: _FakeQueryRepository(),
     );
 
     final result = await cubit.save(connection());
@@ -128,34 +116,31 @@ void main() {
     await cubit.close();
   });
 
-  test('delete clears selected state and deletes saved queries', () async {
-    final repository = _FakeConnectionRepository(
-      connections: [connection(id: 'selected')],
-      selectedId: 'selected',
-    );
-    final queryRepository = _FakeQueryRepository();
-    final cubit = ConnectionCubit(
-      repository: repository,
-      queryRepository: queryRepository,
-    );
-    await cubit.load();
+  test(
+    'delete clears selected state and relies on repository cascades',
+    () async {
+      final repository = _FakeConnectionRepository(
+        connections: [connection(id: 'selected')],
+        selectedId: 'selected',
+      );
+      final cubit = ConnectionCubit(repository: repository);
+      await cubit.load();
 
-    await cubit.delete('selected');
+      await cubit.delete('selected');
 
-    expect(queryRepository.deletedByConnectionIds, ['selected']);
-    expect(cubit.state.selectedId, isNull);
-    expect(cubit.state.activeConnection, isNull);
-    expect(repository.selectedId, isNull);
-    expect(cubit.state.connections, isEmpty);
-    await cubit.close();
-  });
+      expect(cubit.state.selectedId, isNull);
+      expect(cubit.state.activeConnection, isNull);
+      expect(repository.selectedId, isNull);
+      expect(cubit.state.connections, isEmpty);
+      await cubit.close();
+    },
+  );
 
   test('delete sets error state when repository delete fails', () async {
     final cubit = ConnectionCubit(
       repository: _FakeConnectionRepository(
         deleteError: Exception('delete failed'),
       ),
-      queryRepository: _FakeQueryRepository(),
     );
 
     await cubit.delete('missing');
@@ -171,10 +156,7 @@ void main() {
         connection(id: 'beta', name: 'Beta', host: 'db-beta'),
       ],
     );
-    final cubit = ConnectionCubit(
-      repository: repository,
-      queryRepository: _FakeQueryRepository(),
-    );
+    final cubit = ConnectionCubit(repository: repository);
     await cubit.load();
 
     cubit.search('beta');
@@ -197,10 +179,7 @@ void main() {
 
   test('select persists the selected id', () async {
     final repository = _FakeConnectionRepository();
-    final cubit = ConnectionCubit(
-      repository: repository,
-      queryRepository: _FakeQueryRepository(),
-    );
+    final cubit = ConnectionCubit(repository: repository);
 
     await cubit.select('picked');
 
@@ -215,10 +194,7 @@ void main() {
       final repository = _FakeConnectionRepository(
         connections: [connection(id: 'opened')],
       );
-      final cubit = ConnectionCubit(
-        repository: repository,
-        queryRepository: _FakeQueryRepository(),
-      );
+      final cubit = ConnectionCubit(repository: repository);
       await cubit.load();
 
       await cubit.openSavedConnection('opened');
@@ -232,10 +208,7 @@ void main() {
   );
 
   test('validation errors are returned before test execution', () async {
-    final cubit = ConnectionCubit(
-      repository: _FakeConnectionRepository(),
-      queryRepository: _FakeQueryRepository(),
-    );
+    final cubit = ConnectionCubit(repository: _FakeConnectionRepository());
 
     await cubit.test(connection(name: '', type: ConnectionType.postgresql));
     expect(cubit.state.feedbackMessage, 'Name is required');
@@ -256,10 +229,7 @@ void main() {
   });
 
   test('driver failures surface user-facing feedback', () async {
-    final cubit = ConnectionCubit(
-      repository: _FakeConnectionRepository(),
-      queryRepository: _FakeQueryRepository(),
-    );
+    final cubit = ConnectionCubit(repository: _FakeConnectionRepository());
 
     await cubit.test(
       connection(
@@ -282,10 +252,7 @@ void main() {
       'querypod_connection_test_',
     );
     final databasePath = '${temporaryDirectory.path}/database.sqlite';
-    final cubit = ConnectionCubit(
-      repository: _FakeConnectionRepository(),
-      queryRepository: _FakeQueryRepository(),
-    );
+    final cubit = ConnectionCubit(repository: _FakeConnectionRepository());
     final connection = Connection(
       id: 'connection-under-test',
       name: 'Connection under test',
@@ -358,24 +325,4 @@ class _FakeConnectionRepository implements ConnectionRepository {
   Future<void> setSelectedId(String? id) async {
     selectedId = id;
   }
-}
-
-class _FakeQueryRepository implements QueryRepository {
-  final List<String> deletedByConnectionIds = [];
-
-  @override
-  Future<void> delete(String id) async {}
-
-  @override
-  Future<void> deleteByConnection(String connectionId) async {
-    deletedByConnectionIds.add(connectionId);
-  }
-
-  @override
-  Future<List<ConnectionQuery>> getAllForConnection(
-    String connectionId,
-  ) async => [];
-
-  @override
-  Future<ConnectionQuery> save(ConnectionQuery query) async => query;
 }

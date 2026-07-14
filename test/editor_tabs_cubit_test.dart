@@ -146,4 +146,90 @@ void main() {
     expect(cubit.state.activeTab?.type, EditorTabType.query);
     expect(cubit.state.activeTab?.title, 'demo');
   });
+
+  test('close all work tabs keeps the connection editor open', () {
+    final cubit = EditorTabsCubit()
+      ..openConnectionEditor()
+      ..pinTable(connectionId: 'connection', database: 'app', table: users)
+      ..openQuery(queryId: 'query_1', title: 'demo')
+      ..openCreateTableTab(connectionId: 'connection', database: 'app');
+
+    cubit.closeWorkTabs();
+
+    expect(cubit.state.tabs, hasLength(1));
+    expect(cubit.state.tabs.single.type, EditorTabType.connection);
+    expect(cubit.state.activeTabKey, EditorTabsCubit.connectionEditorKey);
+  });
+
+  test('close all to right removes only work tabs after the anchor', () {
+    final cubit = EditorTabsCubit()
+      ..openConnectionEditor()
+      ..pinTable(connectionId: 'connection', database: 'app', table: users)
+      ..openQuery(queryId: 'query_1', title: 'demo')
+      ..openCreateTableTab(connectionId: 'connection', database: 'app');
+
+    const usersKey = TableTabKey(
+      connectionId: 'connection',
+      database: 'app',
+      tableName: 'users',
+    );
+    cubit.closeWorkTabsToRight(usersKey);
+
+    expect(cubit.state.tabs.map((tab) => tab.title), [
+      'New Connection',
+      'users',
+    ]);
+    expect(cubit.state.activeTabKey, usersKey);
+  });
+
+  test('close all to left removes only work tabs before the anchor', () {
+    final cubit = EditorTabsCubit()
+      ..openConnectionEditor()
+      ..pinTable(connectionId: 'connection', database: 'app', table: users)
+      ..openQuery(queryId: 'query_1', title: 'demo')
+      ..openCreateTableTab(connectionId: 'connection', database: 'app');
+
+    const createKey = CreateTableTabKey(
+      connectionId: 'connection',
+      database: 'app',
+    );
+    cubit.closeWorkTabsToLeft(createKey);
+
+    expect(cubit.state.tabs.map((tab) => tab.title), [
+      'New Connection',
+      'Create Table',
+    ]);
+    expect(cubit.state.activeTabKey, createKey);
+  });
+
+  test('bulk close clears preview tab key when preview is removed', () {
+    final cubit = EditorTabsCubit()
+      ..openConnectionEditor()
+      ..openTablePreview(
+        connectionId: 'connection',
+        database: 'app',
+        table: users,
+      );
+
+    expect(cubit.state.previewTabKey, isNotNull);
+
+    cubit.closeWorkTabs();
+
+    expect(cubit.state.tabs.single.type, EditorTabType.connection);
+    expect(cubit.state.previewTabKey, isNull);
+  });
+
+  test('bulk close without matching work tabs does not emit', () async {
+    final cubit = EditorTabsCubit()..openConnectionEditor();
+    final emitted = <EditorTabsState>[];
+    final subscription = cubit.stream.listen(emitted.add);
+
+    cubit.closeWorkTabs();
+    cubit.closeWorkTabsToLeft(EditorTabsCubit.connectionEditorKey);
+    cubit.closeWorkTabsToRight(EditorTabsCubit.connectionEditorKey);
+    await Future<void>.delayed(Duration.zero);
+
+    expect(emitted, isEmpty);
+    await subscription.cancel();
+  });
 }

@@ -217,7 +217,8 @@ class EditorTabsCubit extends Cubit<EditorTabsState> {
       (tab) => tab.key == state.activeTabKey,
     );
     if (currentIndex == -1) return;
-    final previousIndex = (currentIndex - 1 + state.tabs.length) % state.tabs.length;
+    final previousIndex =
+        (currentIndex - 1 + state.tabs.length) % state.tabs.length;
     activate(state.tabs[previousIndex].key);
   }
 
@@ -263,6 +264,24 @@ class EditorTabsCubit extends Cubit<EditorTabsState> {
     );
   }
 
+  void closeWorkTabs() {
+    _closeTabsWhere((tab, index) => _isWorkTab(tab));
+  }
+
+  void closeWorkTabsToRight(EditorTabKey key) {
+    final index = state.tabs.indexWhere((tab) => tab.key == key);
+    if (index == -1) return;
+
+    _closeTabsWhere((tab, tabIndex) => tabIndex > index && _isWorkTab(tab));
+  }
+
+  void closeWorkTabsToLeft(EditorTabKey key) {
+    final index = state.tabs.indexWhere((tab) => tab.key == key);
+    if (index == -1) return;
+
+    _closeTabsWhere((tab, tabIndex) => tabIndex < index && _isWorkTab(tab));
+  }
+
   void closeQueryTab(String queryId) {
     closeTab(QueryTabKey(queryId: queryId));
   }
@@ -302,6 +321,58 @@ class EditorTabsCubit extends Cubit<EditorTabsState> {
       ),
     );
   }
+
+  void _closeTabsWhere(bool Function(EditorTab tab, int index) shouldClose) {
+    final closingKeys = <EditorTabKey>{};
+    final tabs = <EditorTab>[];
+
+    for (var i = 0; i < state.tabs.length; i++) {
+      final tab = state.tabs[i];
+      if (shouldClose(tab, i)) {
+        closingKeys.add(tab.key);
+      } else {
+        tabs.add(tab);
+      }
+    }
+
+    if (closingKeys.isEmpty) return;
+
+    final activeTabKey = _resolveActiveTabAfterClose(tabs, closingKeys);
+    emit(
+      EditorTabsState(
+        tabs: tabs,
+        activeTabKey: activeTabKey,
+        previewTabKey: closingKeys.contains(state.previewTabKey)
+            ? null
+            : state.previewTabKey,
+      ),
+    );
+  }
+
+  EditorTabKey? _resolveActiveTabAfterClose(
+    List<EditorTab> remainingTabs,
+    Set<EditorTabKey> closingKeys,
+  ) {
+    if (state.activeTabKey != null &&
+        !closingKeys.contains(state.activeTabKey)) {
+      return state.activeTabKey;
+    }
+    if (remainingTabs.isEmpty) return null;
+
+    final closedIndexes = <int>[];
+    for (var i = 0; i < state.tabs.length; i++) {
+      if (closingKeys.contains(state.tabs[i].key)) closedIndexes.add(i);
+    }
+    final anchorIndex = closedIndexes.isEmpty ? 0 : closedIndexes.first;
+
+    for (var i = anchorIndex; i < state.tabs.length; i++) {
+      final key = state.tabs[i].key;
+      if (!closingKeys.contains(key)) return key;
+    }
+    return remainingTabs.last.key;
+  }
+
+  bool _isWorkTab(EditorTab tab) => tab.type != EditorTabType.connection;
 
   void openCreateTableTab({
     required String connectionId,

@@ -1,56 +1,79 @@
-import 'dart:io';
-
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querypod/app/database.dart';
 import 'package:querypod/features/editor/data/repositories/query_repository_impl.dart';
 import 'package:querypod/features/editor/domain/entities/connection_query.dart';
-import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+
+import 'support/persistence_test_support.dart';
 
 void main() {
-  setUpAll(sqfliteFfiInit);
+  late QueryPodDatabase database;
+  late QueryRepositoryImpl repository;
 
-  test(
-    'repository scopes queries by connection and cascades deletes',
-    () async {
-      final tempDir = await Directory.systemTemp.createTemp(
-        'querypod_repo_test',
-      );
-      final factory = databaseFactoryFfi;
-      final originalPath = await factory.getDatabasesPath();
-      await factory.setDatabasesPath(tempDir.path);
+  setUp(() async {
+    database = createTestDatabase();
+    repository = QueryRepositoryImpl(database: database);
+    await seedWorkspace(database);
+    await seedConnection(database, id: 'conn-1');
+    await seedConnection(database, id: 'conn-2');
+  });
 
-      final database = await openAppDatabase(databaseFactory: factory);
-      final repository = QueryRepositoryImpl(database: database);
+  tearDown(() => database.close());
 
-      final first = _query(id: 'q1', connectionId: 'conn-1', title: 'demo');
-      final second = _query(id: 'q2', connectionId: 'conn-2', title: 'other');
-      await repository.save(first);
-      await repository.save(second);
+  test('repository scopes and orders queries by connection', () async {
+    await repository.save(_query(id: 'later', connectionId: 'conn-1', day: 2));
+    await repository.save(_query(id: 'other', connectionId: 'conn-2', day: 1));
+    await repository.save(
+      _query(id: 'earlier', connectionId: 'conn-1', day: 1),
+    );
 
-      final conn1Queries = await repository.getAllForConnection('conn-1');
-      expect(conn1Queries.map((query) => query.id), ['q1']);
+    final queries = await repository.getAllForConnection('conn-1');
+    expect(queries.map((query) => query.id), ['earlier', 'later']);
+  });
 
-      await repository.deleteByConnection('conn-1');
-      expect(await repository.getAllForConnection('conn-1'), isEmpty);
-      expect(await repository.getAllForConnection('conn-2'), hasLength(1));
+  test('duplicate save updates instead of inserting another row', () async {
+    await repository.save(
+      _query(id: 'query', connectionId: 'conn-1', title: 'Old'),
+    );
+    await repository.save(
+      _query(id: 'query', connectionId: 'conn-1', title: 'New'),
+    );
 
-      await factory.setDatabasesPath(originalPath);
-      await tempDir.delete(recursive: true);
-    },
-  );
+    final queries = await repository.getAllForConnection('conn-1');
+    expect(queries, hasLength(1));
+    expect(queries.single.title, 'New');
+    expect(queries.single.database, 'app');
+  });
+
+  test('delete and deleteByConnection remove only matching queries', () async {
+    await repository.save(_query(id: 'q1', connectionId: 'conn-1'));
+    await repository.save(_query(id: 'q2', connectionId: 'conn-1'));
+    await repository.save(_query(id: 'q3', connectionId: 'conn-2'));
+
+    await repository.delete('q1');
+    expect(
+      (await repository.getAllForConnection('conn-1')).map((query) => query.id),
+      ['q2'],
+    );
+
+    await repository.deleteByConnection('conn-1');
+    expect(await repository.getAllForConnection('conn-1'), isEmpty);
+    expect(await repository.getAllForConnection('conn-2'), hasLength(1));
+  });
 }
 
 ConnectionQuery _query({
   required String id,
   required String connectionId,
-  required String title,
+  String title = 'demo',
+  int day = 1,
 }) {
-  final now = DateTime(2026, 1, 1);
+  final now = DateTime(2026, 1, day);
   return ConnectionQuery(
     id: id,
     connectionId: connectionId,
     title: title,
     sql: 'SELECT 1;',
+    database: 'app',
     createdAt: now,
     updatedAt: now,
   );

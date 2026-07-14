@@ -11,10 +11,7 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   sqfliteFfiInit();
   final launchBootstrap = LaunchBootstrapConfig.fromEnvironment();
-  await configureDependencies(
-    databaseFactory: databaseFactoryFfi,
-    launchBootstrap: launchBootstrap,
-  );
+  await configureDependencies(launchBootstrap: launchBootstrap);
 
   if (isDesktop) {
     await windowManager.ensureInitialized();

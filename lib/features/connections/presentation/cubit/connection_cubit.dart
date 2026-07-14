@@ -5,19 +5,14 @@ import '../../../../core/database/database_driver_factory.dart';
 
 import '../../domain/entities/connection.dart';
 import '../../domain/repositories/connection_repository.dart';
-import '../../../editor/domain/repositories/query_repository.dart';
 import 'connection_state.dart';
 
 class ConnectionCubit extends Cubit<ConnectionsState> {
-  ConnectionCubit({
-    required ConnectionRepository repository,
-    required QueryRepository queryRepository,
-  }) : _repository = repository,
-       _queryRepository = queryRepository,
-       super(const ConnectionsState());
+  ConnectionCubit({required ConnectionRepository repository})
+    : _repository = repository,
+      super(const ConnectionsState());
 
   final ConnectionRepository _repository;
-  final QueryRepository _queryRepository;
 
   ConnectionsState _feedback(
     String message, {
@@ -101,7 +96,6 @@ class ConnectionCubit extends Cubit<ConnectionsState> {
 
   Future<void> delete(String id) async {
     try {
-      await _queryRepository.deleteByConnection(id);
       await _repository.delete(id);
       if (state.selectedId == id) {
         await _repository.setSelectedId(null);

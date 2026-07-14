@@ -1,70 +1,180 @@
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:drift/drift.dart';
+import 'package:drift/native.dart';
 import 'package:path/path.dart' as p;
-import 'package:sqflite_common/sqlite_api.dart';
+import 'package:path_provider/path_provider.dart';
 
-Future<Database> openAppDatabase({
-  required DatabaseFactory databaseFactory,
-}) async {
-  final databasesPath = await databaseFactory.getDatabasesPath();
-  return await databaseFactory.openDatabase(
-    p.join(databasesPath, 'querypod.db'),
-    options: OpenDatabaseOptions(
-      version: 3,
-      onCreate: (db, version) async {
-        await db.execute('''
-          CREATE TABLE queries (
-            id TEXT PRIMARY KEY,
-            connection_id TEXT NOT NULL,
-            title TEXT NOT NULL,
-            sql TEXT NOT NULL,
-            database TEXT,
-            created_at INTEGER NOT NULL,
-            updated_at INTEGER NOT NULL
-          )
-        ''');
-        await db.execute(
-          'CREATE INDEX idx_queries_connection_id ON queries(connection_id)',
-        );
+part 'database.g.dart';
 
-        await db.execute('''
-          CREATE TABLE query_history (
-            id TEXT PRIMARY KEY,
-            connection_id TEXT NOT NULL,
-            source_type TEXT NOT NULL,
-            source_id TEXT,
-            sql TEXT NOT NULL,
-            execution_time_ms INTEGER NOT NULL,
-            status TEXT NOT NULL,
-            error_message TEXT,
-            created_at INTEGER NOT NULL
-          )
-        ''');
-        await db.execute(
-          'CREATE INDEX idx_query_history_connection_id ON query_history(connection_id)',
-        );
-      },
-      onUpgrade: (db, oldVersion, newVersion) async {
-        if (oldVersion < 2) {
-          await db.execute('ALTER TABLE queries ADD COLUMN database TEXT');
-        }
-        if (oldVersion < 3) {
-          await db.execute('''
-            CREATE TABLE query_history (
-              id TEXT PRIMARY KEY,
-              connection_id TEXT NOT NULL,
-              source_type TEXT NOT NULL,
-              source_id TEXT,
-              sql TEXT NOT NULL,
-              execution_time_ms INTEGER NOT NULL,
-              status TEXT NOT NULL,
-              error_message TEXT,
-              created_at INTEGER NOT NULL
-            )
-          ''');
-          await db.execute(
-            'CREATE INDEX idx_query_history_connection_id ON query_history(connection_id)',
-          );
-        }
-      },
-    ),
+@DataClassName('WorkspaceRow')
+class Workspaces extends Table {
+  @override
+  String get tableName => 'workspaces';
+
+  TextColumn get id => text()();
+  TextColumn get name => text()();
+  DateTimeColumn get createdAt => dateTime()();
+  DateTimeColumn get updatedAt => dateTime()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
+@TableIndex(name: 'idx_connections_workspace_id', columns: {#workspaceId})
+@DataClassName('ConnectionRow')
+class Connections extends Table {
+  @override
+  String get tableName => 'connections';
+
+  TextColumn get id => text()();
+  TextColumn get workspaceId =>
+      text().references(Workspaces, #id, onDelete: KeyAction.cascade)();
+  TextColumn get name => text()();
+  TextColumn get host => text()();
+  IntColumn get port => integer()();
+  TextColumn get user => text()();
+  TextColumn get database => text()();
+  TextColumn get connectionType => text().named('type')();
+  BoolColumn get useTls => boolean()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
+@TableIndex(
+  name: 'idx_saved_queries_connection_id',
+  columns: {#connectionId, #createdAt},
+)
+@DataClassName('SavedQueryRow')
+class SavedQueries extends Table {
+  @override
+  String get tableName => 'saved_queries';
+
+  TextColumn get id => text()();
+  TextColumn get connectionId =>
+      text().references(Connections, #id, onDelete: KeyAction.cascade)();
+  TextColumn get title => text()();
+  TextColumn get sql => text()();
+  TextColumn get database => text().nullable()();
+  DateTimeColumn get createdAt => dateTime()();
+  DateTimeColumn get updatedAt => dateTime()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
+@TableIndex(
+  name: 'idx_query_history_connection_id',
+  columns: {#connectionId, #createdAt},
+)
+@DataClassName('QueryHistoryRow')
+class QueryHistoryEntries extends Table {
+  @override
+  String get tableName => 'query_history';
+
+  TextColumn get id => text()();
+  TextColumn get connectionId =>
+      text().references(Connections, #id, onDelete: KeyAction.cascade)();
+  TextColumn get sourceType => text()();
+  TextColumn get sourceId => text().nullable()();
+  TextColumn get sql => text()();
+  IntColumn get executionTimeMs => integer()();
+  TextColumn get status => text()();
+  TextColumn get errorMessage => text().nullable()();
+  DateTimeColumn get createdAt => dateTime()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
+@DataClassName('PinnedTableRow')
+class PinnedTables extends Table {
+  @override
+  String get tableName => 'pinned_tables';
+
+  TextColumn get connectionId =>
+      text().references(Connections, #id, onDelete: KeyAction.cascade)();
+  TextColumn get database => text()();
+  TextColumn get table => text().named('table_name')();
+  IntColumn get sortOrder => integer()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {connectionId, database, table};
+}
+
+@DataClassName('AppStateRow')
+class AppStateEntries extends Table {
+  @override
+  String get tableName => 'app_state';
+
+  IntColumn get id => integer().withDefault(const Constant(1))();
+  TextColumn get selectedConnectionId => text().nullable().references(
+    Connections,
+    #id,
+    onDelete: KeyAction.setNull,
+  )();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+
+  @override
+  List<String> get customConstraints => ['CHECK (id = 1)'];
+}
+
+@DriftDatabase(
+  tables: [
+    Workspaces,
+    Connections,
+    SavedQueries,
+    QueryHistoryEntries,
+    PinnedTables,
+    AppStateEntries,
+  ],
+)
+class QueryPodDatabase extends _$QueryPodDatabase {
+  QueryPodDatabase({QueryExecutor? executor, String profileNamespace = ''})
+    : super(executor ?? _openProfileDatabase(profileNamespace));
+
+  @override
+  int get schemaVersion => 1;
+
+  @override
+  MigrationStrategy get migration => MigrationStrategy(
+    onCreate: (migrator) async {
+      await migrator.createAll();
+      await customStatement('INSERT INTO app_state (id) VALUES (1)');
+    },
+    beforeOpen: (details) async {
+      await customStatement('PRAGMA foreign_keys = ON');
+    },
   );
+
+  static String filenameForProfile(String profileNamespace) {
+    final normalized = profileNamespace.trim();
+    if (normalized.isEmpty) return 'querypod.db';
+
+    final encoded = base64Url
+        .encode(utf8.encode(normalized))
+        .replaceAll('=', '');
+    return 'querypod_$encoded.db';
+  }
+}
+
+QueryExecutor _openProfileDatabase(String profileNamespace) {
+  return LazyDatabase(() async {
+    final supportDirectory = await getApplicationSupportDirectory();
+    final databaseDirectory = Directory(
+      p.join(supportDirectory.path, 'querypod'),
+    );
+    await databaseDirectory.create(recursive: true);
+    final file = File(
+      p.join(
+        databaseDirectory.path,
+        QueryPodDatabase.filenameForProfile(profileNamespace),
+      ),
+    );
+    return NativeDatabase.createInBackground(file);
+  });
 }

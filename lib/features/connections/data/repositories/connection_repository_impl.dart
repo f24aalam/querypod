@@ -1,121 +1,108 @@
-import 'dart:convert';
+// ignore_for_file: prefer_initializing_formals
 
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:drift/drift.dart';
 
+import '../../../../app/database.dart';
 import '../../domain/entities/connection.dart';
 import '../../domain/repositories/connection_repository.dart';
-import '../models/connection_model.dart';
+import '../services/connection_credential_store.dart';
 
 class ConnectionRepositoryImpl implements ConnectionRepository {
-  static const _connectionsKey = 'querypod_connections';
-  static const _passwordPrefix = 'querypod_connection_';
-  static const _selectedConnectionKey = 'querypod_selected_connection_id';
-
-  final FlutterSecureStorage _secureStorage;
-  final SharedPreferences _prefs;
-  final String _connectionsStorageKey;
-  final String _selectedConnectionStorageKey;
-  final String _passwordStoragePrefix;
+  final QueryPodDatabase _database;
+  final ConnectionCredentialStore _credentialStore;
 
   ConnectionRepositoryImpl({
-    required this._secureStorage,
-    required this._prefs,
-    String keyNamespace = '',
-  }) : _connectionsStorageKey = _withNamespace(_connectionsKey, keyNamespace),
-       _selectedConnectionStorageKey = _withNamespace(
-         _selectedConnectionKey,
-         keyNamespace,
-       ),
-       _passwordStoragePrefix = _withNamespace(_passwordPrefix, keyNamespace);
-
-  static String _withNamespace(String key, String namespace) {
-    final normalized = namespace.trim();
-    if (normalized.isEmpty) return key;
-    return '${normalized}_$key';
-  }
+    required QueryPodDatabase database,
+    required ConnectionCredentialStore credentialStore,
+  }) : _database = database,
+       _credentialStore = credentialStore;
 
   @override
   Future<List<Connection>> getAll() async {
-    final jsonStr = _prefs.getString(_connectionsStorageKey);
-    if (jsonStr == null) return [];
-
-    final List<dynamic> jsonList = jsonDecode(jsonStr);
+    final rows = await _database.select(_database.connections).get();
     final connections = <Connection>[];
-
-    for (final json in jsonList) {
-      final connMap = json as Map<String, dynamic>;
-      final id = connMap['id'] as String;
-      final password = await _secureStorage.read(
-        key: _passwordStoragePrefix + id,
-      );
-      connections.add(
-        ConnectionModel.fromJson(connMap, password: password ?? ''),
-      );
+    for (final row in rows) {
+      connections.add(await _toEntity(row));
     }
-
     return connections;
   }
 
   @override
   Future<Connection?> getById(String id) async {
-    final connections = await getAll();
-    for (final connection in connections) {
-      if (connection.id == id) return connection;
-    }
-    return null;
+    final query = _database.select(_database.connections)
+      ..where((row) => row.id.equals(id));
+    final row = await query.getSingleOrNull();
+    return row == null ? null : _toEntity(row);
   }
 
   @override
   Future<Connection> save(Connection connection) async {
-    final connections = await getAll();
-    final existingIndex = connections.indexWhere((c) => c.id == connection.id);
-
-    if (existingIndex >= 0) {
-      connections[existingIndex] = connection;
-    } else {
-      connections.add(connection);
-    }
-
-    await _secureStorage.write(
-      key: _passwordStoragePrefix + connection.id,
-      value: connection.password,
-    );
-
-    final modelsJson = connections
-        .map((c) => ConnectionModel.fromEntity(c).toJsonMap())
-        .toList();
-
-    await _prefs.setString(_connectionsStorageKey, jsonEncode(modelsJson));
-
+    await _database
+        .into(_database.connections)
+        .insertOnConflictUpdate(
+          ConnectionsCompanion.insert(
+            id: connection.id,
+            workspaceId: connection.workspaceId,
+            name: connection.name,
+            host: connection.host,
+            port: connection.port,
+            user: connection.user,
+            database: connection.database,
+            connectionType: _connectionTypeToStorage(connection.type),
+            useTls: connection.useTls,
+          ),
+        );
+    await _credentialStore.writePassword(connection.id, connection.password);
     return connection;
   }
 
   @override
   Future<void> delete(String id) async {
-    final connections = await getAll();
-    connections.removeWhere((c) => c.id == id);
-
-    await _secureStorage.delete(key: _passwordStoragePrefix + id);
-
-    final modelsJson = connections
-        .map((c) => ConnectionModel.fromEntity(c).toJsonMap())
-        .toList();
-
-    await _prefs.setString(_connectionsStorageKey, jsonEncode(modelsJson));
+    await (_database.delete(
+      _database.connections,
+    )..where((row) => row.id.equals(id))).go();
+    await _credentialStore.deletePassword(id);
   }
 
   @override
-  Future<String?> getSelectedId() async =>
-      _prefs.getString(_selectedConnectionStorageKey);
+  Future<String?> getSelectedId() async {
+    final row = await (_database.select(
+      _database.appStateEntries,
+    )..where((row) => row.id.equals(1))).getSingleOrNull();
+    return row?.selectedConnectionId;
+  }
 
   @override
   Future<void> setSelectedId(String? id) async {
-    if (id == null) {
-      await _prefs.remove(_selectedConnectionStorageKey);
-      return;
-    }
-
-    await _prefs.setString(_selectedConnectionStorageKey, id);
+    await (_database.update(_database.appStateEntries)
+          ..where((row) => row.id.equals(1)))
+        .write(AppStateEntriesCompanion(selectedConnectionId: Value(id)));
   }
+
+  Future<Connection> _toEntity(ConnectionRow row) async {
+    return Connection(
+      id: row.id,
+      name: row.name,
+      host: row.host,
+      port: row.port,
+      user: row.user,
+      password: await _credentialStore.readPassword(row.id) ?? '',
+      database: row.database,
+      workspaceId: row.workspaceId,
+      type: _connectionTypeFromStorage(row.connectionType),
+      useTls: row.useTls,
+    );
+  }
+
+  String _connectionTypeToStorage(ConnectionType type) => switch (type) {
+    ConnectionType.mysql => 'mysql',
+    ConnectionType.sqlite => 'sqlite',
+    ConnectionType.postgresql => 'postgresql',
+  };
+
+  ConnectionType _connectionTypeFromStorage(String value) => switch (value) {
+    'sqlite' => ConnectionType.sqlite,
+    'postgresql' => ConnectionType.postgresql,
+    _ => ConnectionType.mysql,
+  };
 }

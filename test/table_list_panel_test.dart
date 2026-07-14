@@ -10,11 +10,9 @@ import 'package:querypod/features/editor/domain/entities/connection_table.dart';
 import 'package:querypod/features/editor/domain/entities/table_data.dart';
 import 'package:querypod/features/editor/domain/repositories/connection_metadata_repository.dart';
 import 'package:querypod/features/editor/domain/repositories/pinned_tables_repository.dart';
-import 'package:querypod/features/editor/domain/repositories/query_repository.dart';
 import 'package:querypod/features/editor/presentation/cubit/connection_metadata_cubit.dart';
 import 'package:querypod/features/editor/presentation/cubit/connection_metadata_state.dart';
 import 'package:querypod/features/editor/presentation/widgets/table_list_panel.dart';
-import 'package:querypod/features/editor/domain/entities/connection_query.dart';
 
 const _tableListConnection = Connection(
   id: 'connection',
@@ -231,11 +229,7 @@ class _NoopPinnedTablesRepository implements PinnedTablesRepository {
 }
 
 class _TestConnectionCubit extends ConnectionCubit {
-  _TestConnectionCubit()
-    : super(
-        repository: _FakeConnectionRepository(),
-        queryRepository: _FakeQueryRepository(),
-      ) {
+  _TestConnectionCubit() : super(repository: _FakeConnectionRepository()) {
     emit(state.copyWith(activeConnection: () => _tableListConnection));
   }
 }
@@ -258,20 +252,4 @@ class _FakeConnectionRepository implements ConnectionRepository {
 
   @override
   Future<void> setSelectedId(String? id) async {}
-}
-
-class _FakeQueryRepository implements QueryRepository {
-  @override
-  Future<void> delete(String id) async {}
-
-  @override
-  Future<void> deleteByConnection(String connectionId) async {}
-
-  @override
-  Future<List<ConnectionQuery>> getAllForConnection(
-    String connectionId,
-  ) async => [];
-
-  @override
-  Future<ConnectionQuery> save(ConnectionQuery query) async => query;
 }

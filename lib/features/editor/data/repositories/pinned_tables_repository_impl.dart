@@ -1,37 +1,30 @@
-import 'dart:convert';
+// ignore_for_file: prefer_initializing_formals
 
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:drift/drift.dart';
 
+import '../../../../app/database.dart';
 import '../../domain/repositories/pinned_tables_repository.dart';
 
 class PinnedTablesRepositoryImpl implements PinnedTablesRepository {
-  static const _pinnedTablesKey = 'querypod_pinned_tables';
+  final QueryPodDatabase _database;
 
-  final SharedPreferences _prefs;
-  final String _storageKey;
-
-  PinnedTablesRepositoryImpl(this._prefs, {String keyNamespace = ''})
-    : _storageKey = _withNamespace(_pinnedTablesKey, keyNamespace);
-
-  static String _withNamespace(String key, String namespace) {
-    final normalized = namespace.trim();
-    if (normalized.isEmpty) return key;
-    return '${normalized}_$key';
-  }
+  PinnedTablesRepositoryImpl({required QueryPodDatabase database})
+    : _database = database;
 
   @override
   Future<List<String>> getPinnedTables({
     required String connectionId,
     required String database,
   }) async {
-    final data = _read();
-    final connectionPins = data[connectionId];
-    if (connectionPins is! Map<String, dynamic>) return [];
-
-    final databasePins = connectionPins[database];
-    if (databasePins is! List) return [];
-
-    return databasePins.whereType<String>().toList();
+    final query = _database.select(_database.pinnedTables)
+      ..where(
+        (row) =>
+            row.connectionId.equals(connectionId) &
+            row.database.equals(database),
+      )
+      ..orderBy([(row) => OrderingTerm.asc(row.sortOrder)]);
+    final rows = await query.get();
+    return rows.map((row) => row.table).toList(growable: false);
   }
 
   @override
@@ -40,37 +33,26 @@ class PinnedTablesRepositoryImpl implements PinnedTablesRepository {
     required String database,
     required List<String> tableNames,
   }) async {
-    final data = _read();
-    final connectionPins = Map<String, dynamic>.from(
-      (data[connectionId] as Map?) ?? const <String, dynamic>{},
-    );
+    await _database.transaction(() async {
+      await (_database.delete(_database.pinnedTables)..where(
+            (row) =>
+                row.connectionId.equals(connectionId) &
+                row.database.equals(database),
+          ))
+          .go();
 
-    if (tableNames.isEmpty) {
-      connectionPins.remove(database);
-    } else {
-      connectionPins[database] = List<String>.unmodifiable(tableNames);
-    }
-
-    if (connectionPins.isEmpty) {
-      data.remove(connectionId);
-    } else {
-      data[connectionId] = connectionPins;
-    }
-
-    if (data.isEmpty) {
-      await _prefs.remove(_storageKey);
-      return;
-    }
-
-    await _prefs.setString(_storageKey, jsonEncode(data));
-  }
-
-  Map<String, dynamic> _read() {
-    final raw = _prefs.getString(_storageKey);
-    if (raw == null || raw.isEmpty) return <String, dynamic>{};
-
-    final decoded = jsonDecode(raw);
-    if (decoded is! Map<String, dynamic>) return <String, dynamic>{};
-    return Map<String, dynamic>.from(decoded);
+      if (tableNames.isEmpty) return;
+      await _database.batch((batch) {
+        batch.insertAll(_database.pinnedTables, [
+          for (final (index, tableName) in tableNames.indexed)
+            PinnedTablesCompanion.insert(
+              connectionId: connectionId,
+              database: database,
+              table: tableName,
+              sortOrder: index,
+            ),
+        ]);
+      });
+    });
   }
 }

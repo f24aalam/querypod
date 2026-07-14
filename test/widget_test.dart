@@ -384,6 +384,59 @@ void main() {
     expect(context.read<TableDataCubit>().state.sessions, isNotEmpty);
   });
 
+  testWidgets('table row context menu copy as CSV copies one row', (
+    tester,
+  ) async {
+    await _openWidgetTable(tester);
+
+    await _copyRowAs(tester, rowText: 'Alice', format: 'CSV');
+
+    final data = await Clipboard.getData('text/plain');
+    expect(
+      data?.text,
+      'id,name,settings\n'
+      '1,Alice,"{""theme"":""dark"",""notifications"":true}"',
+    );
+  });
+
+  testWidgets('table row context menu copy as SQL copies one row', (
+    tester,
+  ) async {
+    await _openWidgetTable(tester);
+
+    await _copyRowAs(tester, rowText: 'Alice', format: 'SQL');
+
+    final data = await Clipboard.getData('text/plain');
+    expect(
+      data?.text,
+      'INSERT INTO "users" ("id", "name", "settings") VALUES\n'
+      '(\'1\', \'Alice\', \'{"theme":"dark","notifications":true}\');',
+    );
+  });
+
+  testWidgets('table row context menu copy as JSON copies one row', (
+    tester,
+  ) async {
+    await _openWidgetTable(tester);
+
+    await _copyRowAs(tester, rowText: 'Alice', format: 'JSON');
+
+    final data = await Clipboard.getData('text/plain');
+    expect(
+      data?.text,
+      '[\n'
+      '  {\n'
+      '    "id": "1",\n'
+      '    "name": "Alice",\n'
+      '    "settings": {\n'
+      '      "theme": "dark",\n'
+      '      "notifications": true\n'
+      '    }\n'
+      '  }\n'
+      ']',
+    );
+  });
+
   testWidgets('table row copy formatter copies selected rows', (tester) async {
     final context = await _openWidgetTable(tester);
     final tableData = context.read<TableDataCubit>();
@@ -529,6 +582,19 @@ void main() {
       ']',
     );
   });
+}
+
+Future<void> _copyRowAs(
+  WidgetTester tester, {
+  required String rowText,
+  required String format,
+}) async {
+  await tester.longPress(find.text(rowText));
+  await tester.pump(const Duration(milliseconds: 250));
+  await tester.tap(find.text('Copy as'));
+  await tester.pump(const Duration(milliseconds: 250));
+  await tester.tap(find.text(format));
+  await tester.pump(const Duration(milliseconds: 100));
 }
 
 Future<void> _deleteQueryDatabase() async {

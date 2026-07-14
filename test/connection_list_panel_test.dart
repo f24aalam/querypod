@@ -34,7 +34,9 @@ void main() {
     );
   }
 
-  testWidgets('search box filters the rendered connection list', (tester) async {
+  testWidgets('search box filters the rendered connection list', (
+    tester,
+  ) async {
     final repository = _MemoryConnectionRepository(
       connections: [
         connection(id: 'alpha', name: 'Alpha DB', host: 'db-alpha'),
@@ -66,19 +68,58 @@ void main() {
     await connectionCubit.close();
   });
 
-  testWidgets('new connection action shows discard confirmation for dirty edits', (
+  testWidgets(
+    'new connection action shows discard confirmation for dirty edits',
+    (tester) async {
+      final existing = connection(id: 'alpha', name: 'Alpha DB');
+      final repository = _MemoryConnectionRepository(connections: [existing]);
+      final connectionCubit = ConnectionCubit(
+        repository: repository,
+        queryRepository: _FakeQueryRepository(),
+      );
+      final editorCubit = ConnectionEditorCubit()
+        ..load(existing, activeWorkspaceId: 'default')
+        ..updateName('Changed');
+      await connectionCubit.load();
+
+      await tester.pumpWidget(
+        _ConnectionListHarness(
+          connectionCubit: connectionCubit,
+          editorCubit: editorCubit,
+          tabsCubit: EditorTabsCubit(),
+        ),
+      );
+
+      await tester.tap(find.text('New'));
+      await tester.pumpAndSettle();
+      expect(find.text('Discard unsaved changes?'), findsOneWidget);
+
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+      expect(editorCubit.state.draft.sourceConnectionId, 'alpha');
+      expect(editorCubit.state.isDirty, isTrue);
+
+      await tester.tap(find.text('New'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Discard'));
+      await tester.pumpAndSettle();
+
+      expect(editorCubit.state.isNew, isTrue);
+      expect(editorCubit.state.isDirty, isFalse);
+      expect(connectionCubit.state.selectedId, isNull);
+      await connectionCubit.close();
+    },
+  );
+
+  testWidgets('new connection action uses the active workspace', (
     tester,
   ) async {
-    final existing = connection(id: 'alpha', name: 'Alpha DB');
-    final repository = _MemoryConnectionRepository(connections: [existing]);
     final connectionCubit = ConnectionCubit(
-      repository: repository,
+      repository: _MemoryConnectionRepository(),
       queryRepository: _FakeQueryRepository(),
     );
-    final editorCubit = ConnectionEditorCubit()
-      ..load(existing, activeWorkspaceId: 'default')
-      ..updateName('Changed');
-    await connectionCubit.load();
+    await connectionCubit.setWorkspace('workspace-a');
+    final editorCubit = ConnectionEditorCubit();
 
     await tester.pumpWidget(
       _ConnectionListHarness(
@@ -90,21 +131,9 @@ void main() {
 
     await tester.tap(find.text('New'));
     await tester.pumpAndSettle();
-    expect(find.text('Discard unsaved changes?'), findsOneWidget);
 
-    await tester.tap(find.text('Cancel'));
-    await tester.pumpAndSettle();
-    expect(editorCubit.state.draft.sourceConnectionId, 'alpha');
-    expect(editorCubit.state.isDirty, isTrue);
-
-    await tester.tap(find.text('New'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Discard'));
-    await tester.pumpAndSettle();
-
+    expect(editorCubit.state.draft.workspaceId, 'workspace-a');
     expect(editorCubit.state.isNew, isTrue);
-    expect(editorCubit.state.isDirty, isFalse);
-    expect(connectionCubit.state.selectedId, isNull);
     await connectionCubit.close();
   });
 }
@@ -139,10 +168,8 @@ class _ConnectionListHarness extends StatelessWidget {
 }
 
 class _MemoryConnectionRepository implements ConnectionRepository {
-  _MemoryConnectionRepository({
-    List<Connection>? connections,
-    this.selectedId,
-  }) : _connections = [...?connections];
+  _MemoryConnectionRepository({List<Connection>? connections})
+    : _connections = [...?connections];
 
   final List<Connection> _connections;
   String? selectedId;
@@ -153,7 +180,8 @@ class _MemoryConnectionRepository implements ConnectionRepository {
   }
 
   @override
-  Future<List<Connection>> getAll() async => List<Connection>.from(_connections);
+  Future<List<Connection>> getAll() async =>
+      List<Connection>.from(_connections);
 
   @override
   Future<Connection?> getById(String id) async {
@@ -184,8 +212,9 @@ class _FakeQueryRepository implements QueryRepository {
   Future<void> deleteByConnection(String connectionId) async {}
 
   @override
-  Future<List<ConnectionQuery>> getAllForConnection(String connectionId) async =>
-      [];
+  Future<List<ConnectionQuery>> getAllForConnection(
+    String connectionId,
+  ) async => [];
 
   @override
   Future<ConnectionQuery> save(ConnectionQuery query) async => query;

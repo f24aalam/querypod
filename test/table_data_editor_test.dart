@@ -53,7 +53,9 @@ void main() {
     await cubit.close();
   });
 
-  testWidgets('table editor shows and dismisses foreign row preview', (tester) async {
+  testWidgets('table editor shows and dismisses foreign row preview', (
+    tester,
+  ) async {
     final cubit = TableDataCubit(repository: _EditorRepository());
     await cubit.openTable(connection, key);
     await cubit.previewForeignRow(
@@ -115,6 +117,7 @@ class _EditorRepository implements TableDataRepository {
     String table, {
     required TableStructure structure,
     String? searchQuery,
+    String? searchColumn,
     List<TableFilter>? filters,
   }) async => 1;
 
@@ -134,6 +137,7 @@ class _EditorRepository implements TableDataRepository {
     required int offset,
     required int limit,
     String? searchQuery,
+    String? searchColumn,
     List<TableFilter>? filters,
   }) async {
     if (table == 'profiles') {
@@ -149,10 +153,7 @@ class _EditorRepository implements TableDataRepository {
     }
     return TableRowsPage(
       rows: [
-        TableDataRow([
-          TableCellValue.text('1'),
-          TableCellValue.text('1'),
-        ]),
+        TableDataRow([TableCellValue.text('1'), TableCellValue.text('1')]),
       ],
       queryDuration: const Duration(milliseconds: 1),
     );
@@ -200,7 +201,10 @@ class _EditorRepository implements TableDataRepository {
           length: 11,
           isPrimaryKey: false,
           isNullable: true,
-          foreignKey: TableForeignKey(targetTable: 'profiles', targetColumn: 'id'),
+          foreignKey: TableForeignKey(
+            targetTable: 'profiles',
+            targetColumn: 'id',
+          ),
         ),
       ],
       indexes: const [

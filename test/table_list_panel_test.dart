@@ -7,7 +7,6 @@ import 'package:querypod/features/connections/domain/repositories/connection_rep
 import 'package:querypod/features/connections/presentation/cubit/connection_cubit.dart';
 import 'package:querypod/features/editor/domain/entities/connection_database.dart';
 import 'package:querypod/features/editor/domain/entities/connection_table.dart';
-import 'package:querypod/features/editor/domain/entities/query_result.dart';
 import 'package:querypod/features/editor/domain/entities/table_data.dart';
 import 'package:querypod/features/editor/domain/repositories/connection_metadata_repository.dart';
 import 'package:querypod/features/editor/domain/repositories/query_repository.dart';
@@ -30,13 +29,19 @@ const _tableListConnection = Connection(
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets('table list panel forwards search input to metadata cubit', (tester) async {
+  testWidgets('table list panel forwards search input to metadata cubit', (
+    tester,
+  ) async {
     final metadataCubit = _SpyConnectionMetadataCubit(
       const ConnectionMetadataState(
         databases: [ConnectionDatabase(name: 'app')],
         selectedDatabase: 'app',
-        tables: [ConnectionTable(name: 'users', type: ConnectionTableType.table)],
-        filteredTables: [ConnectionTable(name: 'users', type: ConnectionTableType.table)],
+        tables: [
+          ConnectionTable(name: 'users', type: ConnectionTableType.table),
+        ],
+        filteredTables: [
+          ConnectionTable(name: 'users', type: ConnectionTableType.table),
+        ],
       ),
     );
 
@@ -90,7 +95,7 @@ class _SpyConnectionMetadataCubit extends ConnectionMetadataCubit {
     : _state = initialState,
       super(repository: _NoopConnectionMetadataRepository());
 
-  ConnectionMetadataState _state;
+  final ConnectionMetadataState _state;
   final List<String> searchQueries = [];
 
   @override
@@ -104,12 +109,10 @@ class _SpyConnectionMetadataCubit extends ConnectionMetadataCubit {
   void search(String query) {
     searchQueries.add(query);
   }
-
-  @override
-  Future<void> close() async {}
 }
 
-class _NoopConnectionMetadataRepository implements ConnectionMetadataRepository {
+class _NoopConnectionMetadataRepository
+    implements ConnectionMetadataRepository {
   @override
   Future<void> alterTable(
     Connection connection,
@@ -152,7 +155,8 @@ class _NoopConnectionMetadataRepository implements ConnectionMetadataRepository 
   ) async => [];
 
   @override
-  Future<List<ConnectionDatabase>> listDatabases(Connection connection) async => [];
+  Future<List<ConnectionDatabase>> listDatabases(Connection connection) async =>
+      [];
 
   @override
   Future<List<ConnectionTable>> listTables(
@@ -175,11 +179,7 @@ class _TestConnectionCubit extends ConnectionCubit {
         repository: _FakeConnectionRepository(),
         queryRepository: _FakeQueryRepository(),
       ) {
-    emit(
-      state.copyWith(
-        activeConnection: () => _tableListConnection,
-      ),
-    );
+    emit(state.copyWith(activeConnection: () => _tableListConnection));
   }
 }
 
@@ -211,8 +211,9 @@ class _FakeQueryRepository implements QueryRepository {
   Future<void> deleteByConnection(String connectionId) async {}
 
   @override
-  Future<List<ConnectionQuery>> getAllForConnection(String connectionId) async =>
-      [];
+  Future<List<ConnectionQuery>> getAllForConnection(
+    String connectionId,
+  ) async => [];
 
   @override
   Future<ConnectionQuery> save(ConnectionQuery query) async => query;

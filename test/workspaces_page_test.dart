@@ -59,7 +59,9 @@ void main() {
   testWidgets('error state renders the error message', (tester) async {
     await tester.pumpWidget(
       _TestHarness(
-        workspacesCubit: _SpyWorkspacesCubit(const WorkspacesError('load failed')),
+        workspacesCubit: _SpyWorkspacesCubit(
+          const WorkspacesError('load failed'),
+        ),
         connectionCubit: _TestConnectionCubit(),
       ),
     );
@@ -98,7 +100,9 @@ void main() {
     expect(find.text('Created Feb 1, 2024'), findsOneWidget);
   });
 
-  testWidgets('create dialog trims input and ignores blank values', (tester) async {
+  testWidgets('create dialog trims input and ignores blank values', (
+    tester,
+  ) async {
     final workspacesCubit = _SpyWorkspacesCubit(const WorkspacesLoaded([]));
 
     await tester.pumpWidget(
@@ -131,10 +135,7 @@ void main() {
     final router = GoRouter(
       initialLocation: '/',
       routes: [
-        GoRoute(
-          path: '/',
-          builder: (context, state) => const WorkspacesPage(),
-        ),
+        GoRoute(path: '/', builder: (context, state) => const WorkspacesPage()),
         GoRoute(
           path: '/workspace/:id',
           builder: (context, state) =>
@@ -175,10 +176,7 @@ class _TestHarness extends StatelessWidget {
   Widget build(BuildContext context) {
     final router = GoRouter(
       routes: [
-        GoRoute(
-          path: '/',
-          builder: (context, state) => const WorkspacesPage(),
-        ),
+        GoRoute(path: '/', builder: (context, state) => const WorkspacesPage()),
       ],
     );
 
@@ -207,7 +205,7 @@ class _SpyWorkspacesCubit extends WorkspacesCubit {
     : _state = initialState,
       super(repository: _NoopWorkspaceRepository());
 
-  WorkspacesState _state;
+  final WorkspacesState _state;
   int loadCalls = 0;
   final List<String> createdNames = [];
 
@@ -226,9 +224,6 @@ class _SpyWorkspacesCubit extends WorkspacesCubit {
   Future<void> createWorkspace(String name) async {
     createdNames.add(name);
   }
-
-  @override
-  Future<void> close() async {}
 }
 
 class _TestConnectionCubit extends ConnectionCubit {
@@ -248,7 +243,8 @@ class _TestConnectionCubit extends ConnectionCubit {
 
 class _NoopWorkspaceRepository implements WorkspaceRepository {
   @override
-  Future<AppWorkspace> createWorkspace(AppWorkspace workspace) async => workspace;
+  Future<AppWorkspace> createWorkspace(AppWorkspace workspace) async =>
+      workspace;
 
   @override
   Future<void> deleteWorkspace(String id) async {}
@@ -262,7 +258,8 @@ class _NoopWorkspaceRepository implements WorkspaceRepository {
   Future<List<AppWorkspace>> getWorkspaces() async => [];
 
   @override
-  Future<AppWorkspace> updateWorkspace(AppWorkspace workspace) async => workspace;
+  Future<AppWorkspace> updateWorkspace(AppWorkspace workspace) async =>
+      workspace;
 }
 
 class _FakeConnectionRepository implements ConnectionRepository {
@@ -293,8 +290,9 @@ class _FakeQueryRepository implements QueryRepository {
   Future<void> deleteByConnection(String connectionId) async {}
 
   @override
-  Future<List<ConnectionQuery>> getAllForConnection(String connectionId) async =>
-      [];
+  Future<List<ConnectionQuery>> getAllForConnection(
+    String connectionId,
+  ) async => [];
 
   @override
   Future<ConnectionQuery> save(ConnectionQuery query) async => query;

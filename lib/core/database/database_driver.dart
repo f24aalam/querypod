@@ -30,6 +30,7 @@ abstract class DatabaseDriver {
     String table, {
     required TableStructure structure,
     String? searchQuery,
+    String? searchColumn,
     List<TableFilter>? filters,
     void Function(QueryHistory)? onHistory,
   });
@@ -42,6 +43,7 @@ abstract class DatabaseDriver {
     required int offset,
     required int limit,
     String? searchQuery,
+    String? searchColumn,
     List<TableFilter>? filters,
     void Function(QueryHistory)? onHistory,
   });

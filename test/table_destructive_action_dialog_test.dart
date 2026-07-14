@@ -29,45 +29,49 @@ const _dialogConnection = Connection(
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets('drop dialog requires typed confirmation in force mode and closes tab', (
-    tester,
-  ) async {
-    final metadataCubit = _SpyMetadataCubit();
-    final tableCubit = TableDataCubit(repository: _NoopTableDataRepository());
-    final tabsCubit = EditorTabsCubit()
-      ..pinTable(
-        connectionId: 'connection',
-        database: 'app',
-        table: const ConnectionTable(name: 'users', type: ConnectionTableType.table),
+  testWidgets(
+    'drop dialog requires typed confirmation in force mode and closes tab',
+    (tester) async {
+      final metadataCubit = _SpyMetadataCubit();
+      final tableCubit = TableDataCubit(repository: _NoopTableDataRepository());
+      final tabsCubit = EditorTabsCubit()
+        ..pinTable(
+          connectionId: 'connection',
+          database: 'app',
+          table: const ConnectionTable(
+            name: 'users',
+            type: ConnectionTableType.table,
+          ),
+        );
+
+      await tester.pumpWidget(
+        _DialogHarness(
+          metadataCubit: metadataCubit,
+          tableCubit: tableCubit,
+          tabsCubit: tabsCubit,
+          child: const _OpenTableDialog(actionType: DestructiveActionType.drop),
+        ),
       );
+      await tester.pumpAndSettle();
 
-    await tester.pumpWidget(
-      _DialogHarness(
-        metadataCubit: metadataCubit,
-        tableCubit: tableCubit,
-        tabsCubit: tabsCubit,
-        child: const _OpenTableDialog(actionType: DestructiveActionType.drop),
-      ),
-    );
-    await tester.pumpAndSettle();
+      expect(find.text('Drop Table'), findsOneWidget);
+      await tester.tap(find.text('Force (cascade/ignore foreign keys)'));
+      await tester.pumpAndSettle();
 
-    expect(find.text('Drop Table'), findsOneWidget);
-    await tester.tap(find.text('Force (cascade/ignore foreign keys)'));
-    await tester.pumpAndSettle();
+      await tester.tap(find.text('Drop'));
+      await tester.pumpAndSettle();
+      expect(metadataCubit.dropCalls, isEmpty);
 
-    await tester.tap(find.text('Drop'));
-    await tester.pumpAndSettle();
-    expect(metadataCubit.dropCalls, isEmpty);
+      await tester.enterText(find.byType(EditableText), 'users');
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Drop'));
+      await tester.pumpAndSettle();
 
-    await tester.enterText(find.byType(EditableText), 'users');
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Drop'));
-    await tester.pumpAndSettle();
-
-    expect(metadataCubit.dropCalls.single, ('users', true));
-    expect(tabsCubit.state.tabs, isEmpty);
-    await tableCubit.close();
-  });
+      expect(metadataCubit.dropCalls.single, ('users', true));
+      expect(tabsCubit.state.tabs, isEmpty);
+      await tableCubit.close();
+    },
+  );
 
   testWidgets('truncate dialog refreshes the open table', (tester) async {
     final metadataCubit = _SpyMetadataCubit();
@@ -79,7 +83,9 @@ void main() {
         metadataCubit: metadataCubit,
         tableCubit: tableCubit,
         tabsCubit: tabsCubit,
-        child: const _OpenTableDialog(actionType: DestructiveActionType.truncate),
+        child: const _OpenTableDialog(
+          actionType: DestructiveActionType.truncate,
+        ),
       ),
     );
     await tester.pumpAndSettle();
@@ -91,8 +97,12 @@ void main() {
     expect(tableCubit.refreshedKeys.single.tableName, 'users');
   });
 
-  testWidgets('repository failure keeps dialog open and shows the error', (tester) async {
-    final metadataCubit = _SpyMetadataCubit(dropError: Exception('constraint failed'));
+  testWidgets('repository failure keeps dialog open and shows the error', (
+    tester,
+  ) async {
+    final metadataCubit = _SpyMetadataCubit(
+      dropError: Exception('constraint failed'),
+    );
 
     await tester.pumpWidget(
       _DialogHarness(
@@ -212,7 +222,8 @@ class _SpyTableDataCubit extends TableDataCubit {
   }
 }
 
-class _NoopConnectionMetadataRepository implements ConnectionMetadataRepository {
+class _NoopConnectionMetadataRepository
+    implements ConnectionMetadataRepository {
   @override
   Future<void> alterTable(
     Connection connection,
@@ -255,7 +266,8 @@ class _NoopConnectionMetadataRepository implements ConnectionMetadataRepository 
   ) async => [];
 
   @override
-  Future<List<ConnectionDatabase>> listDatabases(Connection connection) async => [];
+  Future<List<ConnectionDatabase>> listDatabases(Connection connection) async =>
+      [];
 
   @override
   Future<List<ConnectionTable>> listTables(
@@ -291,6 +303,7 @@ class _NoopTableDataRepository implements TableDataRepository {
     String table, {
     required TableStructure structure,
     String? searchQuery,
+    String? searchColumn,
     List<TableFilter>? filters,
   }) async => 0;
 
@@ -310,6 +323,7 @@ class _NoopTableDataRepository implements TableDataRepository {
     required int offset,
     required int limit,
     String? searchQuery,
+    String? searchColumn,
     List<TableFilter>? filters,
   }) async => TableRowsPage(rows: const [], queryDuration: Duration.zero);
 

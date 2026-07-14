@@ -228,6 +228,7 @@ class SQLiteDriver implements DatabaseDriver {
     String table, {
     required TableStructure structure,
     String? searchQuery,
+    String? searchColumn,
     List<TableFilter>? filters,
     void Function(QueryHistory)? onHistory,
   }) async {
@@ -238,13 +239,18 @@ class SQLiteDriver implements DatabaseDriver {
       final whereClauses = <String>[];
 
       if (searchQuery != null && searchQuery.isNotEmpty) {
-        final searchClauses = structure.columns
-            .map((col) => '${_quoteIdentifier(col.name)} LIKE ?')
-            .join(' OR ');
-        whereClauses.add('($searchClauses)');
-        queryParams.addAll(
-          List.filled(structure.columns.length, '%$searchQuery%'),
-        );
+        if (searchColumn != null && searchColumn != '__ALL__') {
+          whereClauses.add('${_quoteIdentifier(searchColumn)} LIKE ?');
+          queryParams.add('%$searchQuery%');
+        } else {
+          final searchClauses = structure.columns
+              .map((col) => '${_quoteIdentifier(col.name)} LIKE ?')
+              .join(' OR ');
+          whereClauses.add('($searchClauses)');
+          queryParams.addAll(
+            List.filled(structure.columns.length, '%$searchQuery%'),
+          );
+        }
       }
 
       if (filters != null && filters.isNotEmpty) {
@@ -292,6 +298,7 @@ class SQLiteDriver implements DatabaseDriver {
     required int offset,
     required int limit,
     String? searchQuery,
+    String? searchColumn,
     List<TableFilter>? filters,
     void Function(QueryHistory)? onHistory,
   }) async {
@@ -304,13 +311,18 @@ class SQLiteDriver implements DatabaseDriver {
       final whereClauses = <String>[];
 
       if (searchQuery != null && searchQuery.isNotEmpty) {
-        final searchClauses = structure.columns
-            .map((col) => '${_quoteIdentifier(col.name)} LIKE ?')
-            .join(' OR ');
-        whereClauses.add('($searchClauses)');
-        queryParams.addAll(
-          List.filled(structure.columns.length, '%$searchQuery%'),
-        );
+        if (searchColumn != null && searchColumn != '__ALL__') {
+          whereClauses.add('${_quoteIdentifier(searchColumn)} LIKE ?');
+          queryParams.add('%$searchQuery%');
+        } else {
+          final searchClauses = structure.columns
+              .map((col) => '${_quoteIdentifier(col.name)} LIKE ?')
+              .join(' OR ');
+          whereClauses.add('($searchClauses)');
+          queryParams.addAll(
+            List.filled(structure.columns.length, '%$searchQuery%'),
+          );
+        }
       }
 
       if (filters != null && filters.isNotEmpty) {

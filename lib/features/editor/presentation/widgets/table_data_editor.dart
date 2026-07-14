@@ -890,7 +890,8 @@ class _DataGridState extends State<_DataGrid> {
   }
 
   void _moveSelection(int delta) {
-    final idx = widget.session.singleSelectedRowIndex ??
+    final idx =
+        widget.session.singleSelectedRowIndex ??
         widget.session.selectionAnchorRowIndex;
     if (idx != null) {
       final nextIdx = (idx + delta).clamp(0, widget.session.rows.length - 1);
@@ -908,12 +909,18 @@ class _DataGridState extends State<_DataGrid> {
 
     return CallbackShortcuts(
       bindings: {
-        const SingleActivator(LogicalKeyboardKey.arrowUp): () => _moveSelection(-1),
-        const SingleActivator(LogicalKeyboardKey.arrowDown): () => _moveSelection(1),
+        const SingleActivator(LogicalKeyboardKey.arrowUp): () =>
+            _moveSelection(-1),
+        const SingleActivator(LogicalKeyboardKey.arrowDown): () =>
+            _moveSelection(1),
         const SingleActivator(LogicalKeyboardKey.enter): () {
           final idx = widget.session.singleSelectedRowIndex;
           if (idx != null) {
-            context.read<TableDataCubit>().beginCellEdit(widget.tableKey, idx, 0);
+            context.read<TableDataCubit>().beginCellEdit(
+              widget.tableKey,
+              idx,
+              0,
+            );
           }
         },
       },
@@ -949,7 +956,9 @@ class _DataGridState extends State<_DataGrid> {
                                     .contains(index),
                                 activeEdit: widget.session.activeCellEdit,
                                 stagedEdits: widget.session.stagedCellEdits,
-                                stagedDelete: widget.session.stagedDeletedRowIndexes
+                                stagedDelete: widget
+                                    .session
+                                    .stagedDeletedRowIndexes
                                     .contains(index),
                                 stagedInsert: widget
                                     .session
@@ -958,11 +967,14 @@ class _DataGridState extends State<_DataGrid> {
                                 editable: widget.session.isEditable,
                                 columns: columns,
                                 onOpenForeignKey: (fk, value) {
-                                  context.read<TableDataCubit>().previewForeignRow(
-                                    widget.tableKey,
-                                    fk,
-                                    value.rawValue?.toString() ?? value.display,
-                                  );
+                                  context
+                                      .read<TableDataCubit>()
+                                      .previewForeignRow(
+                                        widget.tableKey,
+                                        fk,
+                                        value.rawValue?.toString() ??
+                                            value.display,
+                                      );
                                 },
                               ),
                             ),
@@ -1158,31 +1170,56 @@ class _GridRow extends StatelessWidget {
                     .read<TableDataCubit>()
                     .updateCellDraft(tableKey, value),
                 onNavigate: (reverse) {
-                  final session = context.read<TableDataCubit>().state.session(tableKey);
+                  final session = context.read<TableDataCubit>().state.session(
+                    tableKey,
+                  );
                   if (session == null) return;
-                  final nextCol = reverse ? activeEdit!.columnIndex - 1 : activeEdit!.columnIndex + 1;
-                  if (nextCol >= 0 && nextCol < session.structure!.columns.length) {
-                    context.read<TableDataCubit>().beginCellEdit(tableKey, activeEdit!.rowIndex, nextCol);
+                  final nextCol = reverse
+                      ? activeEdit!.columnIndex - 1
+                      : activeEdit!.columnIndex + 1;
+                  if (nextCol >= 0 &&
+                      nextCol < session.structure!.columns.length) {
+                    context.read<TableDataCubit>().beginCellEdit(
+                      tableKey,
+                      activeEdit!.rowIndex,
+                      nextCol,
+                    );
                   } else if (nextCol >= session.structure!.columns.length) {
                     // wrap to next row
                     final nextRow = activeEdit!.rowIndex + 1;
                     if (nextRow < session.rows.length) {
-                      context.read<TableDataCubit>().beginCellEdit(tableKey, nextRow, 0);
+                      context.read<TableDataCubit>().beginCellEdit(
+                        tableKey,
+                        nextRow,
+                        0,
+                      );
                     }
                   } else if (nextCol < 0) {
                     // wrap to prev row
                     final prevRow = activeEdit!.rowIndex - 1;
                     if (prevRow >= 0) {
-                      context.read<TableDataCubit>().beginCellEdit(tableKey, prevRow, session.structure!.columns.length - 1);
+                      context.read<TableDataCubit>().beginCellEdit(
+                        tableKey,
+                        prevRow,
+                        session.structure!.columns.length - 1,
+                      );
                     }
                   }
                 },
                 onNavigateRow: (reverse) {
-                  final session = context.read<TableDataCubit>().state.session(tableKey);
+                  final session = context.read<TableDataCubit>().state.session(
+                    tableKey,
+                  );
                   if (session == null) return;
-                  final nextRow = reverse ? activeEdit!.rowIndex - 1 : activeEdit!.rowIndex + 1;
+                  final nextRow = reverse
+                      ? activeEdit!.rowIndex - 1
+                      : activeEdit!.rowIndex + 1;
                   if (nextRow >= 0 && nextRow < session.rows.length) {
-                    context.read<TableDataCubit>().beginCellEdit(tableKey, nextRow, activeEdit!.columnIndex);
+                    context.read<TableDataCubit>().beginCellEdit(
+                      tableKey,
+                      nextRow,
+                      activeEdit!.columnIndex,
+                    );
                   }
                 },
                 foreignKey: columns[index].foreignKey,
@@ -1371,7 +1408,8 @@ class _CellTextFieldState extends State<_CellTextField> {
             final shift = HardwareKeyboard.instance.isShiftPressed;
             widget.onNavigate?.call(shift);
             return KeyEventResult.handled;
-          } else if (event.logicalKey == LogicalKeyboardKey.enter && !HardwareKeyboard.instance.isShiftPressed) {
+          } else if (event.logicalKey == LogicalKeyboardKey.enter &&
+              !HardwareKeyboard.instance.isShiftPressed) {
             widget.onNavigateRow?.call(false);
             return KeyEventResult.handled;
           }
@@ -1540,7 +1578,9 @@ class _PaginationBar extends StatelessWidget {
                   ],
                   if (session.hasPendingChanges) ...[
                     FTooltip(
-                      tipBuilder: (context, controller) => Text('Commit changes (${KeyboardShortcuts.format('Cmd-S')})'),
+                      tipBuilder: (context, controller) => Text(
+                        'Commit changes (${KeyboardShortcuts.format('Cmd-S')})',
+                      ),
                       child: FButton(
                         size: FButtonSizeVariant.xs,
                         variant: session.hasPendingDeletes
@@ -1552,13 +1592,16 @@ class _PaginationBar extends StatelessWidget {
                                   .read<TableDataCubit>()
                                   .commitPendingChanges(tableKey),
                         child: Text(
-                          session.isCommittingChanges ? 'Committing…' : 'Commit',
+                          session.isCommittingChanges
+                              ? 'Committing…'
+                              : 'Commit',
                         ),
                       ),
                     ),
                     const SizedBox(width: 6),
                     FTooltip(
-                      tipBuilder: (context, controller) => const Text('Cancel changes (Esc)'),
+                      tipBuilder: (context, controller) =>
+                          const Text('Cancel changes (Esc)'),
                       child: FButton(
                         size: FButtonSizeVariant.xs,
                         variant: FButtonVariant.outline,
@@ -1822,7 +1865,15 @@ class _TableActionBarState extends State<_TableActionBar> {
     if (_debounce?.isActive ?? false) _debounce!.cancel();
     _debounce = Timer(const Duration(milliseconds: 400), () {
       if (!mounted) return;
-      context.read<TableDataCubit>().setSearchQuery(widget.tableKey, query);
+      final selectedColumn =
+          widget.session.searchColumn ??
+          widget.session.structure?.columns.firstOrNull?.name ??
+          '__ALL__';
+      context.read<TableDataCubit>().setSearch(
+        widget.tableKey,
+        query: query,
+        column: selectedColumn,
+      );
     });
   }
 
@@ -1845,10 +1896,87 @@ class _TableActionBarState extends State<_TableActionBar> {
                 controller: _searchController,
                 onChange: (value) => _onSearchChanged(value.text),
               ),
-              hint: 'Search all columns...',
+              hint: 'Search...',
               maxLines: 1,
               size: FTextFieldSizeVariant.sm,
               clearable: (value) => value.text.isNotEmpty,
+              suffixBuilder: (context, fieldStyle, widgetWidget) {
+                final columns = widget.session.structure?.columns ?? [];
+                if (columns.isEmpty) return const SizedBox.shrink();
+
+                final items = {
+                  '__ALL__': 'All',
+                  for (final col in columns) col.name: col.name,
+                };
+
+                final selectedValue =
+                    widget.session.searchColumn ??
+                    columns.firstOrNull?.name ??
+                    '__ALL__';
+
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: FPopoverMenu(
+                    menuBuilder: (context, controller, menu) => [
+                      FItemGroup(
+                        children: [
+                          for (final entry in items.entries)
+                            FItem(
+                              title: Text(entry.value),
+                              onPress: () {
+                                controller.hide();
+                                context.read<TableDataCubit>().setSearch(
+                                  widget.tableKey,
+                                  column: entry.key,
+                                );
+                              },
+                            ),
+                        ],
+                      ),
+                    ],
+                    builder: (context, controller, child) {
+                      return MouseRegion(
+                        cursor: SystemMouseCursors.click,
+                        child: GestureDetector(
+                          onTap: controller.toggle,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: theme.colors.secondary,
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(
+                                color: theme.colors.border,
+                                width: 1,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  items[selectedValue] ?? 'All',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: theme.colors.mutedForeground,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                Icon(
+                                  Icons.arrow_drop_down,
+                                  size: 14,
+                                  color: theme.colors.mutedForeground,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                );
+              },
             ),
           ),
           const SizedBox(width: 8),

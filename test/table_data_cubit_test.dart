@@ -311,21 +311,29 @@ void main() {
     expect(repository.requests, hasLength(1));
   });
 
-  test('search query resets pagination and avoids unchanged reloads', () async {
+  test('search resets pagination and avoids unchanged reloads', () async {
     final repository = _FakeTableDataRepository(total: 30);
     final cubit = TableDataCubit(repository: repository);
     await cubit.openTable(connection, key);
     await cubit.nextPage(key);
 
-    await cubit.setSearchQuery(key, 'alice');
+    await cubit.setSearch(key, query: 'alice');
 
-    final session = cubit.state.session(key)!;
+    var session = cubit.state.session(key)!;
     expect(session.searchQuery, 'alice');
+    expect(session.searchColumn, isNull);
     expect(session.pageIndex, 0);
     expect(repository.countCalls, 2);
 
-    await cubit.setSearchQuery(key, 'alice');
+    await cubit.setSearch(key, query: 'alice');
     expect(repository.countCalls, 2);
+    
+    await cubit.setSearch(key, query: 'alice', column: 'name');
+    session = cubit.state.session(key)!;
+    expect(session.searchQuery, 'alice');
+    expect(session.searchColumn, 'name');
+    expect(session.pageIndex, 0);
+    expect(repository.countCalls, 3);
   });
 
   test('filters reset pagination and avoid unchanged reloads', () async {
@@ -501,6 +509,7 @@ class _FakeTableDataRepository implements TableDataRepository {
     String table, {
     required TableStructure structure,
     String? searchQuery,
+    String? searchColumn,
     List<TableFilter>? filters,
   }) async {
     countCalls++;
@@ -516,6 +525,7 @@ class _FakeTableDataRepository implements TableDataRepository {
     required int offset,
     required int limit,
     String? searchQuery,
+    String? searchColumn,
     List<TableFilter>? filters,
   }) async {
     if (table == 'profiles') {
@@ -581,6 +591,7 @@ class _ControlledPageRepository implements TableDataRepository {
     String table, {
     required TableStructure structure,
     String? searchQuery,
+    String? searchColumn,
     List<TableFilter>? filters,
   }) async => 120;
 
@@ -593,6 +604,7 @@ class _ControlledPageRepository implements TableDataRepository {
     required int offset,
     required int limit,
     String? searchQuery,
+    String? searchColumn,
     List<TableFilter>? filters,
   }) {
     final request = _PageRequest(offset: offset, limit: limit);

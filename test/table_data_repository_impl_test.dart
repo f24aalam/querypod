@@ -105,6 +105,28 @@ void main() {
       ),
       1,
     );
+    expect(
+      await repository.countRows(
+        connection,
+        'main',
+        'users',
+        structure: structure,
+        searchQuery: '1',
+        searchColumn: 'profile_id',
+      ),
+      2,
+    );
+    expect(
+      await repository.countRows(
+        connection,
+        'main',
+        'users',
+        structure: structure,
+        searchQuery: 'Ali',
+        searchColumn: 'id',
+      ),
+      0,
+    );
 
     final page = await repository.fetchRows(
       connection,

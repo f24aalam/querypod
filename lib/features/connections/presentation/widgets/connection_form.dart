@@ -123,7 +123,8 @@ class ConnectionForm extends StatelessWidget {
                                     ),
                                     const SizedBox(height: 16),
                                     if (draft.type == ConnectionType.mysql ||
-                                        draft.type == ConnectionType.postgresql) ...[
+                                        draft.type ==
+                                            ConnectionType.postgresql) ...[
                                       _FormField(
                                         label: 'Host',
                                         value: draft.host,
@@ -170,9 +171,8 @@ class ConnectionForm extends StatelessWidget {
                                                   style: TextStyle(
                                                     fontSize: 14,
                                                     fontWeight: FontWeight.w500,
-                                                    color: theme
-                                                        .colors
-                                                        .foreground,
+                                                    color:
+                                                        theme.colors.foreground,
                                                   ),
                                                 ),
                                                 const SizedBox(height: 4),
@@ -196,7 +196,8 @@ class ConnectionForm extends StatelessWidget {
                                       ),
                                     ] else ...[
                                       Row(
-                                        crossAxisAlignment: CrossAxisAlignment.end,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.end,
                                         children: [
                                           Expanded(
                                             child: _FormField(
@@ -207,7 +208,9 @@ class ConnectionForm extends StatelessWidget {
                                           ),
                                           const SizedBox(width: 8),
                                           Padding(
-                                            padding: const EdgeInsets.only(bottom: 2),
+                                            padding: const EdgeInsets.only(
+                                              bottom: 2,
+                                            ),
                                             child: FButton.icon(
                                               onPress: () async {
                                                 const typeGroup = XTypeGroup(
@@ -219,15 +222,18 @@ class ConnectionForm extends StatelessWidget {
                                                   ],
                                                 );
                                                 final file = await openFile(
-                                                  acceptedTypeGroups: <XTypeGroup>[
-                                                    typeGroup,
-                                                  ],
+                                                  acceptedTypeGroups:
+                                                      <XTypeGroup>[typeGroup],
                                                 );
                                                 if (file != null) {
-                                                  editor.updateDatabase(file.path);
+                                                  editor.updateDatabase(
+                                                    file.path,
+                                                  );
                                                 }
                                               },
-                                              child: const Icon(Icons.folder_open),
+                                              child: const Icon(
+                                                Icons.folder_open,
+                                              ),
                                             ),
                                           ),
                                         ],
@@ -287,7 +293,14 @@ class ConnectionForm extends StatelessWidget {
   }
 
   Future<void> _save(BuildContext context, ConnectionDraft draft) async {
-    final connection = draft.toConnection();
+    final activeWorkspaceId = context
+        .read<ConnectionCubit>()
+        .state
+        .activeWorkspaceId;
+    final connection =
+        draft.sourceConnectionId == null && activeWorkspaceId != null
+        ? draft.toConnection().copyWith(workspaceId: activeWorkspaceId)
+        : draft.toConnection();
     final saved = await context.read<ConnectionCubit>().save(connection);
     if (!context.mounted || !saved) return;
 

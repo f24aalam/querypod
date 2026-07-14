@@ -71,7 +71,10 @@ void main() {
       tabs.pinTable(
         connectionId: 'connection',
         database: 'app',
-        table: ConnectionTable(name: 'table_$i', type: ConnectionTableType.table),
+        table: ConnectionTable(
+          name: 'table_$i',
+          type: ConnectionTableType.table,
+        ),
       );
     }
     await tester.pump();
@@ -351,6 +354,7 @@ class _WidgetTableRepository implements TableDataRepository {
     String table, {
     required TableStructure structure,
     String? searchQuery,
+    String? searchColumn,
     List<TableFilter>? filters,
   }) async => 2;
 
@@ -363,6 +367,7 @@ class _WidgetTableRepository implements TableDataRepository {
     required int offset,
     required int limit,
     String? searchQuery,
+    String? searchColumn,
     List<TableFilter>? filters,
   }) async => TableRowsPage(
     rows: [

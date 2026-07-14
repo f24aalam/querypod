@@ -21,6 +21,7 @@ class TableDataSession {
   final TableDataStatus status;
   final String? errorMessage;
   final String? searchQuery;
+  final String? searchColumn;
   final List<TableFilter> filters;
   final int feedbackNonce;
   final bool isShowingStructure;
@@ -45,6 +46,7 @@ class TableDataSession {
     this.status = TableDataStatus.initialLoading,
     this.errorMessage,
     this.searchQuery,
+    this.searchColumn,
     List<TableFilter> filters = const [],
     this.feedbackNonce = 0,
     this.isShowingStructure = false,
@@ -93,6 +95,7 @@ class TableDataSession {
     TableDataStatus? status,
     String? Function()? errorMessage,
     String? Function()? searchQuery,
+    String? Function()? searchColumn,
     List<TableFilter>? filters,
     int? feedbackNonce,
     bool? isShowingStructure,
@@ -123,6 +126,7 @@ class TableDataSession {
       status: status ?? this.status,
       errorMessage: errorMessage != null ? errorMessage() : this.errorMessage,
       searchQuery: searchQuery != null ? searchQuery() : this.searchQuery,
+      searchColumn: searchColumn != null ? searchColumn() : this.searchColumn,
       filters: filters ?? this.filters,
       feedbackNonce: feedbackNonce ?? this.feedbackNonce,
       isShowingStructure: isShowingStructure ?? this.isShowingStructure,

@@ -1,12 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:forui/forui.dart';
 import 'package:window_manager/window_manager.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/platform_utils.dart';
+import '../../../connections/presentation/cubit/connection_cubit.dart';
+import '../cubit/connection_metadata_cubit.dart';
 import 'app_menu_actions.dart';
 
 class AppTitleBar extends StatefulWidget {
-  const AppTitleBar({super.key});
+  final bool? canTransferOverride;
+
+  const AppTitleBar({super.key, this.canTransferOverride});
 
   @override
   State<AppTitleBar> createState() => _AppTitleBarState();
@@ -34,6 +39,14 @@ class _AppTitleBarState extends State<AppTitleBar> {
   Widget build(BuildContext context) {
     final theme = context.theme;
     final chromeColor = _chromeColor(theme);
+    final canTransfer =
+        widget.canTransferOverride ??
+        (context.select<ConnectionCubit, bool>(
+              (cubit) => cubit.state.activeConnection != null,
+            ) &&
+            context.select<ConnectionMetadataCubit, bool>(
+              (cubit) => cubit.state.selectedDatabase != null,
+            ));
 
     return Container(
       key: const ValueKey('app-title-bar'),
@@ -45,7 +58,7 @@ class _AppTitleBarState extends State<AppTitleBar> {
       child: Row(
         children: [
           if (!isMacOS) _buildAppIcon(theme),
-          if (!isMacOS) _buildMenuBar(context, theme),
+          if (!isMacOS) _buildMenuBar(context, theme, canTransfer),
           Expanded(
             child: isDesktop
                 ? const DragToMoveArea(child: SizedBox.expand())
@@ -70,10 +83,16 @@ class _AppTitleBarState extends State<AppTitleBar> {
     );
   }
 
-  Widget _buildMenuBar(BuildContext context, FThemeData theme) {
+  Widget _buildMenuBar(
+    BuildContext context,
+    FThemeData theme,
+    bool canTransfer,
+  ) {
     final fileTopLevelStyle = _topLevelButtonStyle(theme, _isFileMenuOpen);
-    final workspaceTopLevelStyle =
-        _topLevelButtonStyle(theme, _isWorkspaceMenuOpen);
+    final workspaceTopLevelStyle = _topLevelButtonStyle(
+      theme,
+      _isWorkspaceMenuOpen,
+    );
     final menuSurfaceStyle = _menuSurfaceStyle(theme);
     final menuItemStyle = _menuItemStyle(theme);
 
@@ -98,6 +117,21 @@ class _AppTitleBarState extends State<AppTitleBar> {
             style: fileTopLevelStyle,
             menuStyle: menuSurfaceStyle,
             menuChildren: [
+              MenuItemButton(
+                onPressed: canTransfer
+                    ? () => AppMenuActions.importDatabase(context)
+                    : null,
+                style: menuItemStyle,
+                child: const Text('Import Database...'),
+              ),
+              MenuItemButton(
+                onPressed: canTransfer
+                    ? () => AppMenuActions.exportDatabase(context)
+                    : null,
+                style: menuItemStyle,
+                child: const Text('Export Database...'),
+              ),
+              const Divider(height: 1),
               MenuItemButton(
                 onPressed: AppMenuActions.quit,
                 semanticsLabel: 'Quit, shortcut Control Q',

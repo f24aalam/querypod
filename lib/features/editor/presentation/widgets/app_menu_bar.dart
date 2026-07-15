@@ -1,18 +1,34 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/platform_utils.dart';
+import '../../../connections/presentation/cubit/connection_cubit.dart';
+import '../cubit/connection_metadata_cubit.dart';
 import 'app_menu_actions.dart';
 
 /// Installs the native macOS menu or global desktop shortcuts around the app.
 class AppMenuShell extends StatelessWidget {
-  const AppMenuShell({super.key, required this.child});
+  const AppMenuShell({
+    super.key,
+    required this.child,
+    this.canTransferOverride,
+  });
 
   final Widget child;
+  final bool? canTransferOverride;
 
   @override
   Widget build(BuildContext context) {
     if (isMacOS) {
+      final canTransfer =
+          canTransferOverride ??
+          (context.select<ConnectionCubit, bool>(
+                (cubit) => cubit.state.activeConnection != null,
+              ) &&
+              context.select<ConnectionMetadataCubit, bool>(
+                (cubit) => cubit.state.selectedDatabase != null,
+              ));
       return PlatformMenuBar(
         menus: [
           const PlatformMenu(
@@ -33,6 +49,23 @@ class AppMenuShell extends StatelessWidget {
               ),
               PlatformMenuItemGroup(
                 members: [PlatformProvidedMenuItem(type: .quit)],
+              ),
+            ],
+          ),
+          PlatformMenu(
+            label: 'File',
+            menus: [
+              PlatformMenuItem(
+                label: 'Import Database...',
+                onSelected: canTransfer
+                    ? () => AppMenuActions.importDatabase(context)
+                    : null,
+              ),
+              PlatformMenuItem(
+                label: 'Export Database...',
+                onSelected: canTransfer
+                    ? () => AppMenuActions.exportDatabase(context)
+                    : null,
               ),
             ],
           ),

@@ -26,7 +26,7 @@ void main() {
           .customSelect('PRAGMA foreign_keys')
           .getSingle();
       expect(foreignKeys.read<int>('foreign_keys'), 1);
-      expect(database.schemaVersion, 1);
+      expect(database.schemaVersion, 2);
 
       final schemaRows = await database
           .customSelect(
@@ -43,6 +43,7 @@ void main() {
           'query_history',
           'pinned_tables',
           'app_state',
+          'app_settings',
           'idx_connections_workspace_id',
           'idx_saved_queries_connection_id',
           'idx_query_history_connection_id',

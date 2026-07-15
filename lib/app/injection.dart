@@ -6,6 +6,11 @@ import '../features/connections/data/repositories/connection_repository_impl.dar
 import '../features/connections/data/services/connection_credential_store.dart';
 import '../features/connections/domain/repositories/connection_repository.dart';
 import '../features/connections/presentation/cubit/connection_cubit.dart';
+import '../features/database_transfer/data/database_tool_repository_impl.dart';
+import '../features/database_transfer/data/database_transfer_repository_impl.dart';
+import '../features/database_transfer/domain/database_tool_repository.dart';
+import '../features/database_transfer/domain/database_transfer_repository.dart';
+import '../features/database_transfer/presentation/cubit/database_transfer_cubit.dart';
 import '../features/editor/data/repositories/query_history_repository_impl.dart';
 import '../features/editor/data/repositories/query_repository_impl.dart';
 import '../features/editor/data/repositories/connection_metadata_repository_impl.dart';
@@ -53,6 +58,9 @@ Future<void> configureDependencies({
   final pinnedTablesRepository = PinnedTablesRepositoryImpl(
     database: appDatabase,
   );
+  final databaseToolRepository = DatabaseToolRepositoryImpl(
+    database: appDatabase,
+  );
 
   getIt.registerSingleton<QueryPodDatabase>(
     appDatabase,
@@ -60,6 +68,12 @@ Future<void> configureDependencies({
   );
   getIt.registerSingleton<ConnectionCredentialStore>(credentials);
   getIt.registerLazySingleton<ConnectionRepository>(() => connectionRepository);
+  getIt.registerLazySingleton<DatabaseToolRepository>(
+    () => databaseToolRepository,
+  );
+  getIt.registerLazySingleton<DatabaseTransferRepository>(
+    () => DatabaseTransferRepositoryImpl(tools: databaseToolRepository),
+  );
   getIt.registerLazySingleton<QueryRepository>(
     () => QueryRepositoryImpl(database: appDatabase),
   );
@@ -93,6 +107,7 @@ Future<void> configureDependencies({
   );
   getIt.registerFactory(() => TableDataCubit(repository: getIt()));
   getIt.registerFactory(() => WorkspacesCubit(repository: getIt()));
+  getIt.registerFactory(() => DatabaseTransferCubit(repository: getIt()));
 
   final workspacePreset = launchBootstrap.workspace;
   if (workspacePreset != null) {

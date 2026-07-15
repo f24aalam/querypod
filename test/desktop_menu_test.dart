@@ -105,6 +105,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: AppMenuShell(
+          canTransferOverride: false,
           child: Focus(autofocus: true, child: const SizedBox.expand()),
         ),
       ),
@@ -124,15 +125,21 @@ void main() {
     debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
 
     await tester.pumpWidget(
-      const MaterialApp(home: AppMenuShell(child: SizedBox.expand())),
+      const MaterialApp(
+        home: AppMenuShell(
+          canTransferOverride: false,
+          child: SizedBox.expand(),
+        ),
+      ),
     );
 
     expect(find.byType(PlatformMenuBar), findsOneWidget);
     final menuBar = tester.widget<PlatformMenuBar>(
       find.byType(PlatformMenuBar),
     );
-    expect(menuBar.menus, hasLength(2));
+    expect(menuBar.menus, hasLength(3));
     expect((menuBar.menus.first as PlatformMenu).label, 'QueryPod');
+    expect((menuBar.menus[1] as PlatformMenu).label, 'File');
     expect((menuBar.menus.last as PlatformMenu).label, 'Workspace');
     debugDefaultTargetPlatformOverride = null;
   });
@@ -185,7 +192,8 @@ void main() {
         BorderRadius.zero,
       );
 
-      final quitItem = fileMenu.menuChildren.single as MenuItemButton;
+      expect(fileMenu.menuChildren, hasLength(4));
+      final quitItem = fileMenu.menuChildren.last as MenuItemButton;
       expect(
         quitItem.style!.backgroundColor!.resolve({}),
         fileMenu.menuStyle!.backgroundColor!.resolve({}),
@@ -241,7 +249,7 @@ Widget _titleBarApp([FThemeData? theme]) {
     theme: resolvedTheme.toApproximateMaterialTheme(),
     home: FTheme(
       data: resolvedTheme,
-      child: const Scaffold(body: AppTitleBar()),
+      child: const Scaffold(body: AppTitleBar(canTransferOverride: false)),
     ),
   );
 }

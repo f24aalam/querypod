@@ -304,6 +304,19 @@ class EditorTabsCubit extends Cubit<EditorTabsState> {
     );
   }
 
+  void closeDatabaseTabs({
+    required String connectionId,
+    required String database,
+  }) {
+    _closeTabsWhere(
+      (tab, index) =>
+          tab.connectionId == connectionId &&
+          tab.database == database &&
+          (tab.type == EditorTabType.table ||
+              tab.type == EditorTabType.createTable),
+    );
+  }
+
   void closeQueryTabs() {
     if (!state.tabs.any((tab) => tab.type == EditorTabType.query)) return;
 

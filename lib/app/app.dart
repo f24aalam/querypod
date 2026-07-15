@@ -4,6 +4,7 @@ import 'package:forui/forui.dart';
 
 import '../features/connections/presentation/cubit/connection_cubit.dart';
 import '../features/connections/presentation/cubit/connection_editor_cubit.dart';
+import '../features/database_transfer/presentation/cubit/database_transfer_cubit.dart';
 import '../features/editor/presentation/cubit/activity_cubit.dart';
 import '../features/editor/presentation/cubit/editor_tabs_cubit.dart';
 import '../features/editor/presentation/cubit/query_editor_cubit.dart';
@@ -33,6 +34,7 @@ class App extends StatelessWidget {
         BlocProvider(create: (_) => getIt<QueryEditorCubit>()),
         BlocProvider(create: (_) => getIt<TableDataCubit>()),
         BlocProvider(create: (_) => getIt<WorkspacesCubit>()..loadWorkspaces()),
+        BlocProvider(create: (_) => getIt<DatabaseTransferCubit>()),
       ],
       child: BlocBuilder<ThemeCubit, ThemeState>(
         builder: (context, state) {

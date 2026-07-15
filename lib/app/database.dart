@@ -123,6 +123,15 @@ class AppStateEntries extends Table {
   List<String> get customConstraints => ['CHECK (id = 1)'];
 }
 
+@DataClassName('AppSettingRow')
+class AppSettings extends Table {
+  TextColumn get key => text()();
+  TextColumn get value => text()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {key};
+}
+
 @DriftDatabase(
   tables: [
     Workspaces,
@@ -131,6 +140,7 @@ class AppStateEntries extends Table {
     QueryHistoryEntries,
     PinnedTables,
     AppStateEntries,
+    AppSettings,
   ],
 )
 class QueryPodDatabase extends _$QueryPodDatabase {
@@ -138,13 +148,18 @@ class QueryPodDatabase extends _$QueryPodDatabase {
     : super(executor ?? _openProfileDatabase(profileNamespace));
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
     onCreate: (migrator) async {
       await migrator.createAll();
       await customStatement('INSERT INTO app_state (id) VALUES (1)');
+    },
+    onUpgrade: (migrator, from, to) async {
+      if (from < 2) {
+        await migrator.createTable(appSettings);
+      }
     },
     beforeOpen: (details) async {
       await customStatement('PRAGMA foreign_keys = ON');

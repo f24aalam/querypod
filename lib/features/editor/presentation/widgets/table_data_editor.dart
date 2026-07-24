@@ -2905,6 +2905,9 @@ class _TableActionBarState extends State<_TableActionBar> {
                 return Padding(
                   padding: const EdgeInsets.only(right: 8),
                   child: FPopoverMenu(
+                    maxHeight: _columnMenuMaxHeight(context),
+                    menuAnchor: Alignment.bottomRight,
+                    childAnchor: Alignment.topRight,
                     menuBuilder: (context, controller, menu) => [
                       FItemGroup(
                         children: [
@@ -2928,6 +2931,7 @@ class _TableActionBarState extends State<_TableActionBar> {
                         child: GestureDetector(
                           onTap: controller.toggle,
                           child: Container(
+                            key: const ValueKey('table-search-column-selector'),
                             padding: const EdgeInsets.symmetric(
                               horizontal: 6,
                               vertical: 2,
@@ -2984,6 +2988,11 @@ class _TableActionBarState extends State<_TableActionBar> {
         ],
       ),
     );
+  }
+
+  double _columnMenuMaxHeight(BuildContext context) {
+    final height = MediaQuery.sizeOf(context).height;
+    return (height * 0.45).clamp(140.0, 360.0);
   }
 
   void _showFilterSheet(BuildContext context) {

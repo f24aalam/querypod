@@ -101,6 +101,49 @@ void main() {
     await cubit.close();
   });
 
+  testWidgets('column search menu scrolls on small screens with many columns', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(420, 360);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final cubit = TableDataCubit(
+      repository: _EditorRepository(columnCount: 40),
+    );
+    await cubit.openTable(connection, key);
+
+    await tester.pumpWidget(_TableEditorHarness(cubit: cubit, tab: tab));
+    await tester.pumpAndSettle();
+
+    await tester.tap(
+      find.byKey(const ValueKey('table-search-column-selector')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('All'), findsOneWidget);
+    expect(
+      find.descendant(of: find.byType(FItem), matching: find.text('col_1')),
+      findsOneWidget,
+    );
+
+    final menuScrollable = find
+        .descendant(
+          of: find.byType(FItemGroup),
+          matching: find.byType(Scrollable),
+        )
+        .last;
+    final menuRect = tester.getRect(menuScrollable);
+    final screenSize = tester.view.physicalSize / tester.view.devicePixelRatio;
+    final menuState = tester.state<ScrollableState>(menuScrollable);
+
+    expect(menuRect.height, lessThanOrEqualTo(screenSize.height * 0.45 + 1));
+    expect(menuRect.bottom, lessThanOrEqualTo(screenSize.height));
+    expect(menuState.position.maxScrollExtent, greaterThan(0));
+    await cubit.close();
+  });
+
   testWidgets('row detail shows PostGIS geometry metadata', (tester) async {
     final cubit = TableDataCubit(repository: _EditorRepository(geo: true));
     await cubit.openTable(connection, key);
@@ -164,8 +207,9 @@ class _TableEditorHarness extends StatelessWidget {
 
 class _EditorRepository implements TableDataRepository {
   final bool geo;
+  final int columnCount;
 
-  const _EditorRepository({this.geo = false});
+  const _EditorRepository({this.geo = false, this.columnCount = 2});
 
   @override
   Future<void> commitChanges(
@@ -232,6 +276,17 @@ class _EditorRepository implements TableDataRepository {
             TableCellValue.text('POINT(74.8447843 12.866526)'),
             TableCellValue.text('12.866526'),
             TableCellValue.text('74.8447843'),
+          ]),
+        ],
+        queryDuration: const Duration(milliseconds: 1),
+      );
+    }
+    if (columnCount > 2) {
+      return TableRowsPage(
+        rows: [
+          TableDataRow([
+            for (var index = 0; index < columnCount; index++)
+              TableCellValue.text(index == 0 ? '1' : 'value_$index'),
           ]),
         ],
         queryDuration: const Duration(milliseconds: 1),
@@ -313,6 +368,28 @@ class _EditorRepository implements TableDataRepository {
             isPrimaryKey: false,
             isNullable: true,
           ),
+        ],
+        orderColumn: 'id',
+      );
+    }
+    if (columnCount > 2) {
+      return TableStructure(
+        columns: [
+          const TableDataColumn(
+            name: 'id',
+            databaseType: 'int',
+            length: 11,
+            isPrimaryKey: true,
+            isNullable: false,
+          ),
+          for (var index = 1; index < columnCount; index++)
+            TableDataColumn(
+              name: 'col_$index',
+              databaseType: 'text',
+              length: 0,
+              isPrimaryKey: false,
+              isNullable: true,
+            ),
         ],
         orderColumn: 'id',
       );

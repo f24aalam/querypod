@@ -5,10 +5,7 @@ import 'package:forui/forui.dart';
 import '../../../../app/theme_cubit.dart';
 
 void showSettingsDialog(BuildContext context) {
-  showDialog(
-    context: context,
-    builder: (context) => const SettingsDialog(),
-  );
+  showDialog(context: context, builder: (context) => const SettingsDialog());
 }
 
 class SettingsDialog extends StatefulWidget {
@@ -74,16 +71,18 @@ class _SettingsDialogState extends State<SettingsDialog> {
             Expanded(
               child: Stack(
                 children: [
-                  if (_selectedIndex == 0) const _AppearanceSettings()
+                  if (_selectedIndex == 0)
+                    const _AppearanceSettings()
                   else
-                    const Center(
-                      child: Text('Placeholder'),
-                    ),
+                    const Center(child: Text('Placeholder')),
                   Positioned(
                     top: 16,
                     right: 16,
                     child: IconButton(
-                      icon: Icon(Icons.close, color: theme.colors.mutedForeground),
+                      icon: Icon(
+                        Icons.close,
+                        color: theme.colors.mutedForeground,
+                      ),
                       onPressed: () => Navigator.of(context).pop(),
                       splashRadius: 20,
                     ),
@@ -196,7 +195,8 @@ class _AppearanceSettings extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: ThemeMode.values.map((mode) {
                 final isSelected = themeState.mode == mode;
-                final label = mode.name[0].toUpperCase() + mode.name.substring(1);
+                final label =
+                    mode.name[0].toUpperCase() + mode.name.substring(1);
                 final icon = switch (mode) {
                   ThemeMode.light => Icons.light_mode_outlined,
                   ThemeMode.dark => Icons.dark_mode_outlined,
@@ -216,25 +216,44 @@ class _AppearanceSettings extends StatelessWidget {
                         right: isLast ? const Radius.circular(7) : Radius.zero,
                       ),
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
                         decoration: BoxDecoration(
-                          color: isSelected ? theme.colors.secondary : Colors.transparent,
+                          color: isSelected
+                              ? theme.colors.secondary
+                              : Colors.transparent,
                           borderRadius: BorderRadius.horizontal(
-                            left: isFirst ? const Radius.circular(7) : Radius.zero,
-                            right: isLast ? const Radius.circular(7) : Radius.zero,
+                            left: isFirst
+                                ? const Radius.circular(7)
+                                : Radius.zero,
+                            right: isLast
+                                ? const Radius.circular(7)
+                                : Radius.zero,
                           ),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(icon, size: 16, color: isSelected ? theme.colors.foreground : theme.colors.mutedForeground),
+                            Icon(
+                              icon,
+                              size: 16,
+                              color: isSelected
+                                  ? theme.colors.foreground
+                                  : theme.colors.mutedForeground,
+                            ),
                             const SizedBox(width: 8),
                             Text(
                               label,
                               style: TextStyle(
                                 fontSize: 13,
-                                fontWeight: isSelected ? FontWeight.w500 : FontWeight.w400,
-                                color: isSelected ? theme.colors.foreground : theme.colors.mutedForeground,
+                                fontWeight: isSelected
+                                    ? FontWeight.w500
+                                    : FontWeight.w400,
+                                color: isSelected
+                                    ? theme.colors.foreground
+                                    : theme.colors.mutedForeground,
                               ),
                             ),
                           ],
@@ -288,16 +307,22 @@ class _AppearanceSettings extends StatelessWidget {
                               color: color.withValues(alpha: 0.4),
                               blurRadius: 8,
                               spreadRadius: 2,
-                            )
+                            ),
                           ]
                         : null,
                     border: Border.all(
-                      color: isSelected ? theme.colors.foreground : Colors.transparent,
+                      color: isSelected
+                          ? theme.colors.foreground
+                          : Colors.transparent,
                       width: 2,
                     ),
                   ),
                   child: isSelected
-                      ? Icon(Icons.check, size: 16, color: schemeTheme.colors.primaryForeground)
+                      ? Icon(
+                          Icons.check,
+                          size: 16,
+                          color: schemeTheme.colors.primaryForeground,
+                        )
                       : null,
                 ),
               ),

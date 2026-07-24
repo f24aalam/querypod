@@ -15,12 +15,15 @@ class PinnedTablesRepositoryImpl implements PinnedTablesRepository {
   Future<List<String>> getPinnedTables({
     required String connectionId,
     required String database,
+    String? schema,
   }) async {
+    final schemaKey = _schemaKey(schema);
     final query = _database.select(_database.pinnedTables)
       ..where(
         (row) =>
             row.connectionId.equals(connectionId) &
-            row.database.equals(database),
+            row.database.equals(database) &
+            row.pgSchema.equals(schemaKey),
       )
       ..orderBy([(row) => OrderingTerm.asc(row.sortOrder)]);
     final rows = await query.get();
@@ -31,13 +34,16 @@ class PinnedTablesRepositoryImpl implements PinnedTablesRepository {
   Future<void> setPinnedTables({
     required String connectionId,
     required String database,
+    String? schema,
     required List<String> tableNames,
   }) async {
+    final schemaKey = _schemaKey(schema);
     await _database.transaction(() async {
       await (_database.delete(_database.pinnedTables)..where(
             (row) =>
                 row.connectionId.equals(connectionId) &
-                row.database.equals(database),
+                row.database.equals(database) &
+                row.pgSchema.equals(schemaKey),
           ))
           .go();
 
@@ -48,6 +54,7 @@ class PinnedTablesRepositoryImpl implements PinnedTablesRepository {
             PinnedTablesCompanion.insert(
               connectionId: connectionId,
               database: database,
+              pgSchema: Value(schemaKey),
               table: tableName,
               sortOrder: index,
             ),
@@ -55,4 +62,7 @@ class PinnedTablesRepositoryImpl implements PinnedTablesRepository {
       });
     });
   }
+
+  String _schemaKey(String? schema) =>
+      schema == null || schema.trim().isEmpty ? 'public' : schema.trim();
 }

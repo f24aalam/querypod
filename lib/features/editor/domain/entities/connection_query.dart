@@ -4,6 +4,7 @@ class ConnectionQuery {
   final String title;
   final String sql;
   final String? database;
+  final String? schema;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -13,6 +14,7 @@ class ConnectionQuery {
     required this.title,
     required this.sql,
     this.database,
+    this.schema,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -21,6 +23,7 @@ class ConnectionQuery {
     String? title,
     String? sql,
     String? Function()? database,
+    String? Function()? schema,
     DateTime? updatedAt,
   }) {
     return ConnectionQuery(
@@ -29,6 +32,7 @@ class ConnectionQuery {
       title: title ?? this.title,
       sql: sql ?? this.sql,
       database: database != null ? database() : this.database,
+      schema: schema != null ? schema() : this.schema,
       createdAt: createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );

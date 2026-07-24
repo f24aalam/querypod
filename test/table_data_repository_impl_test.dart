@@ -23,7 +23,9 @@ void main() {
     databasePath = '${tempDir.path}/table_repo.sqlite';
     final db = await databaseFactoryFfi.openDatabase(databasePath);
     await db.execute('PRAGMA foreign_keys = ON');
-    await db.execute('CREATE TABLE profiles (id INTEGER PRIMARY KEY, bio TEXT)');
+    await db.execute(
+      'CREATE TABLE profiles (id INTEGER PRIMARY KEY, bio TEXT)',
+    );
     await db.execute('''
       CREATE TABLE users (
         id INTEGER PRIMARY KEY,
@@ -58,7 +60,12 @@ void main() {
   });
 
   test('inspectTable returns schema and records query history', () async {
-    final structure = await repository.inspectTable(connection, 'main', 'users');
+    final structure = await repository.inspectTable(
+      connection,
+      'main',
+      'users',
+      null,
+    );
 
     expect(structure.columns.map((column) => column.name).toList(), [
       'id',
@@ -66,7 +73,9 @@ void main() {
       'profile_id',
     ]);
     expect(
-      structure.columns.firstWhere((column) => column.name == 'profile_id').foreignKey,
+      structure.columns
+          .firstWhere((column) => column.name == 'profile_id')
+          .foreignKey,
       isNotNull,
     );
     expect(historyRepository.saved, isNotEmpty);
@@ -74,7 +83,12 @@ void main() {
   });
 
   test('countRows and fetchRows honor search and filters', () async {
-    final structure = await repository.inspectTable(connection, 'main', 'users');
+    final structure = await repository.inspectTable(
+      connection,
+      'main',
+      'users',
+      null,
+    );
 
     expect(
       await repository.countRows(
@@ -101,7 +115,9 @@ void main() {
         'main',
         'users',
         structure: structure,
-        filters: const [TableFilter(column: 'name', operator: '=', value: 'Bob')],
+        filters: const [
+          TableFilter(column: 'name', operator: '=', value: 'Bob'),
+        ],
       ),
       1,
     );
@@ -141,7 +157,12 @@ void main() {
   });
 
   test('commitChanges applies edits deletes and inserts', () async {
-    final structure = await repository.inspectTable(connection, 'main', 'users');
+    final structure = await repository.inspectTable(
+      connection,
+      'main',
+      'users',
+      null,
+    );
     final originalPage = await repository.fetchRows(
       connection,
       'main',
@@ -190,6 +211,7 @@ void main() {
       connection,
       'main',
       'SELECT name FROM users ORDER BY id',
+      null,
     );
 
     expect(results, hasLength(1));
@@ -205,7 +227,8 @@ class _FakeQueryHistoryRepository implements QueryHistoryRepository {
   Future<void> clearHistory(String connectionId) async {}
 
   @override
-  Future<List<QueryHistory>> getAllForConnection(String connectionId) async => [];
+  Future<List<QueryHistory>> getAllForConnection(String connectionId) async =>
+      [];
 
   @override
   Future<QueryHistory> save(QueryHistory history) async {

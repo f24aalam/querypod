@@ -110,11 +110,13 @@ class EditorTabsCubit extends Cubit<EditorTabsState> {
   void openTablePreview({
     required String connectionId,
     required String database,
+    String? schema,
     required ConnectionTable table,
   }) {
     final key = TableTabKey(
       connectionId: connectionId,
       database: database,
+      schema: schema,
       tableName: table.name,
     );
     final existing = state.tabs.where((tab) => tab.key == key).firstOrNull;
@@ -139,9 +141,10 @@ class EditorTabsCubit extends Cubit<EditorTabsState> {
           EditorTab(
             key: key,
             type: EditorTabType.table,
-            title: table.name,
+            title: _tableTitle(table.name, schema),
             connectionId: connectionId,
             database: database,
+            schema: schema,
             tableType: table.type,
             isPinned: false,
           ),
@@ -153,11 +156,13 @@ class EditorTabsCubit extends Cubit<EditorTabsState> {
   void pinTable({
     required String connectionId,
     required String database,
+    String? schema,
     required ConnectionTable table,
   }) {
     final key = TableTabKey(
       connectionId: connectionId,
       database: database,
+      schema: schema,
       tableName: table.name,
     );
     final index = state.tabs.indexWhere((tab) => tab.key == key);
@@ -168,9 +173,10 @@ class EditorTabsCubit extends Cubit<EditorTabsState> {
         EditorTab(
           key: key,
           type: EditorTabType.table,
-          title: table.name,
+          title: _tableTitle(table.name, schema),
           connectionId: connectionId,
           database: database,
+          schema: schema,
           tableType: table.type,
         ),
       );
@@ -377,11 +383,13 @@ class EditorTabsCubit extends Cubit<EditorTabsState> {
   void openCreateTableTab({
     required String connectionId,
     required String database,
+    String? schema,
     String? tableToEdit,
   }) {
     final key = CreateTableTabKey(
       connectionId: connectionId,
       database: database,
+      schema: schema,
       tableToEdit: tableToEdit,
     );
     final index = state.tabs.indexWhere((tab) => tab.key == key);
@@ -389,9 +397,12 @@ class EditorTabsCubit extends Cubit<EditorTabsState> {
     final tab = EditorTab(
       key: key,
       type: EditorTabType.createTable,
-      title: tableToEdit != null ? 'Edit $tableToEdit' : 'Create Table',
+      title: tableToEdit != null
+          ? 'Edit ${_tableTitle(tableToEdit, schema)}'
+          : 'Create Table',
       connectionId: connectionId,
       database: database,
+      schema: schema,
     );
 
     if (index == -1) {
@@ -409,4 +420,7 @@ class EditorTabsCubit extends Cubit<EditorTabsState> {
       ),
     );
   }
+
+  String _tableTitle(String tableName, String? schema) =>
+      schema == null || schema.isEmpty ? tableName : '$schema.$tableName';
 }

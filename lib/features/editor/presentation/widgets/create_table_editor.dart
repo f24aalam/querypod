@@ -35,7 +35,8 @@ class _CreateTableEditorContent extends StatefulWidget {
   const _CreateTableEditorContent({required this.tab});
 
   @override
-  State<_CreateTableEditorContent> createState() => _CreateTableEditorContentState();
+  State<_CreateTableEditorContent> createState() =>
+      _CreateTableEditorContentState();
 }
 
 class _CreateTableEditorContentState extends State<_CreateTableEditorContent> {
@@ -46,7 +47,11 @@ class _CreateTableEditorContentState extends State<_CreateTableEditorContent> {
     super.initState();
     final key = widget.tab.key as CreateTableTabKey;
     if (key.tableToEdit != null) {
-      context.read<CreateTableCubit>().loadTableSchema(key.database, key.tableToEdit!);
+      context.read<CreateTableCubit>().loadTableSchema(
+        key.database,
+        key.schema,
+        key.tableToEdit!,
+      );
     }
   }
 
@@ -61,10 +66,12 @@ class _CreateTableEditorContentState extends State<_CreateTableEditorContent> {
     final state = context.read<CreateTableCubit>().state;
     context.read<EditorTabsCubit>().closeTab(key);
 
-    if (state.originalTableName != null && state.originalTableName != state.tableName) {
+    if (state.originalTableName != null &&
+        state.originalTableName != state.tableName) {
       final oldTableTabKey = TableTabKey(
         connectionId: key.connectionId,
         database: key.database,
+        schema: key.schema,
         tableName: state.originalTableName!,
       );
       context.read<EditorTabsCubit>().closeTab(oldTableTabKey);
@@ -73,6 +80,7 @@ class _CreateTableEditorContentState extends State<_CreateTableEditorContent> {
     final tableTabKey = TableTabKey(
       connectionId: key.connectionId,
       database: key.database,
+      schema: key.schema,
       tableName: state.tableName,
     );
     context.read<TableDataCubit>().refresh(tableTabKey);
@@ -83,10 +91,15 @@ class _CreateTableEditorContentState extends State<_CreateTableEditorContent> {
     final theme = context.theme;
 
     return BlocConsumer<CreateTableCubit, CreateTableState>(
-      listenWhen: (prev, curr) => prev.isSuccess != curr.isSuccess || prev.errorMessage != curr.errorMessage || prev.tableName != curr.tableName,
+      listenWhen: (prev, curr) =>
+          prev.isSuccess != curr.isSuccess ||
+          prev.errorMessage != curr.errorMessage ||
+          prev.tableName != curr.tableName,
       listener: (context, state) {
-        if (state.tableName.isNotEmpty && _tableNameController.text != state.tableName && state.originalTableName != null) {
-           _tableNameController.text = state.tableName;
+        if (state.tableName.isNotEmpty &&
+            _tableNameController.text != state.tableName &&
+            state.originalTableName != null) {
+          _tableNameController.text = state.tableName;
         }
         if (state.isSuccess) {
           _handleSuccess(context);
@@ -102,7 +115,10 @@ class _CreateTableEditorContentState extends State<_CreateTableEditorContent> {
               children: [
                 CircularProgressIndicator(color: theme.colors.primary),
                 const SizedBox(height: 16),
-                Text('Loading table schema...', style: TextStyle(color: theme.colors.mutedForeground)),
+                Text(
+                  'Loading table schema...',
+                  style: TextStyle(color: theme.colors.mutedForeground),
+                ),
               ],
             ),
           );
@@ -123,20 +139,21 @@ class _CreateTableEditorContentState extends State<_CreateTableEditorContent> {
                 ),
               ),
               const SizedBox(height: 24),
-              
+
               SizedBox(
                 width: 300,
                 child: FTextField(
                   control: FTextFieldControl.managed(
                     controller: _tableNameController,
-                    onChange: (val) => context.read<CreateTableCubit>().setTableName(val.text),
+                    onChange: (val) =>
+                        context.read<CreateTableCubit>().setTableName(val.text),
                   ),
                   label: const Text('Table Name'),
                   hint: 'Enter table name...',
                 ),
               ),
               const SizedBox(height: 24),
-              
+
               Row(
                 children: [
                   Text(
@@ -157,7 +174,7 @@ class _CreateTableEditorContentState extends State<_CreateTableEditorContent> {
                 ],
               ),
               const SizedBox(height: 12),
-              
+
               Expanded(
                 child: Container(
                   decoration: BoxDecoration(
@@ -166,7 +183,8 @@ class _CreateTableEditorContentState extends State<_CreateTableEditorContent> {
                   ),
                   child: ListView.separated(
                     itemCount: state.columns.length,
-                    separatorBuilder: (context, index) => Divider(color: theme.colors.border, height: 1),
+                    separatorBuilder: (context, index) =>
+                        Divider(color: theme.colors.border, height: 1),
                     itemBuilder: (context, index) {
                       return _ColumnEditorRow(
                         index: index,
@@ -177,7 +195,7 @@ class _CreateTableEditorContentState extends State<_CreateTableEditorContent> {
                 ),
               ),
               const SizedBox(height: 16),
-              
+
               if (state.errorMessage != null)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 16),
@@ -186,12 +204,14 @@ class _CreateTableEditorContentState extends State<_CreateTableEditorContent> {
                     style: TextStyle(color: theme.colors.destructive),
                   ),
                 ),
-                
+
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   FButton(
-                    onPress: () => context.read<EditorTabsCubit>().closeTab(widget.tab.key),
+                    onPress: () => context.read<EditorTabsCubit>().closeTab(
+                      widget.tab.key,
+                    ),
                     variant: FButtonVariant.outline,
                     child: const Text('Cancel'),
                   ),
@@ -201,7 +221,10 @@ class _CreateTableEditorContentState extends State<_CreateTableEditorContent> {
                         ? null
                         : () {
                             final key = widget.tab.key as CreateTableTabKey;
-                            context.read<CreateTableCubit>().submit(key.database);
+                            context.read<CreateTableCubit>().submit(
+                              key.database,
+                              key.schema,
+                            );
                           },
                     child: state.isSubmitting
                         ? const SizedBox(
@@ -209,7 +232,11 @@ class _CreateTableEditorContentState extends State<_CreateTableEditorContent> {
                             height: 16,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : Text(state.originalTableName != null ? 'Save Changes' : 'Create Table'),
+                        : Text(
+                            state.originalTableName != null
+                                ? 'Save Changes'
+                                : 'Create Table',
+                          ),
                   ),
                 ],
               ),
@@ -240,22 +267,29 @@ class _ColumnEditorRowState extends State<_ColumnEditorRow> {
   void initState() {
     super.initState();
     _nameController = TextEditingController(text: widget.column.name);
-    _lengthController = TextEditingController(text: widget.column.length?.toString() ?? '');
-    _defaultController = TextEditingController(text: widget.column.defaultValue ?? '');
+    _lengthController = TextEditingController(
+      text: widget.column.length?.toString() ?? '',
+    );
+    _defaultController = TextEditingController(
+      text: widget.column.defaultValue ?? '',
+    );
   }
 
   @override
   void didUpdateWidget(_ColumnEditorRow oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.column.name != widget.column.name && _nameController.text != widget.column.name) {
+    if (oldWidget.column.name != widget.column.name &&
+        _nameController.text != widget.column.name) {
       _nameController.text = widget.column.name;
     }
     final lengthStr = widget.column.length?.toString() ?? '';
-    if (oldWidget.column.length != widget.column.length && _lengthController.text != lengthStr) {
+    if (oldWidget.column.length != widget.column.length &&
+        _lengthController.text != lengthStr) {
       _lengthController.text = lengthStr;
     }
     final defaultStr = widget.column.defaultValue ?? '';
-    if (oldWidget.column.defaultValue != widget.column.defaultValue && _defaultController.text != defaultStr) {
+    if (oldWidget.column.defaultValue != widget.column.defaultValue &&
+        _defaultController.text != defaultStr) {
       _defaultController.text = defaultStr;
     }
   }
@@ -278,16 +312,18 @@ class _ColumnEditorRowState extends State<_ColumnEditorRow> {
 
     // Use connection type to determine types list
     final connCubit = context.watch<ConnectionCubit>();
-    final connType = connCubit.state.activeConnection?.type ?? ConnectionType.postgresql;
-    
+    final connType =
+        connCubit.state.activeConnection?.type ?? ConnectionType.postgresql;
+
     final categories = connType == ConnectionType.postgresql
         ? postgresCategories
         : connType == ConnectionType.mysql
-            ? mysqlCategories
-            : sqliteCategories;
+        ? mysqlCategories
+        : sqliteCategories;
 
     final typeUpper = widget.column.type.toUpperCase();
-    final supportsLength = typeUpper.contains('VARCHAR') || typeUpper.contains('CHAR');
+    final supportsLength =
+        typeUpper.contains('VARCHAR') || typeUpper.contains('CHAR');
 
     return Padding(
       padding: const EdgeInsets.all(12),
@@ -299,7 +335,8 @@ class _ColumnEditorRowState extends State<_ColumnEditorRow> {
             child: FTextField(
               control: FTextFieldControl.managed(
                 controller: _nameController,
-                onChange: (val) => _update(widget.column.copyWith(name: val.text)),
+                onChange: (val) =>
+                    _update(widget.column.copyWith(name: val.text)),
               ),
               label: const Text('Name'),
             ),
@@ -320,9 +357,7 @@ class _ColumnEditorRowState extends State<_ColumnEditorRow> {
                 for (final category in categories)
                   FSelectSection<String>(
                     label: Text(category.name),
-                    items: {
-                      for (final t in category.types) t: t,
-                    },
+                    items: {for (final t in category.types) t: t},
                   ),
               ],
             ),
@@ -337,7 +372,9 @@ class _ColumnEditorRowState extends State<_ColumnEditorRow> {
                 child: FTextField(
                   control: FTextFieldControl.managed(
                     controller: _lengthController,
-                    onChange: (val) => _update(widget.column.copyWith(length: int.tryParse(val.text))),
+                    onChange: (val) => _update(
+                      widget.column.copyWith(length: int.tryParse(val.text)),
+                    ),
                   ),
                   label: const Text('Length'),
                 ),
@@ -350,7 +387,8 @@ class _ColumnEditorRowState extends State<_ColumnEditorRow> {
             child: FTextField(
               control: FTextFieldControl.managed(
                 controller: _defaultController,
-                onChange: (val) => _update(widget.column.copyWith(defaultValue: val.text)),
+                onChange: (val) =>
+                    _update(widget.column.copyWith(defaultValue: val.text)),
               ),
               label: const Text('Default'),
             ),
@@ -358,33 +396,54 @@ class _ColumnEditorRowState extends State<_ColumnEditorRow> {
           const SizedBox(width: 16),
           Column(
             children: [
-              Text('PK', style: TextStyle(fontSize: 12, color: theme.colors.mutedForeground)),
+              Text(
+                'PK',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: theme.colors.mutedForeground,
+                ),
+              ),
               const SizedBox(height: 8),
               FSwitch(
                 value: widget.column.isPrimaryKey,
-                onChange: (val) => _update(widget.column.copyWith(isPrimaryKey: val)),
+                onChange: (val) =>
+                    _update(widget.column.copyWith(isPrimaryKey: val)),
               ),
             ],
           ),
           const SizedBox(width: 16),
           Column(
             children: [
-              Text('Null', style: TextStyle(fontSize: 12, color: theme.colors.mutedForeground)),
+              Text(
+                'Null',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: theme.colors.mutedForeground,
+                ),
+              ),
               const SizedBox(height: 8),
               FSwitch(
                 value: widget.column.isNullable,
-                onChange: (val) => _update(widget.column.copyWith(isNullable: val)),
+                onChange: (val) =>
+                    _update(widget.column.copyWith(isNullable: val)),
               ),
             ],
           ),
           const SizedBox(width: 16),
           Column(
             children: [
-              Text('A.I.', style: TextStyle(fontSize: 12, color: theme.colors.mutedForeground)),
+              Text(
+                'A.I.',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: theme.colors.mutedForeground,
+                ),
+              ),
               const SizedBox(height: 8),
               FSwitch(
                 value: widget.column.isAutoIncrement,
-                onChange: (val) => _update(widget.column.copyWith(isAutoIncrement: val)),
+                onChange: (val) =>
+                    _update(widget.column.copyWith(isAutoIncrement: val)),
               ),
             ],
           ),
@@ -392,10 +451,15 @@ class _ColumnEditorRowState extends State<_ColumnEditorRow> {
           Padding(
             padding: const EdgeInsets.only(bottom: 6),
             child: FButton.icon(
-              onPress: () => context.read<CreateTableCubit>().removeColumn(widget.index),
+              onPress: () =>
+                  context.read<CreateTableCubit>().removeColumn(widget.index),
               variant: FButtonVariant.ghost,
               size: FButtonSizeVariant.sm,
-              child: Icon(Icons.delete_outline, size: 16, color: theme.colors.destructive),
+              child: Icon(
+                Icons.delete_outline,
+                size: 16,
+                color: theme.colors.destructive,
+              ),
             ),
           ),
         ],
@@ -412,7 +476,17 @@ class ColumnTypeCategory {
 }
 
 const postgresCategories = [
-  ColumnTypeCategory('Numeric', ['SMALLINT', 'INTEGER', 'BIGINT', 'DECIMAL', 'NUMERIC', 'REAL', 'DOUBLE PRECISION', 'SERIAL', 'BIGSERIAL']),
+  ColumnTypeCategory('Numeric', [
+    'SMALLINT',
+    'INTEGER',
+    'BIGINT',
+    'DECIMAL',
+    'NUMERIC',
+    'REAL',
+    'DOUBLE PRECISION',
+    'SERIAL',
+    'BIGSERIAL',
+  ]),
   ColumnTypeCategory('Character', ['VARCHAR', 'CHAR', 'TEXT']),
   ColumnTypeCategory('Date & Time', ['DATE', 'TIME', 'TIMESTAMP', 'INTERVAL']),
   ColumnTypeCategory('Boolean', ['BOOLEAN']),
@@ -421,9 +495,31 @@ const postgresCategories = [
 ];
 
 const mysqlCategories = [
-  ColumnTypeCategory('Numeric', ['TINYINT', 'SMALLINT', 'MEDIUMINT', 'INT', 'BIGINT', 'DECIMAL', 'FLOAT', 'DOUBLE']),
-  ColumnTypeCategory('Character', ['VARCHAR', 'CHAR', 'TINYTEXT', 'TEXT', 'MEDIUMTEXT', 'LONGTEXT']),
-  ColumnTypeCategory('Date & Time', ['DATE', 'TIME', 'DATETIME', 'TIMESTAMP', 'YEAR']),
+  ColumnTypeCategory('Numeric', [
+    'TINYINT',
+    'SMALLINT',
+    'MEDIUMINT',
+    'INT',
+    'BIGINT',
+    'DECIMAL',
+    'FLOAT',
+    'DOUBLE',
+  ]),
+  ColumnTypeCategory('Character', [
+    'VARCHAR',
+    'CHAR',
+    'TINYTEXT',
+    'TEXT',
+    'MEDIUMTEXT',
+    'LONGTEXT',
+  ]),
+  ColumnTypeCategory('Date & Time', [
+    'DATE',
+    'TIME',
+    'DATETIME',
+    'TIMESTAMP',
+    'YEAR',
+  ]),
   ColumnTypeCategory('Boolean', ['BOOLEAN']),
   ColumnTypeCategory('JSON', ['JSON']),
   ColumnTypeCategory('Binary/Other', ['BINARY', 'VARBINARY', 'BLOB']),

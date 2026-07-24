@@ -935,6 +935,17 @@ class $SavedQueriesTable extends SavedQueries
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _querySchemaMeta = const VerificationMeta(
+    'querySchema',
+  );
+  @override
+  late final GeneratedColumn<String> querySchema = GeneratedColumn<String>(
+    'schema',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -964,6 +975,7 @@ class $SavedQueriesTable extends SavedQueries
     title,
     sql,
     database,
+    querySchema,
     createdAt,
     updatedAt,
   ];
@@ -1017,6 +1029,12 @@ class $SavedQueriesTable extends SavedQueries
         database.isAcceptableOrUnknown(data['database']!, _databaseMeta),
       );
     }
+    if (data.containsKey('schema')) {
+      context.handle(
+        _querySchemaMeta,
+        querySchema.isAcceptableOrUnknown(data['schema']!, _querySchemaMeta),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -1062,6 +1080,10 @@ class $SavedQueriesTable extends SavedQueries
         DriftSqlType.string,
         data['${effectivePrefix}database'],
       ),
+      querySchema: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}schema'],
+      ),
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
@@ -1085,6 +1107,7 @@ class SavedQueryRow extends DataClass implements Insertable<SavedQueryRow> {
   final String title;
   final String sql;
   final String? database;
+  final String? querySchema;
   final DateTime createdAt;
   final DateTime updatedAt;
   const SavedQueryRow({
@@ -1093,6 +1116,7 @@ class SavedQueryRow extends DataClass implements Insertable<SavedQueryRow> {
     required this.title,
     required this.sql,
     this.database,
+    this.querySchema,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -1105,6 +1129,9 @@ class SavedQueryRow extends DataClass implements Insertable<SavedQueryRow> {
     map['sql'] = Variable<String>(sql);
     if (!nullToAbsent || database != null) {
       map['database'] = Variable<String>(database);
+    }
+    if (!nullToAbsent || querySchema != null) {
+      map['schema'] = Variable<String>(querySchema);
     }
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
@@ -1120,6 +1147,9 @@ class SavedQueryRow extends DataClass implements Insertable<SavedQueryRow> {
       database: database == null && nullToAbsent
           ? const Value.absent()
           : Value(database),
+      querySchema: querySchema == null && nullToAbsent
+          ? const Value.absent()
+          : Value(querySchema),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
     );
@@ -1136,6 +1166,7 @@ class SavedQueryRow extends DataClass implements Insertable<SavedQueryRow> {
       title: serializer.fromJson<String>(json['title']),
       sql: serializer.fromJson<String>(json['sql']),
       database: serializer.fromJson<String?>(json['database']),
+      querySchema: serializer.fromJson<String?>(json['querySchema']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
@@ -1149,6 +1180,7 @@ class SavedQueryRow extends DataClass implements Insertable<SavedQueryRow> {
       'title': serializer.toJson<String>(title),
       'sql': serializer.toJson<String>(sql),
       'database': serializer.toJson<String?>(database),
+      'querySchema': serializer.toJson<String?>(querySchema),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
@@ -1160,6 +1192,7 @@ class SavedQueryRow extends DataClass implements Insertable<SavedQueryRow> {
     String? title,
     String? sql,
     Value<String?> database = const Value.absent(),
+    Value<String?> querySchema = const Value.absent(),
     DateTime? createdAt,
     DateTime? updatedAt,
   }) => SavedQueryRow(
@@ -1168,6 +1201,7 @@ class SavedQueryRow extends DataClass implements Insertable<SavedQueryRow> {
     title: title ?? this.title,
     sql: sql ?? this.sql,
     database: database.present ? database.value : this.database,
+    querySchema: querySchema.present ? querySchema.value : this.querySchema,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
   );
@@ -1180,6 +1214,9 @@ class SavedQueryRow extends DataClass implements Insertable<SavedQueryRow> {
       title: data.title.present ? data.title.value : this.title,
       sql: data.sql.present ? data.sql.value : this.sql,
       database: data.database.present ? data.database.value : this.database,
+      querySchema: data.querySchema.present
+          ? data.querySchema.value
+          : this.querySchema,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
@@ -1193,6 +1230,7 @@ class SavedQueryRow extends DataClass implements Insertable<SavedQueryRow> {
           ..write('title: $title, ')
           ..write('sql: $sql, ')
           ..write('database: $database, ')
+          ..write('querySchema: $querySchema, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -1200,8 +1238,16 @@ class SavedQueryRow extends DataClass implements Insertable<SavedQueryRow> {
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, connectionId, title, sql, database, createdAt, updatedAt);
+  int get hashCode => Object.hash(
+    id,
+    connectionId,
+    title,
+    sql,
+    database,
+    querySchema,
+    createdAt,
+    updatedAt,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -1211,6 +1257,7 @@ class SavedQueryRow extends DataClass implements Insertable<SavedQueryRow> {
           other.title == this.title &&
           other.sql == this.sql &&
           other.database == this.database &&
+          other.querySchema == this.querySchema &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt);
 }
@@ -1221,6 +1268,7 @@ class SavedQueriesCompanion extends UpdateCompanion<SavedQueryRow> {
   final Value<String> title;
   final Value<String> sql;
   final Value<String?> database;
+  final Value<String?> querySchema;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
   final Value<int> rowid;
@@ -1230,6 +1278,7 @@ class SavedQueriesCompanion extends UpdateCompanion<SavedQueryRow> {
     this.title = const Value.absent(),
     this.sql = const Value.absent(),
     this.database = const Value.absent(),
+    this.querySchema = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -1240,6 +1289,7 @@ class SavedQueriesCompanion extends UpdateCompanion<SavedQueryRow> {
     required String title,
     required String sql,
     this.database = const Value.absent(),
+    this.querySchema = const Value.absent(),
     required DateTime createdAt,
     required DateTime updatedAt,
     this.rowid = const Value.absent(),
@@ -1255,6 +1305,7 @@ class SavedQueriesCompanion extends UpdateCompanion<SavedQueryRow> {
     Expression<String>? title,
     Expression<String>? sql,
     Expression<String>? database,
+    Expression<String>? querySchema,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
     Expression<int>? rowid,
@@ -1265,6 +1316,7 @@ class SavedQueriesCompanion extends UpdateCompanion<SavedQueryRow> {
       if (title != null) 'title': title,
       if (sql != null) 'sql': sql,
       if (database != null) 'database': database,
+      if (querySchema != null) 'schema': querySchema,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
@@ -1277,6 +1329,7 @@ class SavedQueriesCompanion extends UpdateCompanion<SavedQueryRow> {
     Value<String>? title,
     Value<String>? sql,
     Value<String?>? database,
+    Value<String?>? querySchema,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
     Value<int>? rowid,
@@ -1287,6 +1340,7 @@ class SavedQueriesCompanion extends UpdateCompanion<SavedQueryRow> {
       title: title ?? this.title,
       sql: sql ?? this.sql,
       database: database ?? this.database,
+      querySchema: querySchema ?? this.querySchema,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
@@ -1311,6 +1365,9 @@ class SavedQueriesCompanion extends UpdateCompanion<SavedQueryRow> {
     if (database.present) {
       map['database'] = Variable<String>(database.value);
     }
+    if (querySchema.present) {
+      map['schema'] = Variable<String>(querySchema.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -1331,6 +1388,7 @@ class SavedQueriesCompanion extends UpdateCompanion<SavedQueryRow> {
           ..write('title: $title, ')
           ..write('sql: $sql, ')
           ..write('database: $database, ')
+          ..write('querySchema: $querySchema, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
@@ -1948,6 +2006,18 @@ class $PinnedTablesTable extends PinnedTables
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _pgSchemaMeta = const VerificationMeta(
+    'pgSchema',
+  );
+  @override
+  late final GeneratedColumn<String> pgSchema = GeneratedColumn<String>(
+    'schema',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('public'),
+  );
   static const VerificationMeta _tableMeta = const VerificationMeta('table');
   @override
   late final GeneratedColumn<String> table = GeneratedColumn<String>(
@@ -1972,6 +2042,7 @@ class $PinnedTablesTable extends PinnedTables
   List<GeneratedColumn> get $columns => [
     connectionId,
     database,
+    pgSchema,
     table,
     sortOrder,
   ];
@@ -2006,6 +2077,12 @@ class $PinnedTablesTable extends PinnedTables
     } else if (isInserting) {
       context.missing(_databaseMeta);
     }
+    if (data.containsKey('schema')) {
+      context.handle(
+        _pgSchemaMeta,
+        pgSchema.isAcceptableOrUnknown(data['schema']!, _pgSchemaMeta),
+      );
+    }
     if (data.containsKey('table_name')) {
       context.handle(
         _tableMeta,
@@ -2026,7 +2103,12 @@ class $PinnedTablesTable extends PinnedTables
   }
 
   @override
-  Set<GeneratedColumn> get $primaryKey => {connectionId, database, table};
+  Set<GeneratedColumn> get $primaryKey => {
+    connectionId,
+    database,
+    pgSchema,
+    table,
+  };
   @override
   PinnedTableRow map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
@@ -2038,6 +2120,10 @@ class $PinnedTablesTable extends PinnedTables
       database: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}database'],
+      )!,
+      pgSchema: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}schema'],
       )!,
       table: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
@@ -2059,11 +2145,13 @@ class $PinnedTablesTable extends PinnedTables
 class PinnedTableRow extends DataClass implements Insertable<PinnedTableRow> {
   final String connectionId;
   final String database;
+  final String pgSchema;
   final String table;
   final int sortOrder;
   const PinnedTableRow({
     required this.connectionId,
     required this.database,
+    required this.pgSchema,
     required this.table,
     required this.sortOrder,
   });
@@ -2072,6 +2160,7 @@ class PinnedTableRow extends DataClass implements Insertable<PinnedTableRow> {
     final map = <String, Expression>{};
     map['connection_id'] = Variable<String>(connectionId);
     map['database'] = Variable<String>(database);
+    map['schema'] = Variable<String>(pgSchema);
     map['table_name'] = Variable<String>(table);
     map['sort_order'] = Variable<int>(sortOrder);
     return map;
@@ -2081,6 +2170,7 @@ class PinnedTableRow extends DataClass implements Insertable<PinnedTableRow> {
     return PinnedTablesCompanion(
       connectionId: Value(connectionId),
       database: Value(database),
+      pgSchema: Value(pgSchema),
       table: Value(table),
       sortOrder: Value(sortOrder),
     );
@@ -2094,6 +2184,7 @@ class PinnedTableRow extends DataClass implements Insertable<PinnedTableRow> {
     return PinnedTableRow(
       connectionId: serializer.fromJson<String>(json['connectionId']),
       database: serializer.fromJson<String>(json['database']),
+      pgSchema: serializer.fromJson<String>(json['pgSchema']),
       table: serializer.fromJson<String>(json['table']),
       sortOrder: serializer.fromJson<int>(json['sortOrder']),
     );
@@ -2104,6 +2195,7 @@ class PinnedTableRow extends DataClass implements Insertable<PinnedTableRow> {
     return <String, dynamic>{
       'connectionId': serializer.toJson<String>(connectionId),
       'database': serializer.toJson<String>(database),
+      'pgSchema': serializer.toJson<String>(pgSchema),
       'table': serializer.toJson<String>(table),
       'sortOrder': serializer.toJson<int>(sortOrder),
     };
@@ -2112,11 +2204,13 @@ class PinnedTableRow extends DataClass implements Insertable<PinnedTableRow> {
   PinnedTableRow copyWith({
     String? connectionId,
     String? database,
+    String? pgSchema,
     String? table,
     int? sortOrder,
   }) => PinnedTableRow(
     connectionId: connectionId ?? this.connectionId,
     database: database ?? this.database,
+    pgSchema: pgSchema ?? this.pgSchema,
     table: table ?? this.table,
     sortOrder: sortOrder ?? this.sortOrder,
   );
@@ -2126,6 +2220,7 @@ class PinnedTableRow extends DataClass implements Insertable<PinnedTableRow> {
           ? data.connectionId.value
           : this.connectionId,
       database: data.database.present ? data.database.value : this.database,
+      pgSchema: data.pgSchema.present ? data.pgSchema.value : this.pgSchema,
       table: data.table.present ? data.table.value : this.table,
       sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
     );
@@ -2136,6 +2231,7 @@ class PinnedTableRow extends DataClass implements Insertable<PinnedTableRow> {
     return (StringBuffer('PinnedTableRow(')
           ..write('connectionId: $connectionId, ')
           ..write('database: $database, ')
+          ..write('pgSchema: $pgSchema, ')
           ..write('table: $table, ')
           ..write('sortOrder: $sortOrder')
           ..write(')'))
@@ -2143,13 +2239,15 @@ class PinnedTableRow extends DataClass implements Insertable<PinnedTableRow> {
   }
 
   @override
-  int get hashCode => Object.hash(connectionId, database, table, sortOrder);
+  int get hashCode =>
+      Object.hash(connectionId, database, pgSchema, table, sortOrder);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is PinnedTableRow &&
           other.connectionId == this.connectionId &&
           other.database == this.database &&
+          other.pgSchema == this.pgSchema &&
           other.table == this.table &&
           other.sortOrder == this.sortOrder);
 }
@@ -2157,12 +2255,14 @@ class PinnedTableRow extends DataClass implements Insertable<PinnedTableRow> {
 class PinnedTablesCompanion extends UpdateCompanion<PinnedTableRow> {
   final Value<String> connectionId;
   final Value<String> database;
+  final Value<String> pgSchema;
   final Value<String> table;
   final Value<int> sortOrder;
   final Value<int> rowid;
   const PinnedTablesCompanion({
     this.connectionId = const Value.absent(),
     this.database = const Value.absent(),
+    this.pgSchema = const Value.absent(),
     this.table = const Value.absent(),
     this.sortOrder = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -2170,6 +2270,7 @@ class PinnedTablesCompanion extends UpdateCompanion<PinnedTableRow> {
   PinnedTablesCompanion.insert({
     required String connectionId,
     required String database,
+    this.pgSchema = const Value.absent(),
     required String table,
     required int sortOrder,
     this.rowid = const Value.absent(),
@@ -2180,6 +2281,7 @@ class PinnedTablesCompanion extends UpdateCompanion<PinnedTableRow> {
   static Insertable<PinnedTableRow> custom({
     Expression<String>? connectionId,
     Expression<String>? database,
+    Expression<String>? pgSchema,
     Expression<String>? table,
     Expression<int>? sortOrder,
     Expression<int>? rowid,
@@ -2187,6 +2289,7 @@ class PinnedTablesCompanion extends UpdateCompanion<PinnedTableRow> {
     return RawValuesInsertable({
       if (connectionId != null) 'connection_id': connectionId,
       if (database != null) 'database': database,
+      if (pgSchema != null) 'schema': pgSchema,
       if (table != null) 'table_name': table,
       if (sortOrder != null) 'sort_order': sortOrder,
       if (rowid != null) 'rowid': rowid,
@@ -2196,6 +2299,7 @@ class PinnedTablesCompanion extends UpdateCompanion<PinnedTableRow> {
   PinnedTablesCompanion copyWith({
     Value<String>? connectionId,
     Value<String>? database,
+    Value<String>? pgSchema,
     Value<String>? table,
     Value<int>? sortOrder,
     Value<int>? rowid,
@@ -2203,6 +2307,7 @@ class PinnedTablesCompanion extends UpdateCompanion<PinnedTableRow> {
     return PinnedTablesCompanion(
       connectionId: connectionId ?? this.connectionId,
       database: database ?? this.database,
+      pgSchema: pgSchema ?? this.pgSchema,
       table: table ?? this.table,
       sortOrder: sortOrder ?? this.sortOrder,
       rowid: rowid ?? this.rowid,
@@ -2217,6 +2322,9 @@ class PinnedTablesCompanion extends UpdateCompanion<PinnedTableRow> {
     }
     if (database.present) {
       map['database'] = Variable<String>(database.value);
+    }
+    if (pgSchema.present) {
+      map['schema'] = Variable<String>(pgSchema.value);
     }
     if (table.present) {
       map['table_name'] = Variable<String>(table.value);
@@ -2235,8 +2343,287 @@ class PinnedTablesCompanion extends UpdateCompanion<PinnedTableRow> {
     return (StringBuffer('PinnedTablesCompanion(')
           ..write('connectionId: $connectionId, ')
           ..write('database: $database, ')
+          ..write('pgSchema: $pgSchema, ')
           ..write('table: $table, ')
           ..write('sortOrder: $sortOrder, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $SelectedSchemasTable extends SelectedSchemas
+    with TableInfo<$SelectedSchemasTable, SelectedSchemaRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $SelectedSchemasTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _connectionIdMeta = const VerificationMeta(
+    'connectionId',
+  );
+  @override
+  late final GeneratedColumn<String> connectionId = GeneratedColumn<String>(
+    'connection_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES connections (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _databaseMeta = const VerificationMeta(
+    'database',
+  );
+  @override
+  late final GeneratedColumn<String> database = GeneratedColumn<String>(
+    'database',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _pgSchemaMeta = const VerificationMeta(
+    'pgSchema',
+  );
+  @override
+  late final GeneratedColumn<String> pgSchema = GeneratedColumn<String>(
+    'schema',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [connectionId, database, pgSchema];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'selected_schemas';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<SelectedSchemaRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('connection_id')) {
+      context.handle(
+        _connectionIdMeta,
+        connectionId.isAcceptableOrUnknown(
+          data['connection_id']!,
+          _connectionIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_connectionIdMeta);
+    }
+    if (data.containsKey('database')) {
+      context.handle(
+        _databaseMeta,
+        database.isAcceptableOrUnknown(data['database']!, _databaseMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_databaseMeta);
+    }
+    if (data.containsKey('schema')) {
+      context.handle(
+        _pgSchemaMeta,
+        pgSchema.isAcceptableOrUnknown(data['schema']!, _pgSchemaMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_pgSchemaMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {connectionId, database};
+  @override
+  SelectedSchemaRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return SelectedSchemaRow(
+      connectionId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}connection_id'],
+      )!,
+      database: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}database'],
+      )!,
+      pgSchema: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}schema'],
+      )!,
+    );
+  }
+
+  @override
+  $SelectedSchemasTable createAlias(String alias) {
+    return $SelectedSchemasTable(attachedDatabase, alias);
+  }
+}
+
+class SelectedSchemaRow extends DataClass
+    implements Insertable<SelectedSchemaRow> {
+  final String connectionId;
+  final String database;
+  final String pgSchema;
+  const SelectedSchemaRow({
+    required this.connectionId,
+    required this.database,
+    required this.pgSchema,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['connection_id'] = Variable<String>(connectionId);
+    map['database'] = Variable<String>(database);
+    map['schema'] = Variable<String>(pgSchema);
+    return map;
+  }
+
+  SelectedSchemasCompanion toCompanion(bool nullToAbsent) {
+    return SelectedSchemasCompanion(
+      connectionId: Value(connectionId),
+      database: Value(database),
+      pgSchema: Value(pgSchema),
+    );
+  }
+
+  factory SelectedSchemaRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return SelectedSchemaRow(
+      connectionId: serializer.fromJson<String>(json['connectionId']),
+      database: serializer.fromJson<String>(json['database']),
+      pgSchema: serializer.fromJson<String>(json['pgSchema']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'connectionId': serializer.toJson<String>(connectionId),
+      'database': serializer.toJson<String>(database),
+      'pgSchema': serializer.toJson<String>(pgSchema),
+    };
+  }
+
+  SelectedSchemaRow copyWith({
+    String? connectionId,
+    String? database,
+    String? pgSchema,
+  }) => SelectedSchemaRow(
+    connectionId: connectionId ?? this.connectionId,
+    database: database ?? this.database,
+    pgSchema: pgSchema ?? this.pgSchema,
+  );
+  SelectedSchemaRow copyWithCompanion(SelectedSchemasCompanion data) {
+    return SelectedSchemaRow(
+      connectionId: data.connectionId.present
+          ? data.connectionId.value
+          : this.connectionId,
+      database: data.database.present ? data.database.value : this.database,
+      pgSchema: data.pgSchema.present ? data.pgSchema.value : this.pgSchema,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SelectedSchemaRow(')
+          ..write('connectionId: $connectionId, ')
+          ..write('database: $database, ')
+          ..write('pgSchema: $pgSchema')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(connectionId, database, pgSchema);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is SelectedSchemaRow &&
+          other.connectionId == this.connectionId &&
+          other.database == this.database &&
+          other.pgSchema == this.pgSchema);
+}
+
+class SelectedSchemasCompanion extends UpdateCompanion<SelectedSchemaRow> {
+  final Value<String> connectionId;
+  final Value<String> database;
+  final Value<String> pgSchema;
+  final Value<int> rowid;
+  const SelectedSchemasCompanion({
+    this.connectionId = const Value.absent(),
+    this.database = const Value.absent(),
+    this.pgSchema = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  SelectedSchemasCompanion.insert({
+    required String connectionId,
+    required String database,
+    required String pgSchema,
+    this.rowid = const Value.absent(),
+  }) : connectionId = Value(connectionId),
+       database = Value(database),
+       pgSchema = Value(pgSchema);
+  static Insertable<SelectedSchemaRow> custom({
+    Expression<String>? connectionId,
+    Expression<String>? database,
+    Expression<String>? pgSchema,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (connectionId != null) 'connection_id': connectionId,
+      if (database != null) 'database': database,
+      if (pgSchema != null) 'schema': pgSchema,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  SelectedSchemasCompanion copyWith({
+    Value<String>? connectionId,
+    Value<String>? database,
+    Value<String>? pgSchema,
+    Value<int>? rowid,
+  }) {
+    return SelectedSchemasCompanion(
+      connectionId: connectionId ?? this.connectionId,
+      database: database ?? this.database,
+      pgSchema: pgSchema ?? this.pgSchema,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (connectionId.present) {
+      map['connection_id'] = Variable<String>(connectionId.value);
+    }
+    if (database.present) {
+      map['database'] = Variable<String>(database.value);
+    }
+    if (pgSchema.present) {
+      map['schema'] = Variable<String>(pgSchema.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SelectedSchemasCompanion(')
+          ..write('connectionId: $connectionId, ')
+          ..write('database: $database, ')
+          ..write('pgSchema: $pgSchema, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -2471,6 +2858,9 @@ abstract class _$QueryPodDatabase extends GeneratedDatabase {
   late final $QueryHistoryEntriesTable queryHistoryEntries =
       $QueryHistoryEntriesTable(this);
   late final $PinnedTablesTable pinnedTables = $PinnedTablesTable(this);
+  late final $SelectedSchemasTable selectedSchemas = $SelectedSchemasTable(
+    this,
+  );
   late final $AppStateEntriesTable appStateEntries = $AppStateEntriesTable(
     this,
   );
@@ -2496,6 +2886,7 @@ abstract class _$QueryPodDatabase extends GeneratedDatabase {
     savedQueries,
     queryHistoryEntries,
     pinnedTables,
+    selectedSchemas,
     appStateEntries,
     idxConnectionsWorkspaceId,
     idxSavedQueriesConnectionId,
@@ -2530,6 +2921,13 @@ abstract class _$QueryPodDatabase extends GeneratedDatabase {
         limitUpdateKind: UpdateKind.delete,
       ),
       result: [TableUpdate('pinned_tables', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'connections',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('selected_schemas', kind: UpdateKind.delete)],
     ),
     WritePropagation(
       on: TableUpdateQuery.onTableName(
@@ -2933,6 +3331,27 @@ final class $$ConnectionsTableReferences
     );
   }
 
+  static MultiTypedResultKey<$SelectedSchemasTable, List<SelectedSchemaRow>>
+  _selectedSchemasRefsTable(_$QueryPodDatabase db) =>
+      MultiTypedResultKey.fromTable(
+        db.selectedSchemas,
+        aliasName: 'connections__id__selected_schemas__connection_id',
+      );
+
+  $$SelectedSchemasTableProcessedTableManager get selectedSchemasRefs {
+    final manager = $$SelectedSchemasTableTableManager(
+      $_db,
+      $_db.selectedSchemas,
+    ).filter((f) => f.connectionId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _selectedSchemasRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
   static MultiTypedResultKey<$AppStateEntriesTable, List<AppStateRow>>
   _appStateEntriesRefsTable(_$QueryPodDatabase db) =>
       MultiTypedResultKey.fromTable(
@@ -3094,6 +3513,31 @@ class $$ConnectionsTableFilterComposer
           }) => $$PinnedTablesTableFilterComposer(
             $db: $db,
             $table: $db.pinnedTables,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> selectedSchemasRefs(
+    Expression<bool> Function($$SelectedSchemasTableFilterComposer f) f,
+  ) {
+    final $$SelectedSchemasTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.selectedSchemas,
+      getReferencedColumn: (t) => t.connectionId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$SelectedSchemasTableFilterComposer(
+            $db: $db,
+            $table: $db.selectedSchemas,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -3336,6 +3780,31 @@ class $$ConnectionsTableAnnotationComposer
     return f(composer);
   }
 
+  Expression<T> selectedSchemasRefs<T extends Object>(
+    Expression<T> Function($$SelectedSchemasTableAnnotationComposer a) f,
+  ) {
+    final $$SelectedSchemasTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.selectedSchemas,
+      getReferencedColumn: (t) => t.connectionId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$SelectedSchemasTableAnnotationComposer(
+            $db: $db,
+            $table: $db.selectedSchemas,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
   Expression<T> appStateEntriesRefs<T extends Object>(
     Expression<T> Function($$AppStateEntriesTableAnnotationComposer a) f,
   ) {
@@ -3380,6 +3849,7 @@ class $$ConnectionsTableTableManager
             bool savedQueriesRefs,
             bool queryHistoryEntriesRefs,
             bool pinnedTablesRefs,
+            bool selectedSchemasRefs,
             bool appStateEntriesRefs,
           })
         > {
@@ -3456,6 +3926,7 @@ class $$ConnectionsTableTableManager
                 savedQueriesRefs = false,
                 queryHistoryEntriesRefs = false,
                 pinnedTablesRefs = false,
+                selectedSchemasRefs = false,
                 appStateEntriesRefs = false,
               }) {
                 return PrefetchHooks(
@@ -3464,6 +3935,7 @@ class $$ConnectionsTableTableManager
                     if (savedQueriesRefs) db.savedQueries,
                     if (queryHistoryEntriesRefs) db.queryHistoryEntries,
                     if (pinnedTablesRefs) db.pinnedTables,
+                    if (selectedSchemasRefs) db.selectedSchemas,
                     if (appStateEntriesRefs) db.appStateEntries,
                   ],
                   addJoins:
@@ -3565,6 +4037,27 @@ class $$ConnectionsTableTableManager
                               ),
                           typedResults: items,
                         ),
+                      if (selectedSchemasRefs)
+                        await $_getPrefetchedData<
+                          ConnectionRow,
+                          $ConnectionsTable,
+                          SelectedSchemaRow
+                        >(
+                          currentTable: table,
+                          referencedTable: $$ConnectionsTableReferences
+                              ._selectedSchemasRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$ConnectionsTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).selectedSchemasRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.connectionId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
                       if (appStateEntriesRefs)
                         await $_getPrefetchedData<
                           ConnectionRow,
@@ -3611,6 +4104,7 @@ typedef $$ConnectionsTableProcessedTableManager =
         bool savedQueriesRefs,
         bool queryHistoryEntriesRefs,
         bool pinnedTablesRefs,
+        bool selectedSchemasRefs,
         bool appStateEntriesRefs,
       })
     >;
@@ -3621,6 +4115,7 @@ typedef $$SavedQueriesTableCreateCompanionBuilder =
       required String title,
       required String sql,
       Value<String?> database,
+      Value<String?> querySchema,
       required DateTime createdAt,
       required DateTime updatedAt,
       Value<int> rowid,
@@ -3632,6 +4127,7 @@ typedef $$SavedQueriesTableUpdateCompanionBuilder =
       Value<String> title,
       Value<String> sql,
       Value<String?> database,
+      Value<String?> querySchema,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
       Value<int> rowid,
@@ -3687,6 +4183,11 @@ class $$SavedQueriesTableFilterComposer
 
   ColumnFilters<String> get database => $composableBuilder(
     column: $table.database,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get querySchema => $composableBuilder(
+    column: $table.querySchema,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -3753,6 +4254,11 @@ class $$SavedQueriesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get querySchema => $composableBuilder(
+    column: $table.querySchema,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -3807,6 +4313,11 @@ class $$SavedQueriesTableAnnotationComposer
 
   GeneratedColumn<String> get database =>
       $composableBuilder(column: $table.database, builder: (column) => column);
+
+  GeneratedColumn<String> get querySchema => $composableBuilder(
+    column: $table.querySchema,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
@@ -3873,6 +4384,7 @@ class $$SavedQueriesTableTableManager
                 Value<String> title = const Value.absent(),
                 Value<String> sql = const Value.absent(),
                 Value<String?> database = const Value.absent(),
+                Value<String?> querySchema = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -3882,6 +4394,7 @@ class $$SavedQueriesTableTableManager
                 title: title,
                 sql: sql,
                 database: database,
+                querySchema: querySchema,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 rowid: rowid,
@@ -3893,6 +4406,7 @@ class $$SavedQueriesTableTableManager
                 required String title,
                 required String sql,
                 Value<String?> database = const Value.absent(),
+                Value<String?> querySchema = const Value.absent(),
                 required DateTime createdAt,
                 required DateTime updatedAt,
                 Value<int> rowid = const Value.absent(),
@@ -3902,6 +4416,7 @@ class $$SavedQueriesTableTableManager
                 title: title,
                 sql: sql,
                 database: database,
+                querySchema: querySchema,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 rowid: rowid,
@@ -4396,6 +4911,7 @@ typedef $$PinnedTablesTableCreateCompanionBuilder =
     PinnedTablesCompanion Function({
       required String connectionId,
       required String database,
+      Value<String> pgSchema,
       required String table,
       required int sortOrder,
       Value<int> rowid,
@@ -4404,6 +4920,7 @@ typedef $$PinnedTablesTableUpdateCompanionBuilder =
     PinnedTablesCompanion Function({
       Value<String> connectionId,
       Value<String> database,
+      Value<String> pgSchema,
       Value<String> table,
       Value<int> sortOrder,
       Value<int> rowid,
@@ -4444,6 +4961,11 @@ class $$PinnedTablesTableFilterComposer
   });
   ColumnFilters<String> get database => $composableBuilder(
     column: $table.database,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get pgSchema => $composableBuilder(
+    column: $table.pgSchema,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -4495,6 +5017,11 @@ class $$PinnedTablesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get pgSchema => $composableBuilder(
+    column: $table.pgSchema,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get table => $composableBuilder(
     column: $table.table,
     builder: (column) => ColumnOrderings(column),
@@ -4540,6 +5067,9 @@ class $$PinnedTablesTableAnnotationComposer
   });
   GeneratedColumn<String> get database =>
       $composableBuilder(column: $table.database, builder: (column) => column);
+
+  GeneratedColumn<String> get pgSchema =>
+      $composableBuilder(column: $table.pgSchema, builder: (column) => column);
 
   GeneratedColumn<String> get table =>
       $composableBuilder(column: $table.table, builder: (column) => column);
@@ -4603,12 +5133,14 @@ class $$PinnedTablesTableTableManager
               ({
                 Value<String> connectionId = const Value.absent(),
                 Value<String> database = const Value.absent(),
+                Value<String> pgSchema = const Value.absent(),
                 Value<String> table = const Value.absent(),
                 Value<int> sortOrder = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => PinnedTablesCompanion(
                 connectionId: connectionId,
                 database: database,
+                pgSchema: pgSchema,
                 table: table,
                 sortOrder: sortOrder,
                 rowid: rowid,
@@ -4617,12 +5149,14 @@ class $$PinnedTablesTableTableManager
               ({
                 required String connectionId,
                 required String database,
+                Value<String> pgSchema = const Value.absent(),
                 required String table,
                 required int sortOrder,
                 Value<int> rowid = const Value.absent(),
               }) => PinnedTablesCompanion.insert(
                 connectionId: connectionId,
                 database: database,
+                pgSchema: pgSchema,
                 table: table,
                 sortOrder: sortOrder,
                 rowid: rowid,
@@ -4692,6 +5226,299 @@ typedef $$PinnedTablesTableProcessedTableManager =
       $$PinnedTablesTableUpdateCompanionBuilder,
       (PinnedTableRow, $$PinnedTablesTableReferences),
       PinnedTableRow,
+      PrefetchHooks Function({bool connectionId})
+    >;
+typedef $$SelectedSchemasTableCreateCompanionBuilder =
+    SelectedSchemasCompanion Function({
+      required String connectionId,
+      required String database,
+      required String pgSchema,
+      Value<int> rowid,
+    });
+typedef $$SelectedSchemasTableUpdateCompanionBuilder =
+    SelectedSchemasCompanion Function({
+      Value<String> connectionId,
+      Value<String> database,
+      Value<String> pgSchema,
+      Value<int> rowid,
+    });
+
+final class $$SelectedSchemasTableReferences
+    extends
+        BaseReferences<
+          _$QueryPodDatabase,
+          $SelectedSchemasTable,
+          SelectedSchemaRow
+        > {
+  $$SelectedSchemasTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $ConnectionsTable _connectionIdTable(_$QueryPodDatabase db) => db
+      .connections
+      .createAlias('selected_schemas__connection_id__connections__id');
+
+  $$ConnectionsTableProcessedTableManager get connectionId {
+    final $_column = $_itemColumn<String>('connection_id')!;
+
+    final manager = $$ConnectionsTableTableManager(
+      $_db,
+      $_db.connections,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_connectionIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$SelectedSchemasTableFilterComposer
+    extends Composer<_$QueryPodDatabase, $SelectedSchemasTable> {
+  $$SelectedSchemasTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get database => $composableBuilder(
+    column: $table.database,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get pgSchema => $composableBuilder(
+    column: $table.pgSchema,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$ConnectionsTableFilterComposer get connectionId {
+    final $$ConnectionsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.connectionId,
+      referencedTable: $db.connections,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ConnectionsTableFilterComposer(
+            $db: $db,
+            $table: $db.connections,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$SelectedSchemasTableOrderingComposer
+    extends Composer<_$QueryPodDatabase, $SelectedSchemasTable> {
+  $$SelectedSchemasTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get database => $composableBuilder(
+    column: $table.database,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get pgSchema => $composableBuilder(
+    column: $table.pgSchema,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$ConnectionsTableOrderingComposer get connectionId {
+    final $$ConnectionsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.connectionId,
+      referencedTable: $db.connections,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ConnectionsTableOrderingComposer(
+            $db: $db,
+            $table: $db.connections,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$SelectedSchemasTableAnnotationComposer
+    extends Composer<_$QueryPodDatabase, $SelectedSchemasTable> {
+  $$SelectedSchemasTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get database =>
+      $composableBuilder(column: $table.database, builder: (column) => column);
+
+  GeneratedColumn<String> get pgSchema =>
+      $composableBuilder(column: $table.pgSchema, builder: (column) => column);
+
+  $$ConnectionsTableAnnotationComposer get connectionId {
+    final $$ConnectionsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.connectionId,
+      referencedTable: $db.connections,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ConnectionsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.connections,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$SelectedSchemasTableTableManager
+    extends
+        RootTableManager<
+          _$QueryPodDatabase,
+          $SelectedSchemasTable,
+          SelectedSchemaRow,
+          $$SelectedSchemasTableFilterComposer,
+          $$SelectedSchemasTableOrderingComposer,
+          $$SelectedSchemasTableAnnotationComposer,
+          $$SelectedSchemasTableCreateCompanionBuilder,
+          $$SelectedSchemasTableUpdateCompanionBuilder,
+          (SelectedSchemaRow, $$SelectedSchemasTableReferences),
+          SelectedSchemaRow,
+          PrefetchHooks Function({bool connectionId})
+        > {
+  $$SelectedSchemasTableTableManager(
+    _$QueryPodDatabase db,
+    $SelectedSchemasTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$SelectedSchemasTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$SelectedSchemasTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$SelectedSchemasTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> connectionId = const Value.absent(),
+                Value<String> database = const Value.absent(),
+                Value<String> pgSchema = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => SelectedSchemasCompanion(
+                connectionId: connectionId,
+                database: database,
+                pgSchema: pgSchema,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String connectionId,
+                required String database,
+                required String pgSchema,
+                Value<int> rowid = const Value.absent(),
+              }) => SelectedSchemasCompanion.insert(
+                connectionId: connectionId,
+                database: database,
+                pgSchema: pgSchema,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$SelectedSchemasTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({connectionId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (connectionId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.connectionId,
+                                referencedTable:
+                                    $$SelectedSchemasTableReferences
+                                        ._connectionIdTable(db),
+                                referencedColumn:
+                                    $$SelectedSchemasTableReferences
+                                        ._connectionIdTable(db)
+                                        .id,
+                              )
+                              as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$SelectedSchemasTableProcessedTableManager =
+    ProcessedTableManager<
+      _$QueryPodDatabase,
+      $SelectedSchemasTable,
+      SelectedSchemaRow,
+      $$SelectedSchemasTableFilterComposer,
+      $$SelectedSchemasTableOrderingComposer,
+      $$SelectedSchemasTableAnnotationComposer,
+      $$SelectedSchemasTableCreateCompanionBuilder,
+      $$SelectedSchemasTableUpdateCompanionBuilder,
+      (SelectedSchemaRow, $$SelectedSchemasTableReferences),
+      SelectedSchemaRow,
       PrefetchHooks Function({bool connectionId})
     >;
 typedef $$AppStateEntriesTableCreateCompanionBuilder =
@@ -4975,6 +5802,8 @@ class $QueryPodDatabaseManager {
       $$QueryHistoryEntriesTableTableManager(_db, _db.queryHistoryEntries);
   $$PinnedTablesTableTableManager get pinnedTables =>
       $$PinnedTablesTableTableManager(_db, _db.pinnedTables);
+  $$SelectedSchemasTableTableManager get selectedSchemas =>
+      $$SelectedSchemasTableTableManager(_db, _db.selectedSchemas);
   $$AppStateEntriesTableTableManager get appStateEntries =>
       $$AppStateEntriesTableTableManager(_db, _db.appStateEntries);
 }

@@ -9,6 +9,7 @@ import '../../../features/editor/domain/entities/query_history.dart';
 import '../../../features/editor/domain/entities/query_result.dart';
 import '../../../features/editor/domain/entities/table_data.dart';
 import '../../../features/editor/domain/entities/connection_database.dart';
+import '../../../features/editor/domain/entities/connection_schema.dart';
 import '../../../features/editor/domain/entities/connection_table.dart';
 import '../database_driver.dart';
 
@@ -62,9 +63,18 @@ class SQLiteDriver implements DatabaseDriver {
   }
 
   @override
+  Future<List<ConnectionSchema>> listSchemas(
+    Connection connection,
+    String database,
+  ) async {
+    return const [];
+  }
+
+  @override
   Future<List<ConnectionTable>> listTables(
     Connection connection,
     String database,
+    String? schema,
   ) async {
     final db = await _connect(connection);
     try {
@@ -95,6 +105,7 @@ class SQLiteDriver implements DatabaseDriver {
     Connection connection,
     String database,
     String table, {
+    String? schema,
     void Function(QueryHistory)? onHistory,
   }) async {
     final db = await _connect(connection);
@@ -226,6 +237,7 @@ class SQLiteDriver implements DatabaseDriver {
     Connection connection,
     String database,
     String table, {
+    String? schema,
     required TableStructure structure,
     String? searchQuery,
     String? searchColumn,
@@ -294,6 +306,7 @@ class SQLiteDriver implements DatabaseDriver {
     Connection connection,
     String database,
     String table, {
+    String? schema,
     required TableStructure structure,
     required int offset,
     required int limit,
@@ -377,6 +390,7 @@ class SQLiteDriver implements DatabaseDriver {
     Connection connection,
     String database,
     String table, {
+    String? schema,
     required TableStructure structure,
     required List<TableCellChange> cellChanges,
     required List<TableDataRow> deletedRows,
@@ -448,7 +462,9 @@ class SQLiteDriver implements DatabaseDriver {
       final col = structure.columns.firstWhere((c) => c.name == entry.key);
       columns.add(_quoteIdentifier(col.name));
       placeholders.add('?');
-      if (_isBinaryColumn(col.databaseType) && entry.value != null && entry.value.toString().isNotEmpty) {
+      if (_isBinaryColumn(col.databaseType) &&
+          entry.value != null &&
+          entry.value.toString().isNotEmpty) {
         args.add(_decodeHex(entry.value.toString()));
       } else {
         args.add(entry.value);
@@ -614,6 +630,7 @@ class SQLiteDriver implements DatabaseDriver {
     Connection connection,
     String database,
     String sql,
+    String? schema,
   ) async {
     Database? db;
     try {
@@ -730,6 +747,7 @@ class SQLiteDriver implements DatabaseDriver {
   Future<void> createTable(
     Connection connection,
     String database,
+    String? schema,
     String tableName,
     List<TableColumnDefinition> columns,
   ) async {
@@ -748,6 +766,7 @@ class SQLiteDriver implements DatabaseDriver {
   Future<List<TableColumnDefinition>> getTableSchema(
     Connection connection,
     String database,
+    String? schema,
     String table,
   ) async {
     final db = await _connect(connection);
@@ -819,9 +838,19 @@ class SQLiteDriver implements DatabaseDriver {
   }
 
   @override
+  Future<void> createSchema(
+    Connection connection,
+    String database,
+    String name,
+  ) async {
+    throw UnsupportedError('SQLite does not support schemas');
+  }
+
+  @override
   Future<void> alterTable(
     Connection connection,
     String database,
+    String? schema,
     String oldTableName,
     String newTableName,
     List<TableColumnDefinition> oldColumns,
@@ -1298,6 +1327,7 @@ class SQLiteDriver implements DatabaseDriver {
     Connection connection,
     String database,
     String table, {
+    String? schema,
     bool cascade = false,
   }) async {
     final db = await _connect(connection);
@@ -1319,6 +1349,7 @@ class SQLiteDriver implements DatabaseDriver {
     Connection connection,
     String database,
     String table, {
+    String? schema,
     bool cascade = false,
   }) async {
     final db = await _connect(connection);

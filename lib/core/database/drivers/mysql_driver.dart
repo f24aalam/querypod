@@ -10,6 +10,7 @@ import '../../../features/editor/domain/entities/query_history.dart';
 import '../../../features/editor/domain/entities/query_result.dart';
 import '../../../features/editor/domain/entities/table_data.dart';
 import '../../../features/editor/domain/entities/connection_database.dart';
+import '../../../features/editor/domain/entities/connection_schema.dart';
 import '../../../features/editor/domain/entities/connection_table.dart';
 import '../database_driver.dart';
 import 'alter_table_sql.dart';
@@ -101,9 +102,18 @@ class MySQLDriver implements DatabaseDriver {
   }
 
   @override
+  Future<List<ConnectionSchema>> listSchemas(
+    Connection connection,
+    String database,
+  ) async {
+    return const [];
+  }
+
+  @override
   Future<List<ConnectionTable>> listTables(
     Connection connection,
     String database,
+    String? schema,
   ) async {
     final conn = await _connect(connection, database: database);
     try {
@@ -137,6 +147,7 @@ class MySQLDriver implements DatabaseDriver {
     Connection connection,
     String database,
     String table, {
+    String? schema,
     void Function(QueryHistory)? onHistory,
   }) async {
     final conn = await _connect(connection, database: database);
@@ -318,6 +329,7 @@ class MySQLDriver implements DatabaseDriver {
     Connection connection,
     String database,
     String table, {
+    String? schema,
     required TableStructure structure,
     String? searchQuery,
     String? searchColumn,
@@ -391,6 +403,7 @@ class MySQLDriver implements DatabaseDriver {
     Connection connection,
     String database,
     String table, {
+    String? schema,
     required TableStructure structure,
     required int offset,
     required int limit,
@@ -480,6 +493,7 @@ class MySQLDriver implements DatabaseDriver {
     Connection connection,
     String database,
     String table, {
+    String? schema,
     required TableStructure structure,
     required List<TableCellChange> cellChanges,
     required List<TableDataRow> deletedRows,
@@ -556,7 +570,9 @@ class MySQLDriver implements DatabaseDriver {
       final col = structure.columns.firstWhere((c) => c.name == entry.key);
       columns.add(_quoteIdentifier(col.name));
       placeholders.add(':p$i');
-      if (_isBinaryColumn(col.databaseType) && entry.value != null && entry.value.toString().isNotEmpty) {
+      if (_isBinaryColumn(col.databaseType) &&
+          entry.value != null &&
+          entry.value.toString().isNotEmpty) {
         args['p$i'] = _decodeHex(entry.value.toString());
       } else {
         args['p$i'] = entry.value;
@@ -566,7 +582,8 @@ class MySQLDriver implements DatabaseDriver {
 
     String sql;
     if (columns.isEmpty) {
-      sql = 'INSERT INTO ${_quoteIdentifier(database)}.${_quoteIdentifier(table)} () VALUES ()';
+      sql =
+          'INSERT INTO ${_quoteIdentifier(database)}.${_quoteIdentifier(table)} () VALUES ()';
     } else {
       sql =
           'INSERT INTO ${_quoteIdentifier(database)}.${_quoteIdentifier(table)} (${columns.join(', ')}) '
@@ -611,12 +628,12 @@ class MySQLDriver implements DatabaseDriver {
         ? _decodeHex(change.value)
         : change.value;
     final startMs = DateTime.now().millisecondsSinceEpoch;
-    
+
     final args = <String, dynamic>{'val': updatedValue};
     for (final index in primaryKeyIndexes) {
       args['pk_$index'] = change.row.cells[index].rawValue;
     }
-    
+
     await conn.execute(sql, args);
     final execMs = DateTime.now().millisecondsSinceEpoch - startMs;
 
@@ -649,7 +666,7 @@ class MySQLDriver implements DatabaseDriver {
         'DELETE FROM ${_quoteIdentifier(database)}.${_quoteIdentifier(table)} '
         'WHERE $where LIMIT 1';
     final startMs = DateTime.now().millisecondsSinceEpoch;
-    
+
     final args = <String, dynamic>{};
     for (final index in primaryKeyIndexes) {
       args['pk_$index'] = row.cells[index].rawValue;
@@ -678,7 +695,8 @@ class MySQLDriver implements DatabaseDriver {
   ) {
     return primaryKeyIndexes
         .map(
-          (index) => '${_quoteIdentifier(structure.columns[index].name)} = :pk_$index',
+          (index) =>
+              '${_quoteIdentifier(structure.columns[index].name)} = :pk_$index',
         )
         .join(' AND ');
   }
@@ -727,6 +745,7 @@ class MySQLDriver implements DatabaseDriver {
     Connection connection,
     String database,
     String sql,
+    String? schema,
   ) async {
     MySQLConnection? conn;
     try {
@@ -829,6 +848,7 @@ class MySQLDriver implements DatabaseDriver {
   Future<void> createTable(
     Connection connection,
     String database,
+    String? schema,
     String tableName,
     List<TableColumnDefinition> columns,
   ) async {
@@ -887,6 +907,7 @@ class MySQLDriver implements DatabaseDriver {
   Future<List<TableColumnDefinition>> getTableSchema(
     Connection connection,
     String database,
+    String? schema,
     String table,
   ) async {
     final conn = await _connect(connection, database: database);
@@ -940,9 +961,19 @@ class MySQLDriver implements DatabaseDriver {
   }
 
   @override
+  Future<void> createSchema(
+    Connection connection,
+    String database,
+    String name,
+  ) async {
+    throw UnsupportedError('MySQL does not support schemas');
+  }
+
+  @override
   Future<void> alterTable(
     Connection connection,
     String database,
+    String? schema,
     String oldTableName,
     String newTableName,
     List<TableColumnDefinition> oldColumns,
@@ -969,6 +1000,7 @@ class MySQLDriver implements DatabaseDriver {
     Connection connection,
     String database,
     String table, {
+    String? schema,
     bool cascade = false,
   }) async {
     final conn = await _connect(connection, database: database);
@@ -990,6 +1022,7 @@ class MySQLDriver implements DatabaseDriver {
     Connection connection,
     String database,
     String table, {
+    String? schema,
     bool cascade = false,
   }) async {
     final conn = await _connect(connection, database: database);

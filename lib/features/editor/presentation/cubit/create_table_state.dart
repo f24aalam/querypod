@@ -46,13 +46,13 @@ class CreateTableState extends Equatable {
 
   @override
   List<Object?> get props => [
-        tableName,
-        originalTableName,
-        columns,
-        originalColumns,
-        isSubmitting,
-        isLoading,
-        errorMessage,
-        isSuccess,
-      ];
+    tableName,
+    originalTableName,
+    columns,
+    originalColumns,
+    isSubmitting,
+    isLoading,
+    errorMessage,
+    isSuccess,
+  ];
 }

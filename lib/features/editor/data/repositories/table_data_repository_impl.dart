@@ -1,4 +1,3 @@
-
 import '../../../../core/database/database_driver_factory.dart';
 
 import '../../../connections/domain/entities/connection.dart';
@@ -19,12 +18,14 @@ class TableDataRepositoryImpl implements TableDataRepository {
     Connection connection,
     String database,
     String table,
+    String? schema,
   ) async {
     final driver = DatabaseDriverFactory.getDriver(connection.type);
     return await driver.inspectTable(
       connection,
       database,
       table,
+      schema: schema,
       onHistory: _historyRepository.save,
     );
   }
@@ -34,6 +35,7 @@ class TableDataRepositoryImpl implements TableDataRepository {
     Connection connection,
     String database,
     String table, {
+    String? schema,
     required TableStructure structure,
     String? searchQuery,
     String? searchColumn,
@@ -44,6 +46,7 @@ class TableDataRepositoryImpl implements TableDataRepository {
       connection,
       database,
       table,
+      schema: schema,
       structure: structure,
       searchQuery: searchQuery,
       searchColumn: searchColumn,
@@ -57,6 +60,7 @@ class TableDataRepositoryImpl implements TableDataRepository {
     Connection connection,
     String database,
     String table, {
+    String? schema,
     required TableStructure structure,
     required int offset,
     required int limit,
@@ -69,6 +73,7 @@ class TableDataRepositoryImpl implements TableDataRepository {
       connection,
       database,
       table,
+      schema: schema,
       structure: structure,
       offset: offset,
       limit: limit,
@@ -84,6 +89,7 @@ class TableDataRepositoryImpl implements TableDataRepository {
     Connection connection,
     String database,
     String table, {
+    String? schema,
     required TableStructure structure,
     required List<TableCellChange> cellChanges,
     required List<TableDataRow> deletedRows,
@@ -94,6 +100,7 @@ class TableDataRepositoryImpl implements TableDataRepository {
       connection,
       database,
       table,
+      schema: schema,
       structure: structure,
       cellChanges: cellChanges,
       deletedRows: deletedRows,
@@ -107,8 +114,9 @@ class TableDataRepositoryImpl implements TableDataRepository {
     Connection connection,
     String database,
     String sql,
+    String? schema,
   ) async {
     final driver = DatabaseDriverFactory.getDriver(connection.type);
-    return await driver.executeQuery(connection, database, sql);
+    return await driver.executeQuery(connection, database, sql, schema);
   }
 }

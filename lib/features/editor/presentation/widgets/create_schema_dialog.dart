@@ -5,36 +5,48 @@ import 'package:forui/forui.dart';
 import '../../../connections/domain/entities/connection.dart';
 import '../cubit/connection_metadata_cubit.dart';
 
-class CreateDatabaseDialog extends StatefulWidget {
+class CreateSchemaDialog extends StatefulWidget {
   final Connection connection;
+  final String database;
 
-  const CreateDatabaseDialog({required this.connection, super.key});
+  const CreateSchemaDialog({
+    required this.connection,
+    required this.database,
+    super.key,
+  });
 
-  static void show(BuildContext context, Connection connection) {
+  static void show(
+    BuildContext context, {
+    required Connection connection,
+    required String database,
+  }) {
     showFDialog(
       context: context,
       builder: (dialogContext, style, animation) => BlocProvider.value(
         value: context.read<ConnectionMetadataCubit>(),
-        child: _CreateDatabaseDialogBody(
+        child: _CreateSchemaDialogBody(
           animation: animation,
           connection: connection,
+          database: database,
         ),
       ),
     );
   }
 
   @override
-  State<CreateDatabaseDialog> createState() => _CreateDatabaseDialogState();
+  State<CreateSchemaDialog> createState() => _CreateSchemaDialogState();
 }
 
-class _CreateDatabaseDialogState extends State<CreateDatabaseDialog> {
+class _CreateSchemaDialogState extends State<CreateSchemaDialog> {
   @override
   Widget build(BuildContext context) {
-    // Delegate to the static show method pattern
-    // This widget exists so it can be used as a simple constructor call too.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
-        CreateDatabaseDialog.show(context, widget.connection);
+        CreateSchemaDialog.show(
+          context,
+          connection: widget.connection,
+          database: widget.database,
+        );
         Navigator.of(context).pop();
       }
     });
@@ -42,40 +54,37 @@ class _CreateDatabaseDialogState extends State<CreateDatabaseDialog> {
   }
 }
 
-class _CreateDatabaseDialogBody extends StatefulWidget {
+class _CreateSchemaDialogBody extends StatefulWidget {
   final Animation<double> animation;
   final Connection connection;
+  final String database;
 
-  const _CreateDatabaseDialogBody({
+  const _CreateSchemaDialogBody({
     required this.animation,
     required this.connection,
+    required this.database,
   });
 
   @override
-  State<_CreateDatabaseDialogBody> createState() =>
-      _CreateDatabaseDialogBodyState();
+  State<_CreateSchemaDialogBody> createState() =>
+      _CreateSchemaDialogBodyState();
 }
 
-class _CreateDatabaseDialogBodyState extends State<_CreateDatabaseDialogBody> {
+class _CreateSchemaDialogBodyState extends State<_CreateSchemaDialogBody> {
   final _nameController = TextEditingController();
-  final _charsetController = TextEditingController();
-  final _collationController = TextEditingController();
-
   bool _isLoading = false;
   String? _error;
 
   @override
   void dispose() {
     _nameController.dispose();
-    _charsetController.dispose();
-    _collationController.dispose();
     super.dispose();
   }
 
   Future<void> _submit() async {
     final name = _nameController.text.trim();
     if (name.isEmpty) {
-      setState(() => _error = 'Database name is required');
+      setState(() => _error = 'Schema name is required');
       return;
     }
 
@@ -85,19 +94,12 @@ class _CreateDatabaseDialogBodyState extends State<_CreateDatabaseDialogBody> {
     });
 
     try {
-      final charset = _charsetController.text.trim();
-      final collation = _collationController.text.trim();
-
-      await context.read<ConnectionMetadataCubit>().createDatabase(
+      await context.read<ConnectionMetadataCubit>().createSchema(
         widget.connection,
+        widget.database,
         name,
-        charset: charset.isNotEmpty ? charset : null,
-        collation: collation.isNotEmpty ? collation : null,
       );
-
-      if (mounted) {
-        Navigator.of(context).pop();
-      }
+      if (mounted) Navigator.of(context).pop();
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -115,7 +117,7 @@ class _CreateDatabaseDialogBodyState extends State<_CreateDatabaseDialogBody> {
     return FDialog(
       animation: widget.animation,
       direction: Axis.horizontal,
-      title: const Text('Create Database'),
+      title: const Text('Create Schema'),
       body: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -127,32 +129,8 @@ class _CreateDatabaseDialogBodyState extends State<_CreateDatabaseDialogBody> {
               controller: _nameController,
               onChange: (_) {},
             ),
-            label: const Text('Database Name'),
-            hint: 'my_database',
-          ),
-          const SizedBox(height: 16),
-          FTextField(
-            enabled: !_isLoading,
-            control: FTextFieldControl.managed(
-              controller: _charsetController,
-              onChange: (_) {},
-            ),
-            label: const Text('Charset (Optional)'),
-            hint: widget.connection.type == ConnectionType.postgresql
-                ? 'e.g., UTF8'
-                : 'e.g., utf8mb4',
-          ),
-          const SizedBox(height: 16),
-          FTextField(
-            enabled: !_isLoading,
-            control: FTextFieldControl.managed(
-              controller: _collationController,
-              onChange: (_) {},
-            ),
-            label: const Text('Collation (Optional)'),
-            hint: widget.connection.type == ConnectionType.postgresql
-                ? 'e.g., en_US.UTF-8'
-                : 'e.g., utf8mb4_unicode_ci',
+            label: const Text('Schema Name'),
+            hint: 'analytics',
           ),
           if (_error != null) ...[
             const SizedBox(height: 16),

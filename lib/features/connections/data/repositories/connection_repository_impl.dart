@@ -61,7 +61,13 @@ class ConnectionRepositoryImpl implements ConnectionRepository {
     await (_database.delete(
       _database.connections,
     )..where((row) => row.id.equals(id))).go();
-    await _credentialStore.deletePassword(id);
+    try {
+      await _credentialStore.deletePassword(id);
+    } catch (_) {
+      // Secret-store cleanup must not make an already-deleted connection look
+      // undeletable in the UI. Linux libsecret can reject cleanup when the
+      // keyring/default collection is unavailable.
+    }
   }
 
   @override

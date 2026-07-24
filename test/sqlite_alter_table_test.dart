@@ -109,6 +109,7 @@ void main() {
     await SQLiteDriver().alterTable(
       connection,
       'main',
+      null,
       'items',
       'products',
       oldColumns,
@@ -195,6 +196,7 @@ void main() {
       SQLiteDriver().alterTable(
         connection,
         'main',
+        null,
         'items',
         'items',
         oldColumns,
@@ -234,6 +236,7 @@ void main() {
     await SQLiteDriver().alterTable(
       connection,
       'main',
+      null,
       'items',
       'products',
       columns,
@@ -288,6 +291,7 @@ void main() {
       SQLiteDriver().alterTable(
         connection,
         'main',
+        null,
         'items',
         'items',
         oldColumns,

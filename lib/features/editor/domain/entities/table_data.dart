@@ -167,11 +167,7 @@ class TableCellEdit {
   TableCellCoordinate get coordinate =>
       TableCellCoordinate(rowIndex: rowIndex, columnIndex: columnIndex);
 
-  TableCellEdit copyWith({
-    int? rowIndex,
-    int? columnIndex,
-    String? draftText,
-  }) {
+  TableCellEdit copyWith({int? rowIndex, int? columnIndex, String? draftText}) {
     return TableCellEdit(
       rowIndex: rowIndex ?? this.rowIndex,
       columnIndex: columnIndex ?? this.columnIndex,

@@ -815,6 +815,7 @@ class _WidgetTableRepository implements TableDataRepository {
     Connection connection,
     String database,
     String sql,
+    String? schema,
   ) async {
     return [const QueryResult()];
   }
@@ -824,6 +825,7 @@ class _WidgetTableRepository implements TableDataRepository {
     Connection connection,
     String database,
     String table,
+    String? schema,
   ) async => TableStructure(
     columns: const [
       TableDataColumn(
@@ -856,6 +858,7 @@ class _WidgetTableRepository implements TableDataRepository {
     Connection connection,
     String database,
     String table, {
+    String? schema,
     required TableStructure structure,
     String? searchQuery,
     String? searchColumn,
@@ -874,6 +877,7 @@ class _WidgetTableRepository implements TableDataRepository {
     Connection connection,
     String database,
     String table, {
+    String? schema,
     required TableStructure structure,
     required int offset,
     required int limit,
@@ -901,6 +905,7 @@ class _WidgetTableRepository implements TableDataRepository {
     Connection connection,
     String database,
     String table, {
+    String? schema,
     required TableStructure structure,
     required List<TableCellChange> cellChanges,
     required List<TableDataRow> deletedRows,

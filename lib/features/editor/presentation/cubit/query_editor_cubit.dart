@@ -126,6 +126,28 @@ class QueryEditorCubit extends Cubit<QueryEditorState> {
 
     final updated = query.copyWith(
       database: () => database,
+      schema: () => null,
+      updatedAt: DateTime.now(),
+    );
+    try {
+      await _repository.save(_entityFromDocument(updated));
+    } catch (e) {
+      // Ignored if database is unavailable
+    }
+    emit(
+      QueryEditorState(
+        connectionId: state.connectionId,
+        queries: _replaceQuery(updated),
+      ),
+    );
+  }
+
+  Future<void> setQuerySchema(String id, String? schema) async {
+    final query = state.queryById(id);
+    if (query == null || query.schema == schema) return;
+
+    final updated = query.copyWith(
+      schema: () => schema,
       updatedAt: DateTime.now(),
     );
     try {
@@ -202,6 +224,7 @@ class QueryEditorCubit extends Cubit<QueryEditorState> {
       connection,
       databaseToUse,
       sql,
+      query.schema,
     );
     final executionTimeMs = DateTime.now().millisecondsSinceEpoch - startMs;
 
@@ -276,6 +299,7 @@ class QueryEditorCubit extends Cubit<QueryEditorState> {
       connectionId: query.connectionId,
       title: query.title,
       database: query.database,
+      schema: query.schema,
       sql: query.sql,
       createdAt: query.createdAt,
       updatedAt: query.updatedAt,
@@ -289,6 +313,7 @@ class QueryEditorCubit extends Cubit<QueryEditorState> {
       title: query.title,
       sql: query.controller.fullText,
       database: query.database,
+      schema: query.schema,
       createdAt: query.createdAt,
       updatedAt: query.updatedAt,
     );

@@ -128,6 +128,7 @@ class _EditorRepository implements TableDataRepository {
     Connection connection,
     String database,
     String table, {
+    String? schema,
     required TableStructure structure,
     required List<TableCellChange> cellChanges,
     required List<TableDataRow> deletedRows,
@@ -139,6 +140,7 @@ class _EditorRepository implements TableDataRepository {
     Connection connection,
     String database,
     String table, {
+    String? schema,
     required TableStructure structure,
     String? searchQuery,
     String? searchColumn,
@@ -150,6 +152,7 @@ class _EditorRepository implements TableDataRepository {
     Connection connection,
     String database,
     String sql,
+    String? schema,
   ) async => [const QueryResult()];
 
   @override
@@ -157,6 +160,7 @@ class _EditorRepository implements TableDataRepository {
     Connection connection,
     String database,
     String table, {
+    String? schema,
     required TableStructure structure,
     required int offset,
     required int limit,
@@ -188,6 +192,7 @@ class _EditorRepository implements TableDataRepository {
     Connection connection,
     String database,
     String table,
+    String? schema,
   ) async {
     if (table == 'profiles') {
       return TableStructure(

@@ -67,7 +67,9 @@ class _WorkspacesPageState extends State<WorkspacesPage> {
                     : () {
                         Navigator.of(dialogContext).pop();
                         final updated = workspace.copyWith(name: trimmed);
-                        this.context.read<WorkspacesCubit>().updateWorkspace(updated);
+                        this.context.read<WorkspacesCubit>().updateWorkspace(
+                          updated,
+                        );
                       },
                 child: const Text('Rename'),
               ),
@@ -95,209 +97,269 @@ class _WorkspacesPageState extends State<WorkspacesPage> {
     return Scaffold(
       backgroundColor: context.theme.colors.background,
       body: Column(
-          children: [
-            const AppTitleBar(),
-            Expanded(
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 800),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SizedBox(height: 80),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Workspaces',
-                    style: TextStyle(fontSize: 24).copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  FButton(
-                    onPress: _showCreateDialog,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: const [
-                        Icon(Icons.add, size: 16),
-                        SizedBox(width: 8),
-                        Text('Create Workspace'),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Text(
-                'Group your database connections by project or environment.',
-                style: TextStyle(fontSize: 16).copyWith(
-                  color: context.theme.colors.mutedForeground,
-                ),
-              ),
-              const SizedBox(height: 48),
-              Expanded(
-                child: BlocBuilder<WorkspacesCubit, WorkspacesState>(
-                  builder: (context, state) {
-                    if (state is WorkspacesLoading) {
-                      return const Center(child: CircularProgressIndicator());
-                    } else if (state is WorkspacesError) {
-                      return Center(
-                        child: Text(
-                          'Error: ${state.message}',
-                          style: TextStyle(color: context.theme.colors.destructive),
+        children: [
+          const AppTitleBar(),
+          Expanded(
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 800),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 80),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Workspaces',
+                          style: TextStyle(
+                            fontSize: 24,
+                          ).copyWith(fontWeight: FontWeight.w600),
                         ),
-                      );
-                    } else if (state is WorkspacesLoaded) {
-                      if (state.workspaces.isEmpty) {
-                        return Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.folder_open_outlined,
-                                size: 64,
-                                color: context.theme.colors.mutedForeground,
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                'No workspaces yet',
-                                style: TextStyle(fontSize: 18).copyWith(
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                'Create a workspace to start adding connections.',
-                                style: TextStyle(fontSize: 14).copyWith(
-                                  color: context.theme.colors.mutedForeground,
-                                ),
-                              ),
-                              const SizedBox(height: 24),
-                              FButton(
-                                onPress: _showCreateDialog,
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: const [
-                                    Icon(Icons.add, size: 16),
-                                    SizedBox(width: 8),
-                                    Text('Create your first workspace'),
-                                  ],
-                                ),
-                              ),
+                        FButton(
+                          onPress: _showCreateDialog,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: const [
+                              Icon(Icons.add, size: 16),
+                              SizedBox(width: 8),
+                              Text('Create Workspace'),
                             ],
                           ),
-                        );
-                      }
-
-                      return GridView.builder(
-                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 3,
-                          crossAxisSpacing: 24,
-                          mainAxisSpacing: 24,
-                          childAspectRatio: 1.5,
                         ),
-                        itemCount: state.workspaces.length,
-                        itemBuilder: (context, index) {
-                          final workspace = state.workspaces[index];
-                          return Material(
-                            color: context.theme.colors.card,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              side: BorderSide(color: context.theme.colors.border),
-                            ),
-                            clipBehavior: Clip.antiAlias,
-                            child: InkWell(
-                              onTap: () {
-                                context.read<ConnectionCubit>().setWorkspace(workspace.id);
-                                context.go('/workspace/${workspace.id}');
-                              },
-                              child: Padding(
-                                padding: const EdgeInsets.all(24.0),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Group your database connections by project or environment.',
+                      style: TextStyle(
+                        fontSize: 16,
+                      ).copyWith(color: context.theme.colors.mutedForeground),
+                    ),
+                    const SizedBox(height: 48),
+                    Expanded(
+                      child: BlocBuilder<WorkspacesCubit, WorkspacesState>(
+                        builder: (context, state) {
+                          if (state is WorkspacesLoading) {
+                            return const Center(
+                              child: CircularProgressIndicator(),
+                            );
+                          } else if (state is WorkspacesError) {
+                            return Center(
+                              child: Text(
+                                'Error: ${state.message}',
+                                style: TextStyle(
+                                  color: context.theme.colors.destructive,
+                                ),
+                              ),
+                            );
+                          } else if (state is WorkspacesLoaded) {
+                            if (state.workspaces.isEmpty) {
+                              return Center(
                                 child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    Row(
-                                      children: [
-                                        Container(
-                                          padding: const EdgeInsets.all(8),
-                                          decoration: BoxDecoration(
-                                            color: context.theme.colors.primary.withValues(alpha: 0.1),
-                                            borderRadius: BorderRadius.circular(8),
-                                          ),
-                                          child: Icon(
-                                            Icons.workspaces_outline,
-                                            color: context.theme.colors.primary,
-                                            size: 24,
-                                          ),
-                                        ),
-                                        const Spacer(),
-                                        FPopoverMenu(
-                                          menuBuilder: (context, controller, menu) => [
-                                            FItemGroup(
-                                              children: [
-                                                FItem(
-                                                  title: const Text('Rename'),
-                                                  prefix: const Icon(Icons.drive_file_rename_outline, size: 14),
-                                                  onPress: () {
-                                                    controller.hide();
-                                                    _showRenameDialog(workspace);
-                                                  },
-                                                ),
-                                                FItem(
-                                                  title: const Text('Delete'),
-                                                  prefix: const Icon(Icons.delete_outline, size: 14),
-                                                  variant: FItemVariant.destructive,
-                                                  onPress: () {
-                                                    controller.hide();
-                                                    _showDeleteDialog(workspace);
-                                                  },
-                                                ),
-                                              ],
-                                            ),
-                                          ],
-                                          builder: (context, controller, child) => IconButton(
-                                            icon: Icon(
-                                              Icons.more_horiz,
-                                              color: context.theme.colors.mutedForeground,
-                                            ),
-                                            onPressed: () => controller.toggle(),
-                                          ),
-                                        ),
-                                      ],
+                                    Icon(
+                                      Icons.folder_open_outlined,
+                                      size: 64,
+                                      color:
+                                          context.theme.colors.mutedForeground,
                                     ),
-                                    const Spacer(),
+                                    const SizedBox(height: 16),
                                     Text(
-                                      workspace.name,
-                                      style: TextStyle(fontSize: 18).copyWith(
-                                        fontWeight: FontWeight.w600,
+                                      'No workspaces yet',
+                                      style: TextStyle(
+                                        fontSize: 18,
+                                      ).copyWith(fontWeight: FontWeight.w500),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      'Create a workspace to start adding connections.',
+                                      style: TextStyle(fontSize: 14).copyWith(
+                                        color: context
+                                            .theme
+                                            .colors
+                                            .mutedForeground,
                                       ),
                                     ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      'Created ${DateFormat.yMMMd().format(workspace.createdAt)}',
-                                      style: TextStyle(fontSize: 12).copyWith(
-                                        color: context.theme.colors.mutedForeground,
+                                    const SizedBox(height: 24),
+                                    FButton(
+                                      onPress: _showCreateDialog,
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: const [
+                                          Icon(Icons.add, size: 16),
+                                          SizedBox(width: 8),
+                                          Text('Create your first workspace'),
+                                        ],
                                       ),
                                     ),
                                   ],
                                 ),
-                              ),
-                            ),
-                          );
+                              );
+                            }
+
+                            return GridView.builder(
+                              gridDelegate:
+                                  const SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: 3,
+                                    crossAxisSpacing: 24,
+                                    mainAxisSpacing: 24,
+                                    childAspectRatio: 1.5,
+                                  ),
+                              itemCount: state.workspaces.length,
+                              itemBuilder: (context, index) {
+                                final workspace = state.workspaces[index];
+                                return Material(
+                                  color: context.theme.colors.card,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    side: BorderSide(
+                                      color: context.theme.colors.border,
+                                    ),
+                                  ),
+                                  clipBehavior: Clip.antiAlias,
+                                  child: InkWell(
+                                    onTap: () {
+                                      context
+                                          .read<ConnectionCubit>()
+                                          .setWorkspace(workspace.id);
+                                      context.go('/workspace/${workspace.id}');
+                                    },
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(24.0),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              Container(
+                                                padding: const EdgeInsets.all(
+                                                  8,
+                                                ),
+                                                decoration: BoxDecoration(
+                                                  color: context
+                                                      .theme
+                                                      .colors
+                                                      .primary
+                                                      .withValues(alpha: 0.1),
+                                                  borderRadius:
+                                                      BorderRadius.circular(8),
+                                                ),
+                                                child: Icon(
+                                                  Icons.workspaces_outline,
+                                                  color: context
+                                                      .theme
+                                                      .colors
+                                                      .primary,
+                                                  size: 24,
+                                                ),
+                                              ),
+                                              const Spacer(),
+                                              FPopoverMenu(
+                                                menuBuilder:
+                                                    (
+                                                      context,
+                                                      controller,
+                                                      menu,
+                                                    ) => [
+                                                      FItemGroup(
+                                                        children: [
+                                                          FItem(
+                                                            title: const Text(
+                                                              'Rename',
+                                                            ),
+                                                            prefix: const Icon(
+                                                              Icons
+                                                                  .drive_file_rename_outline,
+                                                              size: 14,
+                                                            ),
+                                                            onPress: () {
+                                                              controller.hide();
+                                                              _showRenameDialog(
+                                                                workspace,
+                                                              );
+                                                            },
+                                                          ),
+                                                          FItem(
+                                                            title: const Text(
+                                                              'Delete',
+                                                            ),
+                                                            prefix: const Icon(
+                                                              Icons
+                                                                  .delete_outline,
+                                                              size: 14,
+                                                            ),
+                                                            variant: FItemVariant
+                                                                .destructive,
+                                                            onPress: () {
+                                                              controller.hide();
+                                                              _showDeleteDialog(
+                                                                workspace,
+                                                              );
+                                                            },
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ],
+                                                builder:
+                                                    (
+                                                      context,
+                                                      controller,
+                                                      child,
+                                                    ) => IconButton(
+                                                      icon: Icon(
+                                                        Icons.more_horiz,
+                                                        color: context
+                                                            .theme
+                                                            .colors
+                                                            .mutedForeground,
+                                                      ),
+                                                      onPressed: () =>
+                                                          controller.toggle(),
+                                                    ),
+                                              ),
+                                            ],
+                                          ),
+                                          const Spacer(),
+                                          Text(
+                                            workspace.name,
+                                            style: TextStyle(fontSize: 18)
+                                                .copyWith(
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            'Created ${DateFormat.yMMMd().format(workspace.createdAt)}',
+                                            style: TextStyle(fontSize: 12)
+                                                .copyWith(
+                                                  color: context
+                                                      .theme
+                                                      .colors
+                                                      .mutedForeground,
+                                                ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
+                            );
+                          }
+                          return const SizedBox();
                         },
-                      );
-                    }
-                    return const SizedBox();
-                  },
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ],
-          ),
-        ),
-      ),
-            ), // closes Expanded
-          ], // closes outer Column children
-        ), // closes outer Column
+            ),
+          ), // closes Expanded
+        ], // closes outer Column children
+      ), // closes outer Column
     ); // closes Scaffold
   }
 }
@@ -344,16 +406,16 @@ class _CreateWorkspaceDialogState extends State<_CreateWorkspaceDialog> {
             children: [
               Text(
                 'Create Workspace',
-                style: TextStyle(fontSize: 18).copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
+                style: TextStyle(
+                  fontSize: 18,
+                ).copyWith(fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 8),
               Text(
                 'Enter a name for your new workspace.',
-                style: TextStyle(fontSize: 14).copyWith(
-                  color: context.theme.colors.mutedForeground,
-                ),
+                style: TextStyle(
+                  fontSize: 14,
+                ).copyWith(color: context.theme.colors.mutedForeground),
               ),
               const SizedBox(height: 24),
               FTextField(
@@ -373,10 +435,7 @@ class _CreateWorkspaceDialogState extends State<_CreateWorkspaceDialog> {
                     child: const Text('Cancel'),
                   ),
                   const SizedBox(width: 12),
-                  FButton(
-                    onPress: _submit,
-                    child: const Text('Create'),
-                  ),
+                  FButton(onPress: _submit, child: const Text('Create')),
                 ],
               ),
             ],

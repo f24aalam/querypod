@@ -71,6 +71,23 @@ void main() {
     expect(credentials.values, isEmpty);
   });
 
+  test(
+    'delete still removes connection when credential cleanup fails',
+    () async {
+      credentials = _DeleteFailingCredentialStore();
+      repository = ConnectionRepositoryImpl(
+        database: database,
+        credentialStore: credentials,
+      );
+      await repository.save(_connection());
+
+      await repository.delete('connection-1');
+
+      expect(await repository.getAll(), isEmpty);
+      expect(credentials.values['connection-1'], 'secret');
+    },
+  );
+
   test('getById returns null for missing ids', () async {
     expect(await repository.getById('missing'), isNull);
   });
@@ -131,6 +148,13 @@ void main() {
       'alpha_querypod_connection_connection-1',
     );
   });
+}
+
+class _DeleteFailingCredentialStore extends MemoryCredentialStore {
+  @override
+  Future<void> deletePassword(String connectionId) async {
+    throw Exception('keyring locked');
+  }
 }
 
 Connection _connection({

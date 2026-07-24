@@ -100,6 +100,28 @@ void main() {
     expect(cubit.state.tabs[0].key, isNot(cubit.state.tabs[1].key));
   });
 
+  test('postgres table tabs are separated and labelled by schema', () {
+    final cubit = EditorTabsCubit();
+    cubit.pinTable(
+      connectionId: 'connection',
+      database: 'app',
+      schema: 'public',
+      table: users,
+    );
+    cubit.pinTable(
+      connectionId: 'connection',
+      database: 'app',
+      schema: 'analytics',
+      table: users,
+    );
+
+    expect(cubit.state.tabs, hasLength(2));
+    expect(cubit.state.tabs.map((tab) => tab.title), [
+      'public.users',
+      'analytics.users',
+    ]);
+  });
+
   test('tab collections are externally immutable', () {
     final cubit = EditorTabsCubit()..openConnectionEditor();
 

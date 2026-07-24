@@ -15,7 +15,8 @@ void main() {
   );
 
   test('draft becomes dirty and survives independently of widgets', () {
-    final cubit = ConnectionEditorCubit()..load(connection, activeWorkspaceId: 'default');
+    final cubit = ConnectionEditorCubit()
+      ..load(connection, activeWorkspaceId: 'default');
 
     cubit.updateHost('localhost');
 
@@ -48,7 +49,8 @@ void main() {
   });
 
   test('TLS setting is editable and preserved when saved', () {
-    final cubit = ConnectionEditorCubit()..load(connection, activeWorkspaceId: 'default');
+    final cubit = ConnectionEditorCubit()
+      ..load(connection, activeWorkspaceId: 'default');
 
     cubit.updateUseTls(false);
 
@@ -58,7 +60,8 @@ void main() {
   });
 
   test('loading null creates a new draft for the active workspace', () {
-    final cubit = ConnectionEditorCubit()..load(null, activeWorkspaceId: 'workspace-a');
+    final cubit = ConnectionEditorCubit()
+      ..load(null, activeWorkspaceId: 'workspace-a');
 
     expect(cubit.state.isNew, isTrue);
     expect(cubit.state.draft.workspaceId, 'workspace-a');

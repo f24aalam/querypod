@@ -1,4 +1,5 @@
 import '../../domain/entities/connection_database.dart';
+import '../../domain/entities/connection_schema.dart';
 import '../../domain/entities/connection_table.dart';
 import '../../../connections/domain/entities/connection.dart';
 
@@ -9,6 +10,8 @@ class ConnectionMetadataState {
   final ConnectionSessionIdentity? connectionSession;
   final List<ConnectionDatabase> databases;
   final String? selectedDatabase;
+  final List<ConnectionSchema> schemas;
+  final String? selectedSchema;
   final List<ConnectionTable> tables;
   final List<ConnectionTable> filteredTables;
   final List<String> pinnedTableNames;
@@ -24,6 +27,8 @@ class ConnectionMetadataState {
     this.connectionSession,
     this.databases = const [],
     this.selectedDatabase,
+    this.schemas = const [],
+    this.selectedSchema,
     this.tables = const [],
     this.filteredTables = const [],
     this.pinnedTableNames = const [],
@@ -40,6 +45,8 @@ class ConnectionMetadataState {
     ConnectionSessionIdentity? Function()? connectionSession,
     List<ConnectionDatabase>? databases,
     String? Function()? selectedDatabase,
+    List<ConnectionSchema>? schemas,
+    String? Function()? selectedSchema,
     List<ConnectionTable>? tables,
     List<ConnectionTable>? filteredTables,
     List<String>? pinnedTableNames,
@@ -59,6 +66,10 @@ class ConnectionMetadataState {
       selectedDatabase: selectedDatabase != null
           ? selectedDatabase()
           : this.selectedDatabase,
+      schemas: schemas ?? this.schemas,
+      selectedSchema: selectedSchema != null
+          ? selectedSchema()
+          : this.selectedSchema,
       tables: tables ?? this.tables,
       filteredTables: filteredTables ?? this.filteredTables,
       pinnedTableNames: pinnedTableNames ?? this.pinnedTableNames,

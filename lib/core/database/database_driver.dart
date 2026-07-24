@@ -3,6 +3,7 @@ import '../../../features/editor/domain/entities/query_history.dart';
 import '../../../features/editor/domain/entities/query_result.dart';
 import '../../../features/editor/domain/entities/table_data.dart';
 import '../../../features/editor/domain/entities/connection_database.dart';
+import '../../../features/editor/domain/entities/connection_schema.dart';
 import '../../../features/editor/domain/entities/connection_table.dart';
 
 abstract class DatabaseDriver {
@@ -12,15 +13,22 @@ abstract class DatabaseDriver {
 
   Future<List<ConnectionDatabase>> listDatabases(Connection connection);
 
+  Future<List<ConnectionSchema>> listSchemas(
+    Connection connection,
+    String database,
+  );
+
   Future<List<ConnectionTable>> listTables(
     Connection connection,
     String database,
+    String? schema,
   );
 
   Future<TableStructure> inspectTable(
     Connection connection,
     String database,
     String table, {
+    String? schema,
     void Function(QueryHistory)? onHistory,
   });
 
@@ -28,6 +36,7 @@ abstract class DatabaseDriver {
     Connection connection,
     String database,
     String table, {
+    String? schema,
     required TableStructure structure,
     String? searchQuery,
     String? searchColumn,
@@ -39,6 +48,7 @@ abstract class DatabaseDriver {
     Connection connection,
     String database,
     String table, {
+    String? schema,
     required TableStructure structure,
     required int offset,
     required int limit,
@@ -52,6 +62,7 @@ abstract class DatabaseDriver {
     Connection connection,
     String database,
     String table, {
+    String? schema,
     required TableStructure structure,
     required List<TableCellChange> cellChanges,
     required List<TableDataRow> deletedRows,
@@ -63,6 +74,7 @@ abstract class DatabaseDriver {
     Connection connection,
     String database,
     String sql,
+    String? schema,
   );
 
   Future<void> createDatabase(
@@ -75,6 +87,7 @@ abstract class DatabaseDriver {
   Future<void> createTable(
     Connection connection,
     String database,
+    String? schema,
     String tableName,
     List<TableColumnDefinition> columns,
   );
@@ -82,12 +95,20 @@ abstract class DatabaseDriver {
   Future<List<TableColumnDefinition>> getTableSchema(
     Connection connection,
     String database,
+    String? schema,
     String table,
+  );
+
+  Future<void> createSchema(
+    Connection connection,
+    String database,
+    String name,
   );
 
   Future<void> alterTable(
     Connection connection,
     String database,
+    String? schema,
     String oldTableName,
     String newTableName,
     List<TableColumnDefinition> oldColumns,
@@ -98,6 +119,7 @@ abstract class DatabaseDriver {
     Connection connection,
     String database,
     String table, {
+    String? schema,
     bool cascade = false,
   });
 
@@ -105,6 +127,7 @@ abstract class DatabaseDriver {
     Connection connection,
     String database,
     String table, {
+    String? schema,
     bool cascade = false,
   });
 }

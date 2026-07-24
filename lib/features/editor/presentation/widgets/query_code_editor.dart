@@ -15,6 +15,9 @@ class QueryCodeEditor extends StatelessWidget {
   final List<String> databases;
   final String? selectedDatabase;
   final ValueChanged<String?>? onDatabaseChanged;
+  final List<String> schemas;
+  final String? selectedSchema;
+  final ValueChanged<String?>? onSchemaChanged;
   final Connection? connection;
 
   const QueryCodeEditor({
@@ -24,6 +27,9 @@ class QueryCodeEditor extends StatelessWidget {
     this.databases = const [],
     this.selectedDatabase,
     this.onDatabaseChanged,
+    this.schemas = const [],
+    this.selectedSchema,
+    this.onSchemaChanged,
     this.connection,
     super.key,
   });
@@ -132,6 +138,54 @@ class QueryCodeEditor extends StatelessWidget {
                           child: const Icon(Icons.add, size: 16),
                         ),
                       ],
+                      if (connection != null &&
+                          connection!.type == ConnectionType.postgresql &&
+                          schemas.isNotEmpty) ...[
+                        const SizedBox(width: 8),
+                        SizedBox(
+                          width: 140,
+                          child: FSelect<String>.search(
+                            items: {
+                              for (final schema in schemas) schema: schema,
+                            },
+                            size: FTextFieldSizeVariant.sm,
+                            hint: 'Select schema',
+                            clearable: false,
+                            searchFieldProperties:
+                                const FSelectSearchFieldProperties(
+                                  hint: 'Search schemas...',
+                                ),
+                            contentConstraints:
+                                const FAutoWidthPortalConstraints(
+                                  maxHeight: 300,
+                                ),
+                            prefixBuilder: (context, fieldStyle, widget) =>
+                                Padding(
+                                  padding: const EdgeInsets.only(left: 8),
+                                  child: Icon(
+                                    Icons.account_tree_outlined,
+                                    size: 14,
+                                    color: theme.colors.mutedForeground,
+                                  ),
+                                ),
+                            suffixBuilder: (context, fieldStyle, widget) =>
+                                Padding(
+                                  padding: const EdgeInsets.only(right: 8),
+                                  child: Icon(
+                                    Icons.arrow_drop_down,
+                                    size: 14,
+                                    color: theme.colors.mutedForeground,
+                                  ),
+                                ),
+                            control: FSelectControl.lifted(
+                              value: schemas.contains(selectedSchema)
+                                  ? selectedSchema
+                                  : null,
+                              onChange: onSchemaChanged ?? (_) {},
+                            ),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                   const SizedBox(width: 8),
@@ -145,7 +199,9 @@ class QueryCodeEditor extends StatelessWidget {
                     },
                   },
                   child: FTooltip(
-                    tipBuilder: (context, controller) => Text('Run query (${KeyboardShortcuts.format('Enter')})'),
+                    tipBuilder: (context, controller) => Text(
+                      'Run query (${KeyboardShortcuts.format('Enter')})',
+                    ),
                     child: FButton(
                       onPress: isRunning ? null : onRun,
                       size: FButtonSizeVariant.sm,

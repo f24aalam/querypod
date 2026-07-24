@@ -72,8 +72,10 @@ class _AppTitleBarState extends State<AppTitleBar> {
 
   Widget _buildMenuBar(BuildContext context, FThemeData theme) {
     final fileTopLevelStyle = _topLevelButtonStyle(theme, _isFileMenuOpen);
-    final workspaceTopLevelStyle =
-        _topLevelButtonStyle(theme, _isWorkspaceMenuOpen);
+    final workspaceTopLevelStyle = _topLevelButtonStyle(
+      theme,
+      _isWorkspaceMenuOpen,
+    );
     final menuSurfaceStyle = _menuSurfaceStyle(theme);
     final menuItemStyle = _menuItemStyle(theme);
 

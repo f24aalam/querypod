@@ -32,6 +32,7 @@ class QueryRepositoryImpl implements QueryRepository {
             title: query.title,
             sql: query.sql,
             database: Value(query.database),
+            querySchema: Value(query.schema),
             createdAt: query.createdAt,
             updatedAt: query.updatedAt,
           ),
@@ -59,6 +60,7 @@ class QueryRepositoryImpl implements QueryRepository {
     title: row.title,
     sql: row.sql,
     database: row.database,
+    schema: row.querySchema,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   );

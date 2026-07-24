@@ -13,12 +13,14 @@ enum DestructiveActionType { drop, truncate }
 class TableDestructiveActionDialog extends StatefulWidget {
   final Connection connection;
   final String database;
+  final String? schema;
   final String tableName;
   final DestructiveActionType actionType;
 
   const TableDestructiveActionDialog({
     required this.connection,
     required this.database,
+    this.schema,
     required this.tableName,
     required this.actionType,
     super.key,
@@ -28,6 +30,7 @@ class TableDestructiveActionDialog extends StatefulWidget {
     BuildContext context, {
     required Connection connection,
     required String database,
+    String? schema,
     required String tableName,
     required DestructiveActionType actionType,
   }) {
@@ -43,6 +46,7 @@ class TableDestructiveActionDialog extends StatefulWidget {
           animation: animation,
           connection: connection,
           database: database,
+          schema: schema,
           tableName: tableName,
           actionType: actionType,
         ),
@@ -65,6 +69,7 @@ class _TableDestructiveActionDialogState
           context,
           connection: widget.connection,
           database: widget.database,
+          schema: widget.schema,
           tableName: widget.tableName,
           actionType: widget.actionType,
         );
@@ -79,6 +84,7 @@ class _TableDestructiveActionDialogBody extends StatefulWidget {
   final Animation<double> animation;
   final Connection connection;
   final String database;
+  final String? schema;
   final String tableName;
   final DestructiveActionType actionType;
 
@@ -86,6 +92,7 @@ class _TableDestructiveActionDialogBody extends StatefulWidget {
     required this.animation,
     required this.connection,
     required this.database,
+    this.schema,
     required this.tableName,
     required this.actionType,
   });
@@ -125,35 +132,39 @@ class _TableDestructiveActionDialogBodyState
     try {
       if (widget.actionType == DestructiveActionType.drop) {
         await context.read<ConnectionMetadataCubit>().dropTable(
-              widget.connection,
-              widget.database,
-              widget.tableName,
-              cascade: _force,
-            );
+          widget.connection,
+          widget.database,
+          widget.tableName,
+          schema: widget.schema,
+          cascade: _force,
+        );
         if (mounted) {
           context.read<EditorTabsCubit>().closeTab(
-                TableTabKey(
-                  connectionId: widget.connection.id,
-                  database: widget.database,
-                  tableName: widget.tableName,
-                ),
-              );
+            TableTabKey(
+              connectionId: widget.connection.id,
+              database: widget.database,
+              schema: widget.schema,
+              tableName: widget.tableName,
+            ),
+          );
         }
       } else {
         await context.read<ConnectionMetadataCubit>().truncateTable(
-              widget.connection,
-              widget.database,
-              widget.tableName,
-              cascade: _force,
-            );
+          widget.connection,
+          widget.database,
+          widget.tableName,
+          schema: widget.schema,
+          cascade: _force,
+        );
         if (mounted) {
           context.read<TableDataCubit>().refresh(
-                TableTabKey(
-                  connectionId: widget.connection.id,
-                  database: widget.database,
-                  tableName: widget.tableName,
-                ),
-              );
+            TableTabKey(
+              connectionId: widget.connection.id,
+              database: widget.database,
+              schema: widget.schema,
+              tableName: widget.tableName,
+            ),
+          );
         }
       }
 
@@ -173,8 +184,9 @@ class _TableDestructiveActionDialogBodyState
   @override
   Widget build(BuildContext context) {
     final theme = context.theme;
-    final actionName =
-        widget.actionType == DestructiveActionType.drop ? 'Drop' : 'Truncate';
+    final actionName = widget.actionType == DestructiveActionType.drop
+        ? 'Drop'
+        : 'Truncate';
 
     return FDialog(
       animation: widget.animation,
@@ -207,7 +219,9 @@ class _TableDestructiveActionDialogBodyState
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(4),
                     border: Border.all(
-                      color: _force ? theme.colors.primary : theme.colors.border,
+                      color: _force
+                          ? theme.colors.primary
+                          : theme.colors.border,
                       width: 1,
                     ),
                     color: _force ? theme.colors.primary : Colors.transparent,
@@ -244,10 +258,7 @@ class _TableDestructiveActionDialogBodyState
               ),
               child: Text(
                 'WARNING: Forcing this action might break data integrity and remove dependent records.',
-                style: TextStyle(
-                  color: theme.colors.destructive,
-                  fontSize: 12,
-                ),
+                style: TextStyle(color: theme.colors.destructive, fontSize: 12),
               ),
             ),
             const SizedBox(height: 16),
@@ -272,10 +283,7 @@ class _TableDestructiveActionDialogBodyState
             const SizedBox(height: 16),
             Text(
               _error!,
-              style: TextStyle(
-                color: theme.colors.destructive,
-                fontSize: 13,
-              ),
+              style: TextStyle(color: theme.colors.destructive, fontSize: 13),
             ),
           ],
         ],

@@ -8,6 +8,7 @@ class QueryDocument {
   final String connectionId;
   final String title;
   final String? database;
+  final String? schema;
   final CodeController controller;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -19,6 +20,7 @@ class QueryDocument {
     required this.connectionId,
     required this.title,
     this.database,
+    this.schema,
     required this.controller,
     required this.createdAt,
     required this.updatedAt,
@@ -30,6 +32,7 @@ class QueryDocument {
     String? title,
     String? connectionId,
     String? Function()? database,
+    String? Function()? schema,
     DateTime? updatedAt,
     CodeController? controller,
     bool? isRunning,
@@ -40,6 +43,7 @@ class QueryDocument {
       connectionId: connectionId ?? this.connectionId,
       title: title ?? this.title,
       database: database != null ? database() : this.database,
+      schema: schema != null ? schema() : this.schema,
       controller: controller ?? this.controller,
       createdAt: createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -54,6 +58,7 @@ class QueryDocument {
     required String title,
     required String sql,
     String? database,
+    String? schema,
     required DateTime createdAt,
     required DateTime updatedAt,
   }) {
@@ -62,6 +67,7 @@ class QueryDocument {
       connectionId: connectionId,
       title: title,
       database: database,
+      schema: schema,
       controller: CodeController(text: sql, language: highlight.sql),
       createdAt: createdAt,
       updatedAt: updatedAt,
@@ -73,6 +79,7 @@ class QueryDocument {
     required String connectionId,
     required String title,
     String? database,
+    String? schema,
     String initialText =
         '-- Write your query here\nSELECT *\nFROM users\nLIMIT 100;',
   }) {
@@ -82,6 +89,7 @@ class QueryDocument {
       connectionId: connectionId,
       title: title,
       database: database,
+      schema: schema,
       controller: CodeController(text: initialText, language: highlight.sql),
       createdAt: now,
       updatedAt: now,
@@ -127,6 +135,7 @@ bool _listEquals(List<QueryDocument> a, List<QueryDocument> b) {
     if (left.id != right.id ||
         left.title != right.title ||
         left.database != right.database ||
+        left.schema != right.schema ||
         left.isRunning != right.isRunning ||
         !identical(left.results, right.results)) {
       return false;

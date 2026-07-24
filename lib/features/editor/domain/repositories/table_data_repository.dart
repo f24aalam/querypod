@@ -7,12 +7,14 @@ abstract class TableDataRepository {
     Connection connection,
     String database,
     String table,
+    String? schema,
   );
 
   Future<int> countRows(
     Connection connection,
     String database,
     String table, {
+    String? schema,
     required TableStructure structure,
     String? searchQuery,
     String? searchColumn,
@@ -23,6 +25,7 @@ abstract class TableDataRepository {
     Connection connection,
     String database,
     String table, {
+    String? schema,
     required TableStructure structure,
     required int offset,
     required int limit,
@@ -35,6 +38,7 @@ abstract class TableDataRepository {
     Connection connection,
     String database,
     String table, {
+    String? schema,
     required TableStructure structure,
     required List<TableCellChange> cellChanges,
     required List<TableDataRow> deletedRows,
@@ -45,5 +49,6 @@ abstract class TableDataRepository {
     Connection connection,
     String database,
     String sql,
+    String? schema,
   );
 }

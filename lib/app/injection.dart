@@ -67,7 +67,7 @@ Future<void> configureDependencies({
     () => QueryHistoryRepositoryImpl(database: appDatabase),
   );
   getIt.registerLazySingleton<ConnectionMetadataRepository>(
-    () => ConnectionMetadataRepositoryImpl(),
+    () => ConnectionMetadataRepositoryImpl(database: appDatabase),
   );
   getIt.registerLazySingleton<PinnedTablesRepository>(
     () => pinnedTablesRepository,

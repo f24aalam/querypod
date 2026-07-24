@@ -28,7 +28,9 @@ enum AppColorScheme {
       AppColorScheme.yellow => FThemes.yellow,
       AppColorScheme.violet => FThemes.violet,
     };
-    return brightness == Brightness.light ? scheme.light.desktop : scheme.dark.desktop;
+    return brightness == Brightness.light
+        ? scheme.light.desktop
+        : scheme.dark.desktop;
   }
 }
 
@@ -42,10 +44,7 @@ class ThemeState {
   });
 
   ThemeState copyWith({ThemeMode? mode, AppColorScheme? scheme}) {
-    return ThemeState(
-      mode: mode ?? this.mode,
-      scheme: scheme ?? this.scheme,
-    );
+    return ThemeState(mode: mode ?? this.mode, scheme: scheme ?? this.scheme);
   }
 }
 

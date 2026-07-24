@@ -245,6 +245,7 @@ class TableDataCubit extends Cubit<TableDataState> {
         connection,
         key.database,
         fk.targetTable,
+        key.schema,
       );
 
       final filter = TableFilter(
@@ -257,6 +258,7 @@ class TableDataCubit extends Cubit<TableDataState> {
         connection,
         key.database,
         fk.targetTable,
+        schema: key.schema,
         structure: targetStructure,
         offset: 0,
         limit: 1,
@@ -774,6 +776,7 @@ class TableDataCubit extends Cubit<TableDataState> {
         connection,
         key.database,
         key.tableName,
+        schema: key.schema,
         structure: structure,
         cellChanges: [
           for (final edit in cellChanges)
@@ -843,12 +846,14 @@ class TableDataCubit extends Cubit<TableDataState> {
         connection,
         key.database,
         key.tableName,
+        key.schema,
       );
       if (!_isCurrent(key, generation)) return;
       final total = await repository.countRows(
         connection,
         key.database,
         key.tableName,
+        schema: key.schema,
         structure: structure,
         searchQuery: current.searchQuery,
         searchColumn: current.searchColumn,
@@ -864,6 +869,7 @@ class TableDataCubit extends Cubit<TableDataState> {
         connection,
         key.database,
         key.tableName,
+        schema: key.schema,
         structure: structure,
         offset: pageIndex * latest.pageSize,
         limit: latest.pageSize,
@@ -908,6 +914,7 @@ class TableDataCubit extends Cubit<TableDataState> {
         connection,
         key.database,
         key.tableName,
+        schema: key.schema,
         structure: structure,
         offset: pageIndex * current.pageSize,
         limit: current.pageSize,

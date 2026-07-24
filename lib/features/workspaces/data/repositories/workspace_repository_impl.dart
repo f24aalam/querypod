@@ -66,7 +66,13 @@ class WorkspaceRepositoryImpl implements WorkspaceRepository {
     });
 
     for (final connectionId in connectionIds) {
-      await _credentialStore.deletePassword(connectionId);
+      try {
+        await _credentialStore.deletePassword(connectionId);
+      } catch (_) {
+        // Workspace deletion has already removed the connection metadata.
+        // Treat secure-store cleanup as best-effort for the same reason as
+        // single connection deletion.
+      }
     }
   }
 

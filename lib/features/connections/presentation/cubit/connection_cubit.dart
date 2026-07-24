@@ -96,9 +96,13 @@ class ConnectionCubit extends Cubit<ConnectionsState> {
 
   Future<void> delete(String id) async {
     try {
+      final shouldClearActive =
+          state.selectedId == id || state.activeConnection?.id == id;
       await _repository.delete(id);
       if (state.selectedId == id) {
         await _repository.setSelectedId(null);
+      }
+      if (shouldClearActive) {
         emit(
           state.copyWith(selectedId: () => null, activeConnection: () => null),
         );

@@ -109,9 +109,7 @@ class _HistorySidebarPanel extends StatelessWidget {
       child: const Column(
         children: [
           SidebarHeader(title: 'HISTORY'),
-          Expanded(
-            child: HistoryListPanel(),
-          ),
+          Expanded(child: HistoryListPanel()),
         ],
       ),
     );

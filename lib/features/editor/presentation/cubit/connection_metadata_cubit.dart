@@ -53,6 +53,8 @@ class ConnectionMetadataCubit extends Cubit<ConnectionMetadataState> {
         connectionSession: () => session,
         databases: const [],
         selectedDatabase: () => null,
+        schemas: const [],
+        selectedSchema: () => null,
         tables: const [],
         filteredTables: const [],
         pinnedTableNames: const [],
@@ -81,7 +83,7 @@ class ConnectionMetadataCubit extends Cubit<ConnectionMetadataState> {
       );
 
       if (initialDatabase != null) {
-        await _loadTables(
+        await _loadSchemasAndTables(
           connection,
           initialDatabase,
           request: request,
@@ -98,6 +100,8 @@ class ConnectionMetadataCubit extends Cubit<ConnectionMetadataState> {
         ).copyWith(
           databases: const [],
           selectedDatabase: () => null,
+          schemas: const [],
+          selectedSchema: () => null,
           tables: const [],
           filteredTables: const [],
           pinnedTableNames: const [],
@@ -116,6 +120,8 @@ class ConnectionMetadataCubit extends Cubit<ConnectionMetadataState> {
     emit(
       state.copyWith(
         selectedDatabase: () => database,
+        schemas: const [],
+        selectedSchema: () => null,
         query: '',
         tables: const [],
         filteredTables: const [],
@@ -126,7 +132,7 @@ class ConnectionMetadataCubit extends Cubit<ConnectionMetadataState> {
     );
 
     try {
-      await _loadTables(
+      await _loadSchemasAndTables(
         connection,
         database,
         request: request,
@@ -158,6 +164,7 @@ class ConnectionMetadataCubit extends Cubit<ConnectionMetadataState> {
       await _loadTables(
         connection,
         database,
+        schema: state.selectedSchema,
         request: request,
         session: session,
       );
@@ -199,6 +206,7 @@ class ConnectionMetadataCubit extends Cubit<ConnectionMetadataState> {
   Future<void> toggleTablePin(ConnectionTable table) async {
     final connectionId = state.connectionId;
     final database = state.selectedDatabase;
+    final schema = state.selectedSchema;
     if (connectionId == null || database == null) return;
 
     final pinned = List<String>.from(state.pinnedTableNames);
@@ -212,6 +220,7 @@ class ConnectionMetadataCubit extends Cubit<ConnectionMetadataState> {
     await pinnedTablesRepository.setPinnedTables(
       connectionId: connectionId,
       database: database,
+      schema: schema,
       tableNames: pinned,
     );
   }
@@ -261,14 +270,27 @@ class ConnectionMetadataCubit extends Cubit<ConnectionMetadataState> {
   Future<void> createTable(
     Connection connection,
     String database,
+    String? schema,
     String tableName,
     List<TableColumnDefinition> columns,
   ) async {
     try {
-      await repository.createTable(connection, database, tableName, columns);
+      await repository.createTable(
+        connection,
+        database,
+        schema,
+        tableName,
+        columns,
+      );
 
       // Refresh tables
-      await refreshTables(connection, database);
+      await _loadTables(
+        connection,
+        database,
+        schema: schema,
+        request: ++_requestGeneration,
+        session: connection.sessionIdentity,
+      );
     } catch (e) {
       emit(
         _feedback(
@@ -287,10 +309,16 @@ class ConnectionMetadataCubit extends Cubit<ConnectionMetadataState> {
   Future<List<TableColumnDefinition>> getTableSchema(
     Connection connection,
     String database,
+    String? schema,
     String table,
   ) async {
     try {
-      return await repository.getTableSchema(connection, database, table);
+      return await repository.getTableSchema(
+        connection,
+        database,
+        schema,
+        table,
+      );
     } catch (e) {
       emit(
         _feedback(
@@ -309,6 +337,7 @@ class ConnectionMetadataCubit extends Cubit<ConnectionMetadataState> {
   Future<void> alterTable(
     Connection connection,
     String database,
+    String? schema,
     String oldTableName,
     String newTableName,
     List<TableColumnDefinition> oldColumns,
@@ -318,13 +347,20 @@ class ConnectionMetadataCubit extends Cubit<ConnectionMetadataState> {
       await repository.alterTable(
         connection,
         database,
+        schema,
         oldTableName,
         newTableName,
         oldColumns,
         newColumns,
       );
 
-      await refreshTables(connection, database);
+      await _loadTables(
+        connection,
+        database,
+        schema: schema,
+        request: ++_requestGeneration,
+        session: connection.sessionIdentity,
+      );
     } catch (e) {
       emit(
         _feedback(
@@ -344,12 +380,25 @@ class ConnectionMetadataCubit extends Cubit<ConnectionMetadataState> {
     Connection connection,
     String database,
     String table, {
+    String? schema,
     bool cascade = false,
   }) async {
     try {
-      await repository.dropTable(connection, database, table, cascade: cascade);
+      await repository.dropTable(
+        connection,
+        database,
+        table,
+        schema: schema,
+        cascade: cascade,
+      );
 
-      await refreshTables(connection, database);
+      await _loadTables(
+        connection,
+        database,
+        schema: schema,
+        request: ++_requestGeneration,
+        session: connection.sessionIdentity,
+      );
     } catch (e) {
       emit(
         _feedback(
@@ -366,6 +415,7 @@ class ConnectionMetadataCubit extends Cubit<ConnectionMetadataState> {
     Connection connection,
     String database,
     String table, {
+    String? schema,
     bool cascade = false,
   }) async {
     try {
@@ -373,6 +423,7 @@ class ConnectionMetadataCubit extends Cubit<ConnectionMetadataState> {
         connection,
         database,
         table,
+        schema: schema,
         cascade: cascade,
       );
 
@@ -394,17 +445,23 @@ class ConnectionMetadataCubit extends Cubit<ConnectionMetadataState> {
   Future<void> _loadTables(
     Connection connection,
     String database, {
+    String? schema,
     required int request,
     required ConnectionSessionIdentity session,
   }) async {
     final pinnedFuture = pinnedTablesRepository.getPinnedTables(
       connectionId: connection.id,
       database: database,
+      schema: schema,
     );
-    final tables = await repository.listTables(connection, database);
-    if (!_isCurrent(request, session, database: database)) return;
+    final tables = await repository.listTables(connection, database, schema);
+    if (!_isCurrent(request, session, database: database, schema: schema)) {
+      return;
+    }
     final pinnedTableNames = await pinnedFuture;
-    if (!_isCurrent(request, session, database: database)) return;
+    if (!_isCurrent(request, session, database: database, schema: schema)) {
+      return;
+    }
     final filteredTables = _filter(tables, state.query);
 
     emit(
@@ -414,6 +471,7 @@ class ConnectionMetadataCubit extends Cubit<ConnectionMetadataState> {
         pinnedTableNames: await _prunedPinnedTables(
           connection.id,
           database,
+          schema,
           tables,
           pinnedTableNames,
         ),
@@ -428,10 +486,12 @@ class ConnectionMetadataCubit extends Cubit<ConnectionMetadataState> {
     int request,
     ConnectionSessionIdentity session, {
     String? database,
+    String? schema,
   }) {
     return request == _requestGeneration &&
         state.connectionSession == session &&
-        (database == null || state.selectedDatabase == database);
+        (database == null || state.selectedDatabase == database) &&
+        (schema == null || state.selectedSchema == schema);
   }
 
   List<ConnectionTable> _filter(List<ConnectionTable> tables, String query) {
@@ -446,6 +506,7 @@ class ConnectionMetadataCubit extends Cubit<ConnectionMetadataState> {
   Future<List<String>> _prunedPinnedTables(
     String connectionId,
     String database,
+    String? schema,
     List<ConnectionTable> tables,
     List<String> pinnedTableNames,
   ) async {
@@ -456,10 +517,133 @@ class ConnectionMetadataCubit extends Cubit<ConnectionMetadataState> {
       await pinnedTablesRepository.setPinnedTables(
         connectionId: connectionId,
         database: database,
+        schema: schema,
         tableNames: pinned,
       );
     }
 
     return pinned;
+  }
+
+  Future<void> selectSchema(
+    Connection connection,
+    String database,
+    String schema,
+  ) async {
+    if (state.selectedDatabase != database || state.selectedSchema == schema) {
+      return;
+    }
+    final session = connection.sessionIdentity;
+    if (state.connectionSession != session) return;
+    final request = ++_requestGeneration;
+
+    await repository.setSelectedSchema(
+      connectionId: connection.id,
+      database: database,
+      schema: schema,
+    );
+
+    emit(
+      state.copyWith(
+        selectedSchema: () => schema,
+        query: '',
+        tables: const [],
+        filteredTables: const [],
+        pinnedTableNames: const [],
+        selectedTable: () => null,
+        status: ConnectionMetadataStatus.loadingTables,
+      ),
+    );
+
+    await _loadTables(
+      connection,
+      database,
+      schema: schema,
+      request: request,
+      session: session,
+    );
+  }
+
+  Future<void> createSchema(
+    Connection connection,
+    String database,
+    String name,
+  ) async {
+    try {
+      await repository.createSchema(connection, database, name);
+      final schemas = await repository.listSchemas(connection, database);
+      final session = connection.sessionIdentity;
+      if (state.connectionSession != session) return;
+      emit(state.copyWith(schemas: schemas));
+      await selectSchema(connection, database, name);
+    } catch (e) {
+      emit(
+        _feedback(
+          _metadataErrorMessage(e, fallback: 'Failed to create schema $name'),
+          isError: true,
+          status: state.status,
+        ),
+      );
+      rethrow;
+    }
+  }
+
+  Future<void> _loadSchemasAndTables(
+    Connection connection,
+    String database, {
+    required int request,
+    required ConnectionSessionIdentity session,
+  }) async {
+    if (connection.type != ConnectionType.postgresql) {
+      emit(state.copyWith(schemas: const [], selectedSchema: () => null));
+      await _loadTables(
+        connection,
+        database,
+        schema: null,
+        request: request,
+        session: session,
+      );
+      return;
+    }
+
+    final schemas = await repository.listSchemas(connection, database);
+    if (!_isCurrent(request, session, database: database)) return;
+    final remembered = await repository.getSelectedSchema(
+      connectionId: connection.id,
+      database: database,
+    );
+    if (!_isCurrent(request, session, database: database)) return;
+
+    final schemaNames = schemas.map((schema) => schema.name).toSet();
+    final initialSchema = remembered != null && schemaNames.contains(remembered)
+        ? remembered
+        : (schemaNames.contains('public')
+              ? 'public'
+              : (schemas.isNotEmpty ? schemas.first.name : null));
+
+    emit(
+      state.copyWith(
+        schemas: schemas,
+        selectedSchema: () => initialSchema,
+        status: initialSchema == null
+            ? ConnectionMetadataStatus.idle
+            : ConnectionMetadataStatus.loadingTables,
+      ),
+    );
+
+    if (initialSchema != null) {
+      await repository.setSelectedSchema(
+        connectionId: connection.id,
+        database: database,
+        schema: initialSchema,
+      );
+      await _loadTables(
+        connection,
+        database,
+        schema: initialSchema,
+        request: request,
+        session: session,
+      );
+    }
   }
 }

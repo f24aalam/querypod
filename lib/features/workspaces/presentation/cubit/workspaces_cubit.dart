@@ -8,8 +8,7 @@ import 'workspaces_state.dart';
 class WorkspacesCubit extends Cubit<WorkspacesState> {
   final WorkspaceRepository _repository;
 
-  WorkspacesCubit({required this._repository})
-      : super(WorkspacesInitial());
+  WorkspacesCubit({required this._repository}) : super(WorkspacesInitial());
 
   Future<void> loadWorkspaces() async {
     emit(WorkspacesLoading());

@@ -148,6 +148,35 @@ void main() {
     );
     expect(credentials.values, isEmpty);
   });
+
+  test(
+    'deleteWorkspace still removes metadata when credential cleanup fails',
+    () async {
+      credentials = _DeleteFailingCredentialStore();
+      repository = WorkspaceRepositoryImpl(
+        database: database,
+        credentialStore: credentials,
+      );
+      await repository.createWorkspace(
+        _workspace('team', 'Team', DateTime(2024, 1, 1)),
+      );
+      await seedConnection(database, id: 'first', workspaceId: 'team');
+      await credentials.writePassword('first', 'one');
+
+      await repository.deleteWorkspace('team');
+
+      expect(await database.select(database.workspaces).get(), isEmpty);
+      expect(await database.select(database.connections).get(), isEmpty);
+      expect(credentials.values['first'], 'one');
+    },
+  );
+}
+
+class _DeleteFailingCredentialStore extends MemoryCredentialStore {
+  @override
+  Future<void> deletePassword(String connectionId) async {
+    throw Exception('keyring locked');
+  }
 }
 
 AppWorkspace _workspace(String id, String name, DateTime createdAt) {

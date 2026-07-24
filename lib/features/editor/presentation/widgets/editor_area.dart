@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:forui/forui.dart';
@@ -428,6 +430,13 @@ class _QueryEditorTab extends StatelessWidget {
       (ConnectionMetadataCubit cubit) =>
           cubit.state.databases.map((db) => db.name).toList(),
     );
+    final schemas = context.select(
+      (ConnectionMetadataCubit cubit) =>
+          cubit.state.schemas.map((schema) => schema.name).toList(),
+    );
+    final selectedSchema = context.select(
+      (ConnectionMetadataCubit cubit) => cubit.state.selectedSchema,
+    );
 
     final connection = context.select(
       (ConnectionCubit cubit) => cubit.state.activeConnection,
@@ -439,9 +448,22 @@ class _QueryEditorTab extends StatelessWidget {
       databases: databases,
       selectedDatabase: query.database ?? connection?.database,
       connection: connection,
+      schemas: schemas,
+      selectedSchema: query.schema ?? selectedSchema,
       onDatabaseChanged: (db) =>
           context.read<QueryEditorCubit>().setQueryDatabase(query.id, db),
-      onRun: () => context.read<QueryEditorCubit>().runQuery(query.id),
+      onSchemaChanged: (schema) =>
+          context.read<QueryEditorCubit>().setQuerySchema(query.id, schema),
+      onRun: () {
+        final queryCubit = context.read<QueryEditorCubit>();
+        final schemaToUse = query.schema ?? selectedSchema;
+        unawaited(() async {
+          if (query.schema != schemaToUse) {
+            await queryCubit.setQuerySchema(query.id, schemaToUse);
+          }
+          await queryCubit.runQuery(query.id);
+        }());
+      },
     );
 
     if (query.results == null || query.results!.isEmpty) return editor;

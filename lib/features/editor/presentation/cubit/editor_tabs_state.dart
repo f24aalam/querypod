@@ -19,11 +19,13 @@ class ConnectionEditorTabKey extends EditorTabKey {
 class CreateTableTabKey extends EditorTabKey {
   final String connectionId;
   final String database;
+  final String? schema;
   final String? tableToEdit;
 
   const CreateTableTabKey({
     required this.connectionId,
     required this.database,
+    this.schema,
     this.tableToEdit,
   });
 
@@ -33,21 +35,23 @@ class CreateTableTabKey extends EditorTabKey {
       other is CreateTableTabKey &&
           connectionId == other.connectionId &&
           database == other.database &&
+          schema == other.schema &&
           tableToEdit == other.tableToEdit;
 
   @override
-  int get hashCode => Object.hash(connectionId, database, tableToEdit);
+  int get hashCode => Object.hash(connectionId, database, schema, tableToEdit);
 }
-
 
 class TableTabKey extends EditorTabKey {
   final String connectionId;
   final String database;
+  final String? schema;
   final String tableName;
 
   const TableTabKey({
     required this.connectionId,
     required this.database,
+    this.schema,
     required this.tableName,
   });
 
@@ -57,10 +61,11 @@ class TableTabKey extends EditorTabKey {
       other is TableTabKey &&
           connectionId == other.connectionId &&
           database == other.database &&
+          schema == other.schema &&
           tableName == other.tableName;
 
   @override
-  int get hashCode => Object.hash(connectionId, database, tableName);
+  int get hashCode => Object.hash(connectionId, database, schema, tableName);
 }
 
 class QueryTabKey extends EditorTabKey {
@@ -83,6 +88,7 @@ class EditorTab {
   final String title;
   final String? connectionId;
   final String? database;
+  final String? schema;
   final ConnectionTableType? tableType;
   final bool isPinned;
 
@@ -92,6 +98,7 @@ class EditorTab {
     required this.title,
     this.connectionId,
     this.database,
+    this.schema,
     this.tableType,
     this.isPinned = true,
   });
@@ -107,6 +114,7 @@ class EditorTab {
       title: title ?? this.title,
       connectionId: connectionId != null ? connectionId() : this.connectionId,
       database: database,
+      schema: schema,
       tableType: tableType,
       isPinned: isPinned ?? this.isPinned,
     );
@@ -121,6 +129,7 @@ class EditorTab {
           title == other.title &&
           connectionId == other.connectionId &&
           database == other.database &&
+          schema == other.schema &&
           tableType == other.tableType &&
           isPinned == other.isPinned;
 
@@ -131,6 +140,7 @@ class EditorTab {
     title,
     connectionId,
     database,
+    schema,
     tableType,
     isPinned,
   );

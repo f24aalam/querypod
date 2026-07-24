@@ -6,6 +6,7 @@ import 'package:querypod/features/connections/domain/entities/connection.dart';
 import 'package:querypod/features/connections/domain/repositories/connection_repository.dart';
 import 'package:querypod/features/connections/presentation/cubit/connection_cubit.dart';
 import 'package:querypod/features/editor/domain/entities/connection_database.dart';
+import 'package:querypod/features/editor/domain/entities/connection_schema.dart';
 import 'package:querypod/features/editor/domain/entities/connection_table.dart';
 import 'package:querypod/features/editor/domain/entities/table_data.dart';
 import 'package:querypod/features/editor/domain/repositories/connection_metadata_repository.dart';
@@ -157,6 +158,7 @@ class _NoopConnectionMetadataRepository
   Future<void> alterTable(
     Connection connection,
     String database,
+    String? schema,
     String oldTableName,
     String newTableName,
     List<TableColumnDefinition> oldColumns,
@@ -175,6 +177,7 @@ class _NoopConnectionMetadataRepository
   Future<void> createTable(
     Connection connection,
     String database,
+    String? schema,
     String tableName,
     List<TableColumnDefinition> columns,
   ) async {}
@@ -184,6 +187,7 @@ class _NoopConnectionMetadataRepository
     Connection connection,
     String database,
     String table, {
+    String? schema,
     bool cascade = false,
   }) async {}
 
@@ -191,8 +195,28 @@ class _NoopConnectionMetadataRepository
   Future<List<TableColumnDefinition>> getTableSchema(
     Connection connection,
     String database,
+    String? schema,
     String table,
   ) async => [];
+
+  @override
+  Future<List<ConnectionSchema>> listSchemas(
+    Connection connection,
+    String database,
+  ) async => const [ConnectionSchema(name: 'public')];
+
+  @override
+  Future<String?> getSelectedSchema({
+    required String connectionId,
+    required String database,
+  }) async => null;
+
+  @override
+  Future<void> setSelectedSchema({
+    required String connectionId,
+    required String database,
+    required String? schema,
+  }) async {}
 
   @override
   Future<List<ConnectionDatabase>> listDatabases(Connection connection) async =>
@@ -202,6 +226,7 @@ class _NoopConnectionMetadataRepository
   Future<List<ConnectionTable>> listTables(
     Connection connection,
     String database,
+    String? schema,
   ) async => [];
 
   @override
@@ -209,8 +234,16 @@ class _NoopConnectionMetadataRepository
     Connection connection,
     String database,
     String table, {
+    String? schema,
     bool cascade = false,
   }) async {}
+
+  @override
+  Future<void> createSchema(
+    Connection connection,
+    String database,
+    String name,
+  ) async {}
 }
 
 class _NoopPinnedTablesRepository implements PinnedTablesRepository {
@@ -218,12 +251,14 @@ class _NoopPinnedTablesRepository implements PinnedTablesRepository {
   Future<List<String>> getPinnedTables({
     required String connectionId,
     required String database,
+    String? schema,
   }) async => [];
 
   @override
   Future<void> setPinnedTables({
     required String connectionId,
     required String database,
+    String? schema,
     required List<String> tableNames,
   }) async {}
 }

@@ -110,9 +110,7 @@ Future<void> createSqliteFixtureSchema(Database db) async {
 
   // -- indexes and view (90-views-and-indexes.sql equivalent) --
 
-  await db.execute(
-    'CREATE INDEX idx_projects_status ON projects (status)',
-  );
+  await db.execute('CREATE INDEX idx_projects_status ON projects (status)');
   await db.execute(
     'CREATE INDEX idx_activity_logs_happened_at ON activity_logs (happened_at)',
   );

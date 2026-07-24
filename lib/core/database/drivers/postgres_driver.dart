@@ -9,6 +9,7 @@ import '../../../features/editor/domain/entities/query_history.dart';
 import '../../../features/editor/domain/entities/query_result.dart';
 import '../../../features/editor/domain/entities/table_data.dart';
 import '../../../features/editor/domain/entities/connection_database.dart';
+import '../../../features/editor/domain/entities/connection_schema.dart';
 import '../../../features/editor/domain/entities/connection_table.dart';
 import '../database_driver.dart';
 import 'alter_table_sql.dart';
@@ -106,14 +107,46 @@ class PostgresDriver implements DatabaseDriver {
   }
 
   @override
-  Future<List<ConnectionTable>> listTables(
+  Future<List<ConnectionSchema>> listSchemas(
     covariant Connection connection,
     String database,
   ) async {
     final conn = await _connect(connection, database: database);
     try {
+      final results = await conn.execute('''
+        SELECT schema_name
+        FROM information_schema.schemata
+        WHERE schema_name NOT IN ('pg_catalog', 'information_schema')
+          AND schema_name NOT LIKE 'pg_toast%'
+        ORDER BY CASE WHEN schema_name = 'public' THEN 0 ELSE 1 END,
+                 schema_name;
+      ''');
+      return results
+          .map((row) => ConnectionSchema(name: _asString(row[0])))
+          .where((schema) => schema.name.isNotEmpty)
+          .toList();
+    } finally {
+      await conn.close();
+    }
+  }
+
+  @override
+  Future<List<ConnectionTable>> listTables(
+    covariant Connection connection,
+    String database,
+    String? schema,
+  ) async {
+    final conn = await _connect(connection, database: database);
+    try {
+      final schemaToUse = _effectiveSchema(schema);
       final results = await conn.execute(
-        "SELECT table_name, table_type FROM information_schema.tables WHERE table_schema = 'public';",
+        pg.Sql.named('''
+          SELECT table_name, table_type
+          FROM information_schema.tables
+          WHERE table_schema = @schema
+          ORDER BY table_name;
+        '''),
+        parameters: {'schema': schemaToUse},
       );
 
       return results
@@ -137,15 +170,24 @@ class PostgresDriver implements DatabaseDriver {
     covariant Connection connection,
     String database,
     String table, {
+    String? schema,
     void Function(QueryHistory)? onHistory,
   }) async {
     final conn = await _connect(connection, database: database);
     try {
-      final quotedTable = _quoteIdentifier(table);
-      final sql =
-          "SELECT column_name, data_type, character_maximum_length, is_nullable FROM information_schema.columns WHERE table_schema = 'public' AND table_name = '$table' ORDER BY ordinal_position;";
+      final schemaToUse = _effectiveSchema(schema);
+      final qualifiedTable = _qualifiedIdentifier(schemaToUse, table);
+      final sql = '''
+          SELECT column_name, data_type, character_maximum_length, is_nullable
+          FROM information_schema.columns
+          WHERE table_schema = @schema AND table_name = @table
+          ORDER BY ordinal_position;
+          ''';
       final startMs = DateTime.now().millisecondsSinceEpoch;
-      final schema = await conn.execute(sql);
+      final tableSchema = await conn.execute(
+        pg.Sql.named(sql),
+        parameters: {'schema': schemaToUse, 'table': table},
+      );
       final execMs = DateTime.now().millisecondsSinceEpoch - startMs;
 
       onHistory?.call(
@@ -161,15 +203,17 @@ class PostgresDriver implements DatabaseDriver {
         ),
       );
 
-      final pkeySql =
-          '''
+      final pkeySql = '''
         SELECT a.attname
         FROM pg_index i
         JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)
-        WHERE i.indrelid = '$quotedTable'::regclass AND i.indisprimary;
+        WHERE i.indrelid = to_regclass(@qualifiedTable) AND i.indisprimary;
       ''';
 
-      final pkeyResults = await conn.execute(pkeySql);
+      final pkeyResults = await conn.execute(
+        pg.Sql.named(pkeySql),
+        parameters: {'qualifiedTable': qualifiedTable},
+      );
       final primaryKeys = pkeyResults.map((row) => _asString(row[0])).toSet();
 
       final fkSql = '''
@@ -185,13 +229,15 @@ class PostgresDriver implements DatabaseDriver {
             JOIN information_schema.constraint_column_usage AS ccu
               ON ccu.constraint_name = tc.constraint_name
               AND ccu.table_schema = tc.table_schema
-        WHERE tc.constraint_type = 'FOREIGN KEY' AND tc.table_name = @table;
+        WHERE tc.constraint_type = 'FOREIGN KEY'
+          AND tc.table_schema = @schema
+          AND tc.table_name = @table;
       ''';
 
       final startFkMs = DateTime.now().millisecondsSinceEpoch;
       final fkSchema = await conn.execute(
         pg.Sql.named(fkSql),
-        parameters: {'table': table},
+        parameters: {'schema': schemaToUse, 'table': table},
       );
       final execFkMs = DateTime.now().millisecondsSinceEpoch - startFkMs;
 
@@ -221,7 +267,7 @@ class PostgresDriver implements DatabaseDriver {
       final lengths = <String, int?>{};
       final nullables = <String>{};
 
-      for (final row in schema) {
+      for (final row in tableSchema) {
         final name = _asString(row[0]);
         types[name] = _asString(row[1]);
         lengths[name] = row[2] != null ? int.tryParse(row[2].toString()) : null;
@@ -230,7 +276,7 @@ class PostgresDriver implements DatabaseDriver {
         }
       }
 
-      final columns = schema.map((row) {
+      final columns = tableSchema.map((row) {
         final name = _asString(row[0]);
         return TableDataColumn(
           name: name,
@@ -253,8 +299,11 @@ class PostgresDriver implements DatabaseDriver {
             JOIN pg_index ix ON t.oid = ix.indrelid
             JOIN pg_class i ON i.oid = ix.indexrelid
             JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = ANY(ix.indkey)
+            JOIN pg_namespace n ON n.oid = t.relnamespace
         WHERE
-            t.relkind = 'r' AND t.relname = @table
+            t.relkind = 'r'
+            AND n.nspname = @schema
+            AND t.relname = @table
         ORDER BY
             i.relname, a.attnum;
       ''';
@@ -262,7 +311,7 @@ class PostgresDriver implements DatabaseDriver {
       final startIdxMs = DateTime.now().millisecondsSinceEpoch;
       final idxSchema = await conn.execute(
         pg.Sql.named(idxSql),
-        parameters: {'table': table},
+        parameters: {'schema': schemaToUse, 'table': table},
       );
       final execIdxMs = DateTime.now().millisecondsSinceEpoch - startIdxMs;
 
@@ -323,6 +372,7 @@ class PostgresDriver implements DatabaseDriver {
     covariant Connection connection,
     String database,
     String table, {
+    String? schema,
     required TableStructure structure,
     String? searchQuery,
     String? searchColumn,
@@ -331,14 +381,17 @@ class PostgresDriver implements DatabaseDriver {
   }) async {
     final conn = await _connect(connection, database: database);
     try {
-      var sql = 'SELECT COUNT(*) AS total FROM ${_quoteIdentifier(table)}';
+      var sql =
+          'SELECT COUNT(*) AS total FROM ${_qualifiedIdentifier(_effectiveSchema(schema), table)}';
 
       final parameters = <String, dynamic>{};
       final whereClauses = <String>[];
 
       if (searchQuery != null && searchQuery.isNotEmpty) {
         if (searchColumn != null && searchColumn != '__ALL__') {
-          whereClauses.add('CAST(${_quoteIdentifier(searchColumn)} AS TEXT) ILIKE @search');
+          whereClauses.add(
+            'CAST(${_quoteIdentifier(searchColumn)} AS TEXT) ILIKE @search',
+          );
           parameters['search'] = '%$searchQuery%';
         } else {
           final searchClauses = structure.columns
@@ -398,6 +451,7 @@ class PostgresDriver implements DatabaseDriver {
     covariant Connection connection,
     String database,
     String table, {
+    String? schema,
     required TableStructure structure,
     required int offset,
     required int limit,
@@ -409,14 +463,17 @@ class PostgresDriver implements DatabaseDriver {
     final conn = await _connect(connection, database: database);
     final stopwatch = Stopwatch()..start();
     try {
-      var sql = 'SELECT * FROM ${_quoteIdentifier(table)}';
+      var sql =
+          'SELECT * FROM ${_qualifiedIdentifier(_effectiveSchema(schema), table)}';
 
       final parameters = <String, dynamic>{};
       final whereClauses = <String>[];
 
       if (searchQuery != null && searchQuery.isNotEmpty) {
         if (searchColumn != null && searchColumn != '__ALL__') {
-          whereClauses.add('CAST(${_quoteIdentifier(searchColumn)} AS TEXT) ILIKE @search');
+          whereClauses.add(
+            'CAST(${_quoteIdentifier(searchColumn)} AS TEXT) ILIKE @search',
+          );
           parameters['search'] = '%$searchQuery%';
         } else {
           final searchClauses = structure.columns
@@ -488,6 +545,7 @@ class PostgresDriver implements DatabaseDriver {
     covariant Connection connection,
     String database,
     String table, {
+    String? schema,
     required TableStructure structure,
     required List<TableCellChange> cellChanges,
     required List<TableDataRow> deletedRows,
@@ -510,6 +568,7 @@ class PostgresDriver implements DatabaseDriver {
             connection.id,
             txn,
             database,
+            schema,
             table,
             structure,
             primaryKeyIndexes,
@@ -522,6 +581,7 @@ class PostgresDriver implements DatabaseDriver {
             connection.id,
             txn,
             database,
+            schema,
             table,
             structure,
             primaryKeyIndexes,
@@ -534,6 +594,7 @@ class PostgresDriver implements DatabaseDriver {
             connection.id,
             txn,
             database,
+            schema,
             table,
             structure,
             row,
@@ -550,6 +611,7 @@ class PostgresDriver implements DatabaseDriver {
     String connectionId,
     pg.TxSession txn,
     String database,
+    String? schema,
     String table,
     TableStructure structure,
     Map<String, dynamic> insertedRow,
@@ -564,7 +626,9 @@ class PostgresDriver implements DatabaseDriver {
       final col = structure.columns.firstWhere((c) => c.name == entry.key);
       columns.add(_quoteIdentifier(col.name));
       placeholders.add('@p$i');
-      if (_isBinaryColumn(col.databaseType) && entry.value != null && entry.value.toString().isNotEmpty) {
+      if (_isBinaryColumn(col.databaseType) &&
+          entry.value != null &&
+          entry.value.toString().isNotEmpty) {
         parameters['p$i'] = _decodeHex(entry.value.toString());
       } else {
         parameters['p$i'] = entry.value;
@@ -577,8 +641,12 @@ class PostgresDriver implements DatabaseDriver {
       sql = 'INSERT INTO ${_quoteIdentifier(table)} DEFAULT VALUES';
     } else {
       sql =
-          'INSERT INTO ${_quoteIdentifier(table)} (${columns.join(', ')}) '
+          'INSERT INTO ${_qualifiedIdentifier(_effectiveSchema(schema), table)} (${columns.join(', ')}) '
           'VALUES (${placeholders.join(', ')})';
+    }
+    if (columns.isEmpty) {
+      sql =
+          'INSERT INTO ${_qualifiedIdentifier(_effectiveSchema(schema), table)} DEFAULT VALUES';
     }
 
     final startMs = DateTime.now().millisecondsSinceEpoch;
@@ -603,6 +671,7 @@ class PostgresDriver implements DatabaseDriver {
     String connectionId,
     pg.TxSession txn,
     String database,
+    String? schema,
     String table,
     TableStructure structure,
     List<int> primaryKeyIndexes,
@@ -621,7 +690,7 @@ class PostgresDriver implements DatabaseDriver {
     final where = whereClauses.join(' AND ');
 
     final sql =
-        'UPDATE ${_quoteIdentifier(table)} '
+        'UPDATE ${_qualifiedIdentifier(_effectiveSchema(schema), table)} '
         'SET $setClause WHERE $where';
 
     final updatedValue =
@@ -656,6 +725,7 @@ class PostgresDriver implements DatabaseDriver {
     String connectionId,
     pg.TxSession txn,
     String database,
+    String? schema,
     String table,
     TableStructure structure,
     List<int> primaryKeyIndexes,
@@ -671,7 +741,7 @@ class PostgresDriver implements DatabaseDriver {
     final where = whereClauses.join(' AND ');
 
     final sql =
-        'DELETE FROM ${_quoteIdentifier(table)} '
+        'DELETE FROM ${_qualifiedIdentifier(_effectiveSchema(schema), table)} '
         'WHERE $where';
 
     final parameters = <String, dynamic>{};
@@ -698,6 +768,12 @@ class PostgresDriver implements DatabaseDriver {
   }
 
   String _quoteIdentifier(String value) => '"${value.replaceAll('"', '""')}"';
+
+  String _effectiveSchema(String? schema) =>
+      schema == null || schema.trim().isEmpty ? 'public' : schema.trim();
+
+  String _qualifiedIdentifier(String schema, String table) =>
+      '${_quoteIdentifier(schema)}.${_quoteIdentifier(table)}';
 
   TableCellValue _cell(dynamic value, TableDataColumn column) {
     if (value == null) return const TableCellValue.nullValue();
@@ -732,10 +808,14 @@ class PostgresDriver implements DatabaseDriver {
     covariant Connection connection,
     String database,
     String sql,
+    String? schema,
   ) async {
     pg.Connection? conn;
     try {
       conn = await _connect(connection, database: database);
+      if (schema != null && schema.trim().isNotEmpty) {
+        await conn.execute('SET search_path TO ${_quoteIdentifier(schema)}');
+      }
 
       final statements = sql
           .split(';')
@@ -835,6 +915,7 @@ class PostgresDriver implements DatabaseDriver {
   Future<void> createTable(
     covariant Connection connection,
     String database,
+    String? schema,
     String tableName,
     List<TableColumnDefinition> columns,
   ) async {
@@ -880,7 +961,7 @@ class PostgresDriver implements DatabaseDriver {
       }
 
       final sql =
-          'CREATE TABLE "${tableName.replaceAll('"', '""')}" (\n  ${columnDefs.join(',\n  ')}\n)';
+          'CREATE TABLE ${_qualifiedIdentifier(_effectiveSchema(schema), tableName)} (\n  ${columnDefs.join(',\n  ')}\n)';
       await conn.execute(sql);
     } finally {
       await conn.close();
@@ -891,19 +972,21 @@ class PostgresDriver implements DatabaseDriver {
   Future<List<TableColumnDefinition>> getTableSchema(
     covariant Connection connection,
     String database,
+    String? schema,
     String table,
   ) async {
     final conn = await _connect(connection, database: database);
     try {
-      final schema = await conn.execute(
+      final schemaToUse = _effectiveSchema(schema);
+      final columnRows = await conn.execute(
         pg.Sql.named('''
           SELECT column_name, data_type, character_maximum_length,
                  is_nullable, column_default, is_identity
           FROM information_schema.columns
-          WHERE table_schema = 'public' AND table_name = @table
+          WHERE table_schema = @schema AND table_name = @table
           ORDER BY ordinal_position
         '''),
-        parameters: {'table': table},
+        parameters: {'schema': schemaToUse, 'table': table},
       );
 
       final pkeyResults = await conn.execute(
@@ -915,17 +998,17 @@ class PostgresDriver implements DatabaseDriver {
                table_constraints.constraint_schema
            AND key_column_usage.constraint_name =
                table_constraints.constraint_name
-          WHERE table_constraints.table_schema = 'public'
+          WHERE table_constraints.table_schema = @schema
             AND table_constraints.table_name = @table
             AND table_constraints.constraint_type = 'PRIMARY KEY'
           ORDER BY key_column_usage.ordinal_position
         '''),
-        parameters: {'table': table},
+        parameters: {'schema': schemaToUse, 'table': table},
       );
       final primaryKeys = pkeyResults.map((row) => _asString(row[0])).toSet();
 
       final columns = <TableColumnDefinition>[];
-      for (final row in schema) {
+      for (final row in columnRows) {
         final name = _asString(row[0]);
         final typeRaw = _asString(row[1]);
         final lengthStr = row[2]?.toString();
@@ -977,9 +1060,24 @@ class PostgresDriver implements DatabaseDriver {
   }
 
   @override
+  Future<void> createSchema(
+    covariant Connection connection,
+    String database,
+    String name,
+  ) async {
+    final conn = await _connect(connection, database: database);
+    try {
+      await conn.execute('CREATE SCHEMA ${_quoteIdentifier(name)}');
+    } finally {
+      await conn.close();
+    }
+  }
+
+  @override
   Future<void> alterTable(
     covariant Connection connection,
     String database,
+    String? schema,
     String oldTableName,
     String newTableName,
     List<TableColumnDefinition> oldColumns,
@@ -987,16 +1085,20 @@ class PostgresDriver implements DatabaseDriver {
   ) async {
     final conn = await _connect(connection, database: database);
     try {
+      final schemaToUse = _effectiveSchema(schema);
       await conn.runTx((transaction) async {
+        await transaction.execute(
+          'SET LOCAL search_path TO ${_quoteIdentifier(schemaToUse)}',
+        );
         final pkResult = await transaction.execute(
           pg.Sql.named('''
             SELECT constraint_name
             FROM information_schema.table_constraints
-            WHERE table_schema = 'public'
+            WHERE table_schema = @schema
               AND table_name = @table
               AND constraint_type = 'PRIMARY KEY'
           '''),
-          parameters: {'table': oldTableName},
+          parameters: {'schema': schemaToUse, 'table': oldTableName},
         );
         final primaryKeyConstraint = pkResult.isEmpty
             ? null
@@ -1014,12 +1116,12 @@ class PostgresDriver implements DatabaseDriver {
                  )::regclass
             JOIN pg_namespace AS sequence_schema
               ON sequence_schema.oid = sequence.relnamespace
-            WHERE columns.table_schema = 'public'
+            WHERE columns.table_schema = @schema
               AND columns.table_name = @table
               AND columns.is_identity = 'NO'
               AND columns.column_default LIKE 'nextval(%'
           '''),
-          parameters: {'table': oldTableName},
+          parameters: {'schema': schemaToUse, 'table': oldTableName},
         );
         final serialSequences = <String, String>{
           for (final row in serialResult)
@@ -1048,11 +1150,13 @@ class PostgresDriver implements DatabaseDriver {
     covariant Connection connection,
     String database,
     String table, {
+    String? schema,
     bool cascade = false,
   }) async {
     final conn = await _connect(connection, database: database);
     try {
-      var sql = 'DROP TABLE ${_quoteIdentifier(table)}';
+      var sql =
+          'DROP TABLE ${_qualifiedIdentifier(_effectiveSchema(schema), table)}';
       if (cascade) {
         sql += ' CASCADE';
       }
@@ -1067,11 +1171,13 @@ class PostgresDriver implements DatabaseDriver {
     covariant Connection connection,
     String database,
     String table, {
+    String? schema,
     bool cascade = false,
   }) async {
     final conn = await _connect(connection, database: database);
     try {
-      var sql = 'TRUNCATE TABLE ${_quoteIdentifier(table)}';
+      var sql =
+          'TRUNCATE TABLE ${_qualifiedIdentifier(_effectiveSchema(schema), table)}';
       if (cascade) {
         sql += ' CASCADE';
       }

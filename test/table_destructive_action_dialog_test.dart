@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:forui/forui.dart';
 import 'package:querypod/features/connections/domain/entities/connection.dart';
 import 'package:querypod/features/editor/domain/entities/connection_database.dart';
+import 'package:querypod/features/editor/domain/entities/connection_schema.dart';
 import 'package:querypod/features/editor/domain/entities/connection_table.dart';
 import 'package:querypod/features/editor/domain/entities/query_result.dart';
 import 'package:querypod/features/editor/domain/entities/table_data.dart';
@@ -198,6 +199,7 @@ class _SpyMetadataCubit extends ConnectionMetadataCubit {
     Connection connection,
     String database,
     String table, {
+    String? schema,
     bool cascade = false,
   }) async {
     if (dropError != null) throw dropError!;
@@ -209,6 +211,7 @@ class _SpyMetadataCubit extends ConnectionMetadataCubit {
     Connection connection,
     String database,
     String table, {
+    String? schema,
     bool cascade = false,
   }) async {
     truncateCalls.add((table, cascade));
@@ -232,6 +235,7 @@ class _NoopConnectionMetadataRepository
   Future<void> alterTable(
     Connection connection,
     String database,
+    String? schema,
     String oldTableName,
     String newTableName,
     List<TableColumnDefinition> oldColumns,
@@ -250,6 +254,7 @@ class _NoopConnectionMetadataRepository
   Future<void> createTable(
     Connection connection,
     String database,
+    String? schema,
     String tableName,
     List<TableColumnDefinition> columns,
   ) async {}
@@ -259,6 +264,7 @@ class _NoopConnectionMetadataRepository
     Connection connection,
     String database,
     String table, {
+    String? schema,
     bool cascade = false,
   }) async {}
 
@@ -266,8 +272,28 @@ class _NoopConnectionMetadataRepository
   Future<List<TableColumnDefinition>> getTableSchema(
     Connection connection,
     String database,
+    String? schema,
     String table,
   ) async => [];
+
+  @override
+  Future<List<ConnectionSchema>> listSchemas(
+    Connection connection,
+    String database,
+  ) async => const [ConnectionSchema(name: 'public')];
+
+  @override
+  Future<String?> getSelectedSchema({
+    required String connectionId,
+    required String database,
+  }) async => null;
+
+  @override
+  Future<void> setSelectedSchema({
+    required String connectionId,
+    required String database,
+    required String? schema,
+  }) async {}
 
   @override
   Future<List<ConnectionDatabase>> listDatabases(Connection connection) async =>
@@ -277,6 +303,7 @@ class _NoopConnectionMetadataRepository
   Future<List<ConnectionTable>> listTables(
     Connection connection,
     String database,
+    String? schema,
   ) async => [];
 
   @override
@@ -284,8 +311,16 @@ class _NoopConnectionMetadataRepository
     Connection connection,
     String database,
     String table, {
+    String? schema,
     bool cascade = false,
   }) async {}
+
+  @override
+  Future<void> createSchema(
+    Connection connection,
+    String database,
+    String name,
+  ) async {}
 }
 
 class _NoopPinnedTablesRepository implements PinnedTablesRepository {
@@ -293,12 +328,14 @@ class _NoopPinnedTablesRepository implements PinnedTablesRepository {
   Future<List<String>> getPinnedTables({
     required String connectionId,
     required String database,
+    String? schema,
   }) async => [];
 
   @override
   Future<void> setPinnedTables({
     required String connectionId,
     required String database,
+    String? schema,
     required List<String> tableNames,
   }) async {}
 }
@@ -309,6 +346,7 @@ class _NoopTableDataRepository implements TableDataRepository {
     Connection connection,
     String database,
     String table, {
+    String? schema,
     required TableStructure structure,
     required List<TableCellChange> cellChanges,
     required List<TableDataRow> deletedRows,
@@ -320,6 +358,7 @@ class _NoopTableDataRepository implements TableDataRepository {
     Connection connection,
     String database,
     String table, {
+    String? schema,
     required TableStructure structure,
     String? searchQuery,
     String? searchColumn,
@@ -331,6 +370,7 @@ class _NoopTableDataRepository implements TableDataRepository {
     Connection connection,
     String database,
     String sql,
+    String? schema,
   ) async => [const QueryResult()];
 
   @override
@@ -338,6 +378,7 @@ class _NoopTableDataRepository implements TableDataRepository {
     Connection connection,
     String database,
     String table, {
+    String? schema,
     required TableStructure structure,
     required int offset,
     required int limit,
@@ -351,5 +392,6 @@ class _NoopTableDataRepository implements TableDataRepository {
     Connection connection,
     String database,
     String table,
+    String? schema,
   ) async => TableStructure(columns: const [], orderColumn: 'id');
 }

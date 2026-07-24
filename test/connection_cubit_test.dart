@@ -136,6 +136,33 @@ void main() {
     },
   );
 
+  test(
+    'delete clears stale active connection when selection is null',
+    () async {
+      final repository = _FakeConnectionRepository(
+        connections: [
+          connection(id: 'active', workspaceId: 'workspace-a'),
+          connection(id: 'visible', workspaceId: 'workspace-b'),
+        ],
+        selectedId: 'active',
+      );
+      final cubit = ConnectionCubit(repository: repository);
+      await cubit.load();
+      await cubit.setWorkspace('workspace-b');
+
+      expect(cubit.state.selectedId, isNull);
+      expect(cubit.state.activeConnection?.id, 'active');
+
+      await cubit.delete('active');
+
+      expect(cubit.state.activeConnection, isNull);
+      expect(cubit.state.connections.map((item) => item.id).toList(), [
+        'visible',
+      ]);
+      await cubit.close();
+    },
+  );
+
   test('delete sets error state when repository delete fails', () async {
     final cubit = ConnectionCubit(
       repository: _FakeConnectionRepository(

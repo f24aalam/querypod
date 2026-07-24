@@ -22,7 +22,10 @@ void main() {
 
   test('loadWorkspaces emits loading then loaded', () async {
     final repository = _FakeWorkspaceRepository(
-      workspaces: [workspace(id: 'a'), workspace(id: 'b')],
+      workspaces: [
+        workspace(id: 'a'),
+        workspace(id: 'b'),
+      ],
     );
     final cubit = WorkspacesCubit(repository: repository);
 
@@ -45,7 +48,9 @@ void main() {
 
   test('loadWorkspaces emits error when repository fails', () async {
     final cubit = WorkspacesCubit(
-      repository: _FakeWorkspaceRepository(getWorkspacesError: Exception('boom')),
+      repository: _FakeWorkspaceRepository(
+        getWorkspacesError: Exception('boom'),
+      ),
     );
 
     final future = expectLater(
@@ -83,7 +88,9 @@ void main() {
 
   test('createWorkspace emits error when repository create fails', () async {
     final cubit = WorkspacesCubit(
-      repository: _FakeWorkspaceRepository(createError: Exception('create failed')),
+      repository: _FakeWorkspaceRepository(
+        createError: Exception('create failed'),
+      ),
     );
 
     await cubit.createWorkspace('Broken');
@@ -113,7 +120,9 @@ void main() {
 
   test('updateWorkspace emits error when repository update fails', () async {
     final cubit = WorkspacesCubit(
-      repository: _FakeWorkspaceRepository(updateError: Exception('update failed')),
+      repository: _FakeWorkspaceRepository(
+        updateError: Exception('update failed'),
+      ),
     );
 
     await cubit.updateWorkspace(workspace());
@@ -138,7 +147,9 @@ void main() {
 
   test('deleteWorkspace emits error when repository delete fails', () async {
     final cubit = WorkspacesCubit(
-      repository: _FakeWorkspaceRepository(deleteError: Exception('delete failed')),
+      repository: _FakeWorkspaceRepository(
+        deleteError: Exception('delete failed'),
+      ),
     );
 
     await cubit.deleteWorkspace('first');

@@ -139,6 +139,7 @@ class _ConnectionItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final itemContext = context;
     return FContextMenu(
       menuBuilder: (context, controller, menu) => [
         FItemGroup(
@@ -148,7 +149,10 @@ class _ConnectionItem extends StatelessWidget {
               prefix: const Icon(Icons.delete_outline, size: 14),
               onPress: () {
                 controller.hide();
-                _showDeleteConfirmation(context);
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (!itemContext.mounted) return;
+                  _showDeleteConfirmation(itemContext);
+                });
               },
             ),
           ],

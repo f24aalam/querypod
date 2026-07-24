@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querypod/features/connections/domain/entities/connection.dart';
 import 'package:querypod/features/editor/domain/entities/connection_database.dart';
+import 'package:querypod/features/editor/domain/entities/connection_schema.dart';
 import 'package:querypod/features/editor/domain/entities/connection_table.dart';
 import 'package:querypod/features/editor/domain/repositories/connection_metadata_repository.dart';
 import 'package:querypod/features/editor/domain/repositories/pinned_tables_repository.dart';
@@ -237,6 +238,41 @@ void main() {
       'users',
     ]);
   });
+
+  test(
+    'postgres load restores selected schema and loads tables for it',
+    () async {
+      final repository =
+          _MutableRepository(
+              tables: const [
+                ConnectionTable(
+                  name: 'events',
+                  type: ConnectionTableType.table,
+                ),
+              ],
+            )
+            ..schemas = const [
+              ConnectionSchema(name: 'analytics'),
+              ConnectionSchema(name: 'public'),
+            ]
+            ..selectedSchemas['same-id::first_db'] = 'analytics';
+      final cubit = ConnectionMetadataCubit(
+        repository: repository,
+        pinnedTablesRepository: _MemoryPinnedTablesRepository(),
+      );
+      final connection = firstConnection.copyWith(
+        database: 'first_db',
+        type: ConnectionType.postgresql,
+      );
+
+      await cubit.loadConnection(connection);
+
+      expect(cubit.state.selectedDatabase, 'first_db');
+      expect(cubit.state.selectedSchema, 'analytics');
+      expect(repository.lastListTablesSchema, 'analytics');
+      expect(cubit.state.tables.single.name, 'events');
+    },
+  );
 }
 
 class _MemoryPinnedTablesRepository implements PinnedTablesRepository {
@@ -245,30 +281,35 @@ class _MemoryPinnedTablesRepository implements PinnedTablesRepository {
   void seed({
     required String connectionId,
     required String database,
+    String? schema,
     required List<String> tableNames,
   }) {
-    _pins[_key(connectionId, database)] = List<String>.from(tableNames);
+    _pins[_key(connectionId, database, schema)] = List<String>.from(tableNames);
   }
 
   @override
   Future<List<String>> getPinnedTables({
     required String connectionId,
     required String database,
+    String? schema,
   }) async {
-    return List<String>.from(_pins[_key(connectionId, database)] ?? const []);
+    return List<String>.from(
+      _pins[_key(connectionId, database, schema)] ?? const [],
+    );
   }
 
   @override
   Future<void> setPinnedTables({
     required String connectionId,
     required String database,
+    String? schema,
     required List<String> tableNames,
   }) async {
-    _pins[_key(connectionId, database)] = List<String>.from(tableNames);
+    _pins[_key(connectionId, database, schema)] = List<String>.from(tableNames);
   }
 
-  String _key(String connectionId, String database) =>
-      '$connectionId::$database';
+  String _key(String connectionId, String database, String? schema) =>
+      '$connectionId::$database::${schema ?? 'public'}';
 }
 
 class _ImmediateRepository extends _MutableRepository {
@@ -279,6 +320,9 @@ class _MutableRepository implements ConnectionMetadataRepository {
   _MutableRepository({required this.tables});
 
   List<ConnectionTable> tables;
+  List<ConnectionSchema> schemas = const [ConnectionSchema(name: 'public')];
+  final selectedSchemas = <String, String>{};
+  String? lastListTablesSchema;
 
   @override
   Future<List<ConnectionDatabase>> listDatabases(Connection connection) async {
@@ -292,8 +336,37 @@ class _MutableRepository implements ConnectionMetadataRepository {
   Future<List<ConnectionTable>> listTables(
     Connection connection,
     String database,
+    String? schema,
   ) async {
+    lastListTablesSchema = schema;
     return tables;
+  }
+
+  @override
+  Future<List<ConnectionSchema>> listSchemas(
+    Connection connection,
+    String database,
+  ) async {
+    return schemas;
+  }
+
+  @override
+  Future<String?> getSelectedSchema({
+    required String connectionId,
+    required String database,
+  }) async => selectedSchemas['$connectionId::$database'];
+
+  @override
+  Future<void> setSelectedSchema({
+    required String connectionId,
+    required String database,
+    required String? schema,
+  }) async {
+    if (schema == null) {
+      selectedSchemas.remove('$connectionId::$database');
+    } else {
+      selectedSchemas['$connectionId::$database'] = schema;
+    }
   }
 
   @override
@@ -308,6 +381,7 @@ class _MutableRepository implements ConnectionMetadataRepository {
   Future<void> createTable(
     Connection connection,
     String database,
+    String? schema,
     String tableName,
     List<TableColumnDefinition> columns,
   ) async {}
@@ -316,6 +390,7 @@ class _MutableRepository implements ConnectionMetadataRepository {
   Future<List<TableColumnDefinition>> getTableSchema(
     Connection connection,
     String database,
+    String? schema,
     String table,
   ) async {
     return [];
@@ -325,6 +400,7 @@ class _MutableRepository implements ConnectionMetadataRepository {
   Future<void> alterTable(
     Connection connection,
     String database,
+    String? schema,
     String oldTableName,
     String newTableName,
     List<TableColumnDefinition> oldColumns,
@@ -336,6 +412,7 @@ class _MutableRepository implements ConnectionMetadataRepository {
     Connection connection,
     String database,
     String tableName, {
+    String? schema,
     bool cascade = false,
   }) async {}
 
@@ -344,8 +421,16 @@ class _MutableRepository implements ConnectionMetadataRepository {
     Connection connection,
     String database,
     String tableName, {
+    String? schema,
     bool cascade = false,
   }) async {}
+
+  @override
+  Future<void> createSchema(
+    Connection connection,
+    String database,
+    String name,
+  ) async {}
 }
 
 class _ControlledRepository implements ConnectionMetadataRepository {
@@ -363,9 +448,31 @@ class _ControlledRepository implements ConnectionMetadataRepository {
   Future<List<ConnectionTable>> listTables(
     Connection connection,
     String database,
+    String? schema,
   ) {
     return (tables[database] ??= Completer<List<ConnectionTable>>()).future;
   }
+
+  @override
+  Future<List<ConnectionSchema>> listSchemas(
+    Connection connection,
+    String database,
+  ) async {
+    return const [ConnectionSchema(name: 'public')];
+  }
+
+  @override
+  Future<String?> getSelectedSchema({
+    required String connectionId,
+    required String database,
+  }) async => null;
+
+  @override
+  Future<void> setSelectedSchema({
+    required String connectionId,
+    required String database,
+    required String? schema,
+  }) async {}
 
   @override
   Future<void> createDatabase(
@@ -379,6 +486,7 @@ class _ControlledRepository implements ConnectionMetadataRepository {
   Future<void> createTable(
     Connection connection,
     String database,
+    String? schema,
     String tableName,
     List<TableColumnDefinition> columns,
   ) async {}
@@ -387,6 +495,7 @@ class _ControlledRepository implements ConnectionMetadataRepository {
   Future<List<TableColumnDefinition>> getTableSchema(
     Connection connection,
     String database,
+    String? schema,
     String table,
   ) async {
     return [];
@@ -396,6 +505,7 @@ class _ControlledRepository implements ConnectionMetadataRepository {
   Future<void> alterTable(
     Connection connection,
     String database,
+    String? schema,
     String oldTableName,
     String newTableName,
     List<TableColumnDefinition> oldColumns,
@@ -407,6 +517,7 @@ class _ControlledRepository implements ConnectionMetadataRepository {
     Connection connection,
     String database,
     String tableName, {
+    String? schema,
     bool cascade = false,
   }) async {}
 
@@ -415,8 +526,16 @@ class _ControlledRepository implements ConnectionMetadataRepository {
     Connection connection,
     String database,
     String tableName, {
+    String? schema,
     bool cascade = false,
   }) async {}
+
+  @override
+  Future<void> createSchema(
+    Connection connection,
+    String database,
+    String name,
+  ) async {}
 }
 
 class _DatabaseSwitchRepository implements ConnectionMetadataRepository {
@@ -434,9 +553,31 @@ class _DatabaseSwitchRepository implements ConnectionMetadataRepository {
   Future<List<ConnectionTable>> listTables(
     Connection connection,
     String database,
+    String? schema,
   ) {
     return (tables[database] ??= Completer<List<ConnectionTable>>()).future;
   }
+
+  @override
+  Future<List<ConnectionSchema>> listSchemas(
+    Connection connection,
+    String database,
+  ) async {
+    return const [ConnectionSchema(name: 'public')];
+  }
+
+  @override
+  Future<String?> getSelectedSchema({
+    required String connectionId,
+    required String database,
+  }) async => null;
+
+  @override
+  Future<void> setSelectedSchema({
+    required String connectionId,
+    required String database,
+    required String? schema,
+  }) async {}
 
   @override
   Future<void> createDatabase(
@@ -450,6 +591,7 @@ class _DatabaseSwitchRepository implements ConnectionMetadataRepository {
   Future<void> createTable(
     Connection connection,
     String database,
+    String? schema,
     String tableName,
     List<TableColumnDefinition> columns,
   ) async {}
@@ -458,6 +600,7 @@ class _DatabaseSwitchRepository implements ConnectionMetadataRepository {
   Future<List<TableColumnDefinition>> getTableSchema(
     Connection connection,
     String database,
+    String? schema,
     String table,
   ) async {
     return [];
@@ -467,6 +610,7 @@ class _DatabaseSwitchRepository implements ConnectionMetadataRepository {
   Future<void> alterTable(
     Connection connection,
     String database,
+    String? schema,
     String oldTableName,
     String newTableName,
     List<TableColumnDefinition> oldColumns,
@@ -478,6 +622,7 @@ class _DatabaseSwitchRepository implements ConnectionMetadataRepository {
     Connection connection,
     String database,
     String tableName, {
+    String? schema,
     bool cascade = false,
   }) async {}
 
@@ -486,6 +631,14 @@ class _DatabaseSwitchRepository implements ConnectionMetadataRepository {
     Connection connection,
     String database,
     String tableName, {
+    String? schema,
     bool cascade = false,
   }) async {}
+
+  @override
+  Future<void> createSchema(
+    Connection connection,
+    String database,
+    String name,
+  ) async {}
 }

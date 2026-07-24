@@ -580,6 +580,7 @@ class _FakeTableDataRepository implements TableDataRepository {
     Connection connection,
     String database,
     String table,
+    String? schema,
   ) async {
     if (table == 'profiles' && foreignPreviewStructure != null) {
       return foreignPreviewStructure!;
@@ -592,6 +593,7 @@ class _FakeTableDataRepository implements TableDataRepository {
     Connection connection,
     String database,
     String sql,
+    String? schema,
   ) async {
     return [const QueryResult()];
   }
@@ -601,6 +603,7 @@ class _FakeTableDataRepository implements TableDataRepository {
     Connection connection,
     String database,
     String table, {
+    String? schema,
     required TableStructure structure,
     String? searchQuery,
     String? searchColumn,
@@ -615,6 +618,7 @@ class _FakeTableDataRepository implements TableDataRepository {
     Connection connection,
     String database,
     String table, {
+    String? schema,
     required TableStructure structure,
     required int offset,
     required int limit,
@@ -646,6 +650,7 @@ class _FakeTableDataRepository implements TableDataRepository {
     Connection connection,
     String database,
     String table, {
+    String? schema,
     required TableStructure structure,
     required List<TableCellChange> cellChanges,
     required List<TableDataRow> deletedRows,
@@ -667,6 +672,7 @@ class _ControlledPageRepository implements TableDataRepository {
     Connection connection,
     String database,
     String sql,
+    String? schema,
   ) async {
     return [const QueryResult()];
   }
@@ -676,6 +682,7 @@ class _ControlledPageRepository implements TableDataRepository {
     Connection connection,
     String database,
     String table,
+    String? schema,
   ) async => _structure;
 
   @override
@@ -683,6 +690,7 @@ class _ControlledPageRepository implements TableDataRepository {
     Connection connection,
     String database,
     String table, {
+    String? schema,
     required TableStructure structure,
     String? searchQuery,
     String? searchColumn,
@@ -694,6 +702,7 @@ class _ControlledPageRepository implements TableDataRepository {
     Connection connection,
     String database,
     String table, {
+    String? schema,
     required TableStructure structure,
     required int offset,
     required int limit,
@@ -719,6 +728,7 @@ class _ControlledPageRepository implements TableDataRepository {
     Connection connection,
     String database,
     String table, {
+    String? schema,
     required TableStructure structure,
     required List<TableCellChange> cellChanges,
     required List<TableDataRow> deletedRows,

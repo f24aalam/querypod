@@ -13,6 +13,7 @@ import '../cubit/table_data_cubit.dart';
 import '../cubit/connection_metadata_cubit.dart';
 import '../cubit/connection_metadata_state.dart';
 import 'create_database_dialog.dart';
+import 'create_schema_dialog.dart';
 import 'sidebar_header.dart';
 import 'table_destructive_action_dialog.dart';
 
@@ -95,6 +96,7 @@ class _TableListPanelState extends State<TableListPanel> {
                             context.read<EditorTabsCubit>().openCreateTableTab(
                               connectionId: selectedConnection.id,
                               database: database,
+                              schema: state.selectedSchema,
                             );
                           }
                         },
@@ -285,7 +287,12 @@ class _DatabasePicker extends StatelessWidget {
         .read<ConnectionCubit>()
         .state
         .activeConnection;
-    final items = {for (final db in state.databases) db.name: db.name};
+    final databaseItems = {for (final db in state.databases) db.name: db.name};
+    final schemaItems = {
+      for (final schema in state.schemas) schema.name: schema.name,
+    };
+    final showSchemaPicker =
+        selectedConnection?.type == ConnectionType.postgresql;
 
     return Container(
       decoration: BoxDecoration(
@@ -324,60 +331,151 @@ class _DatabasePicker extends StatelessWidget {
                   ],
                 ),
               )
-            : Row(
+            : Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Expanded(
-                    child: FSelect<String>.search(
-                      items: items,
-                      size: FTextFieldSizeVariant.sm,
-                      hint: 'Select database',
-                      enabled: selectedConnection != null && items.isNotEmpty,
-                      clearable: false,
-                      searchFieldProperties: const FSelectSearchFieldProperties(
-                        hint: 'Search databases...',
-                      ),
-                      contentConstraints: const FAutoWidthPortalConstraints(
-                        maxHeight: 300,
-                      ),
-                      prefixBuilder: (context, fieldStyle, widget) => Padding(
-                        padding: const EdgeInsets.only(left: 8),
-                        child: Icon(
-                          Icons.storage_outlined,
-                          size: 14,
-                          color: theme.colors.mutedForeground,
+                  Row(
+                    children: [
+                      Expanded(
+                        child: FSelect<String>.search(
+                          items: databaseItems,
+                          size: FTextFieldSizeVariant.sm,
+                          hint: 'Select database',
+                          enabled:
+                              selectedConnection != null &&
+                              databaseItems.isNotEmpty,
+                          clearable: false,
+                          searchFieldProperties:
+                              const FSelectSearchFieldProperties(
+                                hint: 'Search databases...',
+                              ),
+                          contentConstraints: const FAutoWidthPortalConstraints(
+                            maxHeight: 300,
+                          ),
+                          prefixBuilder: (context, fieldStyle, widget) =>
+                              Padding(
+                                padding: const EdgeInsets.only(left: 8),
+                                child: Icon(
+                                  Icons.storage_outlined,
+                                  size: 14,
+                                  color: theme.colors.mutedForeground,
+                                ),
+                              ),
+                          suffixBuilder: (context, fieldStyle, widget) =>
+                              Padding(
+                                padding: const EdgeInsets.only(right: 8),
+                                child: Icon(
+                                  Icons.arrow_drop_down,
+                                  size: 14,
+                                  color: theme.colors.mutedForeground,
+                                ),
+                              ),
+                          control: FSelectControl.lifted(
+                            value: state.selectedDatabase,
+                            onChange: (value) {
+                              if (value == null || selectedConnection == null) {
+                                return;
+                              }
+                              context
+                                  .read<ConnectionMetadataCubit>()
+                                  .selectDatabase(selectedConnection, value);
+                            },
+                          ),
                         ),
                       ),
-                      suffixBuilder: (context, fieldStyle, widget) => Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: Icon(
-                          Icons.arrow_drop_down,
-                          size: 14,
-                          color: theme.colors.mutedForeground,
+                      if (selectedConnection != null &&
+                          selectedConnection.type != ConnectionType.sqlite) ...[
+                        const SizedBox(width: 8),
+                        FButton.icon(
+                          onPress: () {
+                            CreateDatabaseDialog.show(
+                              context,
+                              selectedConnection,
+                            );
+                          },
+                          size: FButtonSizeVariant.sm,
+                          variant: FButtonVariant.outline,
+                          child: const Icon(Icons.add, size: 16),
                         ),
-                      ),
-                      control: FSelectControl.lifted(
-                        value: state.selectedDatabase,
-                        onChange: (value) {
-                          if (value == null || selectedConnection == null) {
-                            return;
-                          }
-                          context
-                              .read<ConnectionMetadataCubit>()
-                              .selectDatabase(selectedConnection, value);
-                        },
-                      ),
-                    ),
+                      ],
+                    ],
                   ),
-                  if (selectedConnection != null &&
-                      selectedConnection.type != ConnectionType.sqlite) ...[
-                    const SizedBox(width: 8),
-                    FButton.icon(
-                      onPress: () {
-                        CreateDatabaseDialog.show(context, selectedConnection);
-                      },
-                      size: FButtonSizeVariant.sm,
-                      variant: FButtonVariant.outline,
-                      child: const Icon(Icons.add, size: 16),
+                  if (showSchemaPicker) ...[
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: FSelect<String>.search(
+                            items: schemaItems,
+                            size: FTextFieldSizeVariant.sm,
+                            hint: 'Select schema',
+                            enabled:
+                                selectedConnection != null &&
+                                state.selectedDatabase != null &&
+                                schemaItems.isNotEmpty,
+                            clearable: false,
+                            searchFieldProperties:
+                                const FSelectSearchFieldProperties(
+                                  hint: 'Search schemas...',
+                                ),
+                            contentConstraints:
+                                const FAutoWidthPortalConstraints(
+                                  maxHeight: 300,
+                                ),
+                            prefixBuilder: (context, fieldStyle, widget) =>
+                                Padding(
+                                  padding: const EdgeInsets.only(left: 8),
+                                  child: Icon(
+                                    Icons.account_tree_outlined,
+                                    size: 14,
+                                    color: theme.colors.mutedForeground,
+                                  ),
+                                ),
+                            suffixBuilder: (context, fieldStyle, widget) =>
+                                Padding(
+                                  padding: const EdgeInsets.only(right: 8),
+                                  child: Icon(
+                                    Icons.arrow_drop_down,
+                                    size: 14,
+                                    color: theme.colors.mutedForeground,
+                                  ),
+                                ),
+                            control: FSelectControl.lifted(
+                              value: state.selectedSchema,
+                              onChange: (value) {
+                                final database = state.selectedDatabase;
+                                if (value == null ||
+                                    selectedConnection == null ||
+                                    database == null) {
+                                  return;
+                                }
+                                context
+                                    .read<ConnectionMetadataCubit>()
+                                    .selectSchema(
+                                      selectedConnection,
+                                      database,
+                                      value,
+                                    );
+                              },
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        FButton.icon(
+                          onPress: state.selectedDatabase == null
+                              ? null
+                              : () {
+                                  CreateSchemaDialog.show(
+                                    context,
+                                    connection: selectedConnection!,
+                                    database: state.selectedDatabase!,
+                                  );
+                                },
+                          size: FButtonSizeVariant.sm,
+                          variant: FButtonVariant.outline,
+                          child: const Icon(Icons.add, size: 16),
+                        ),
+                      ],
                     ),
                   ],
                 ],
@@ -433,6 +531,7 @@ class _TableItem extends StatelessWidget {
                 context.read<EditorTabsCubit>().openCreateTableTab(
                   connectionId: connection.id,
                   database: database,
+                  schema: metadata.state.selectedSchema,
                   tableToEdit: table.name,
                 );
               },
@@ -465,6 +564,7 @@ class _TableItem extends StatelessWidget {
                   context,
                   connection: connection,
                   database: database,
+                  schema: metadata.state.selectedSchema,
                   tableName: table.name,
                   actionType: DestructiveActionType.truncate,
                 );
@@ -494,6 +594,7 @@ class _TableItem extends StatelessWidget {
                   context,
                   connection: connection,
                   database: database,
+                  schema: metadata.state.selectedSchema,
                   tableName: table.name,
                   actionType: DestructiveActionType.drop,
                 );
@@ -550,6 +651,7 @@ class _TableItem extends StatelessWidget {
     final metadata = context.read<ConnectionMetadataCubit>();
     final connection = context.read<ConnectionCubit>().state.activeConnection;
     final database = metadata.state.selectedDatabase;
+    final schema = metadata.state.selectedSchema;
     if (connection == null || database == null) return;
 
     metadata.selectTable(table);
@@ -558,12 +660,14 @@ class _TableItem extends StatelessWidget {
       tabs.pinTable(
         connectionId: connection.id,
         database: database,
+        schema: schema,
         table: table,
       );
     } else {
       tabs.openTablePreview(
         connectionId: connection.id,
         database: database,
+        schema: schema,
         table: table,
       );
     }
@@ -571,6 +675,7 @@ class _TableItem extends StatelessWidget {
     final key = TableTabKey(
       connectionId: connection.id,
       database: database,
+      schema: schema,
       tableName: table.name,
     );
     unawaited(

@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:drift/native.dart';
+import 'package:querypod/app/database.dart';
 import 'package:querypod/core/database/database_driver_factory.dart';
 import 'package:querypod/features/connections/domain/entities/connection.dart';
 import 'package:querypod/features/editor/data/repositories/connection_metadata_repository_impl.dart';
@@ -176,7 +178,9 @@ class RepositoryIntegrationHarness {
     return RepositoryIntegrationHarness._(
       config: config,
       connection: config.toConnection(),
-      metadataRepository: ConnectionMetadataRepositoryImpl(),
+      metadataRepository: ConnectionMetadataRepositoryImpl(
+        database: QueryPodDatabase(executor: NativeDatabase.memory()),
+      ),
       tableRepository: TableDataRepositoryImpl(
         historyRepository: historyRepository,
       ),
@@ -223,6 +227,7 @@ class RepositoryIntegrationHarness {
     final tables = await metadataRepository.listTables(
       connection,
       config.database,
+      null,
     );
     final names = tables.map((table) => table.name).toSet();
 
@@ -251,6 +256,7 @@ class RepositoryIntegrationHarness {
       connection,
       config.database,
       'projects',
+      null,
     );
 
     final columnsByName = {
@@ -277,6 +283,7 @@ class RepositoryIntegrationHarness {
       connection,
       config.database,
       'project_members',
+      null,
     );
 
     final columnsByName = {
@@ -298,6 +305,7 @@ class RepositoryIntegrationHarness {
       connection,
       config.database,
       'SELECT id, email FROM users ORDER BY id LIMIT 2',
+      null,
     );
 
     expect(results, hasLength(1));
@@ -317,6 +325,7 @@ class RepositoryIntegrationHarness {
       connection,
       config.database,
       'SELECT FROM definitely_broken',
+      null,
     );
 
     expect(results, hasLength(1));
@@ -331,6 +340,7 @@ class RepositoryIntegrationHarness {
       connection,
       config.database,
       'large_events',
+      null,
     );
 
     final total = await tableRepository.countRows(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../../app/app_zoom_shortcuts.dart';
 import '../../../../core/platform_utils.dart';
 import 'app_menu_actions.dart';
 
@@ -13,49 +14,53 @@ class AppMenuShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (isMacOS) {
-      return PlatformMenuBar(
-        menus: [
-          const PlatformMenu(
-            label: 'QueryPod',
-            menus: [
-              PlatformMenuItemGroup(
-                members: [PlatformProvidedMenuItem(type: .about)],
-              ),
-              PlatformMenuItemGroup(
-                members: [PlatformProvidedMenuItem(type: .servicesSubmenu)],
-              ),
-              PlatformMenuItemGroup(
-                members: [
-                  PlatformProvidedMenuItem(type: .hide),
-                  PlatformProvidedMenuItem(type: .hideOtherApplications),
-                  PlatformProvidedMenuItem(type: .showAllApplications),
-                ],
-              ),
-              PlatformMenuItemGroup(
-                members: [PlatformProvidedMenuItem(type: .quit)],
-              ),
-            ],
-          ),
-          PlatformMenu(
-            label: 'Workspace',
-            menus: [
-              PlatformMenuItem(
-                label: 'Change Workspace',
-                onSelected: () => AppMenuActions.changeWorkspace(context),
-              ),
-            ],
-          ),
-        ],
-        child: child,
+      return AppZoomShortcuts(
+        child: PlatformMenuBar(
+          menus: [
+            const PlatformMenu(
+              label: 'QueryPod',
+              menus: [
+                PlatformMenuItemGroup(
+                  members: [PlatformProvidedMenuItem(type: .about)],
+                ),
+                PlatformMenuItemGroup(
+                  members: [PlatformProvidedMenuItem(type: .servicesSubmenu)],
+                ),
+                PlatformMenuItemGroup(
+                  members: [
+                    PlatformProvidedMenuItem(type: .hide),
+                    PlatformProvidedMenuItem(type: .hideOtherApplications),
+                    PlatformProvidedMenuItem(type: .showAllApplications),
+                  ],
+                ),
+                PlatformMenuItemGroup(
+                  members: [PlatformProvidedMenuItem(type: .quit)],
+                ),
+              ],
+            ),
+            PlatformMenu(
+              label: 'Workspace',
+              menus: [
+                PlatformMenuItem(
+                  label: 'Change Workspace',
+                  onSelected: () => AppMenuActions.changeWorkspace(context),
+                ),
+              ],
+            ),
+          ],
+          child: child,
+        ),
       );
     }
 
-    return CallbackShortcuts(
-      bindings: {
-        const SingleActivator(LogicalKeyboardKey.keyQ, control: true):
-            AppMenuActions.quit,
-      },
-      child: child,
+    return AppZoomShortcuts(
+      child: CallbackShortcuts(
+        bindings: {
+          const SingleActivator(LogicalKeyboardKey.keyQ, control: true):
+              AppMenuActions.quit,
+        },
+        child: child,
+      ),
     );
   }
 }

@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:forui/forui.dart';
@@ -21,6 +23,10 @@ class _SettingsDialogState extends State<SettingsDialog> {
   @override
   Widget build(BuildContext context) {
     final theme = context.theme;
+    final viewport = MediaQuery.sizeOf(context);
+    final dialogWidth = math.min(800.0, math.max(280.0, viewport.width - 48));
+    final dialogHeight = math.min(600.0, math.max(240.0, viewport.height - 48));
+    final compact = dialogWidth < 600;
 
     return Dialog(
       backgroundColor: theme.colors.background,
@@ -30,13 +36,13 @@ class _SettingsDialogState extends State<SettingsDialog> {
       ),
       clipBehavior: Clip.antiAlias,
       child: SizedBox(
-        width: 800,
-        height: 600,
+        width: dialogWidth,
+        height: dialogHeight,
         child: Row(
           children: [
             // Sidebar
             Container(
-              width: 240,
+              width: compact ? 156 : 240,
               decoration: BoxDecoration(
                 color: theme.colors.secondary,
                 border: Border(
@@ -72,7 +78,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
               child: Stack(
                 children: [
                   if (_selectedIndex == 0)
-                    const _AppearanceSettings()
+                    _AppearanceSettings(compact: compact)
                   else
                     const Center(child: Text('Placeholder')),
                   Positioned(
@@ -154,7 +160,9 @@ class _SidebarItem extends StatelessWidget {
 }
 
 class _AppearanceSettings extends StatelessWidget {
-  const _AppearanceSettings();
+  const _AppearanceSettings({required this.compact});
+
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -163,7 +171,7 @@ class _AppearanceSettings extends StatelessWidget {
     final theme = context.theme;
 
     return ListView(
-      padding: const EdgeInsets.all(32),
+      padding: EdgeInsets.all(compact ? 20 : 32),
       children: [
         Text(
           'Appearance & Theme',
@@ -183,8 +191,8 @@ class _AppearanceSettings extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
-        Align(
-          alignment: Alignment.centerLeft,
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
           child: Container(
             decoration: BoxDecoration(
               color: theme.colors.background,
@@ -271,6 +279,64 @@ class _AppearanceSettings extends StatelessWidget {
               }).toList(),
             ),
           ),
+        ),
+        const SizedBox(height: 32),
+        Text(
+          'Application Zoom',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w500,
+            color: theme.colors.foreground,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          'Scale the complete interface, including controls and dialogs.',
+          style: TextStyle(fontSize: 13, color: theme.colors.mutedForeground),
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            IconButton(
+              key: const ValueKey('zoom-out'),
+              tooltip: 'Zoom out',
+              onPressed: themeState.zoomLevel > minimumZoomLevel
+                  ? themeCubit.zoomOut
+                  : null,
+              icon: const Icon(Icons.remove, size: 18),
+            ),
+            Container(
+              key: const ValueKey('zoom-percentage'),
+              width: 64,
+              alignment: Alignment.center,
+              child: Text(
+                '${themeState.zoomPercentage}%',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: theme.colors.foreground,
+                ),
+              ),
+            ),
+            IconButton(
+              key: const ValueKey('zoom-in'),
+              tooltip: 'Zoom in',
+              onPressed: themeState.zoomLevel < maximumZoomLevel
+                  ? themeCubit.zoomIn
+                  : null,
+              icon: const Icon(Icons.add, size: 18),
+            ),
+            TextButton(
+              key: const ValueKey('zoom-reset'),
+              onPressed: themeState.zoomLevel == 0
+                  ? null
+                  : themeCubit.resetZoom,
+              child: const Text('Reset'),
+            ),
+          ],
         ),
         const SizedBox(height: 32),
         Text(

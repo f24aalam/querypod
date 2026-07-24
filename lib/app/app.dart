@@ -11,6 +11,9 @@ import '../features/editor/presentation/cubit/query_editor_cubit.dart';
 import '../features/editor/presentation/cubit/table_data_cubit.dart';
 import '../features/editor/presentation/cubit/connection_metadata_cubit.dart';
 import '../features/workspaces/presentation/cubit/workspaces_cubit.dart';
+import 'app_zoom_shortcuts.dart';
+import 'app_zoom_viewport.dart';
+import 'database.dart';
 import 'injection.dart';
 import 'router.dart';
 
@@ -18,8 +21,9 @@ import 'theme_cubit.dart';
 
 class App extends StatefulWidget {
   final String initialLocation;
+  final int initialZoomLevel;
 
-  const App({super.key, this.initialLocation = '/'});
+  const App({super.key, this.initialLocation = '/', this.initialZoomLevel = 0});
 
   @override
   State<App> createState() => _AppState();
@@ -32,7 +36,12 @@ class _AppState extends State<App> {
   Widget build(BuildContext context) {
     return MultiBlocProvider(
       providers: [
-        BlocProvider(create: (_) => ThemeCubit()),
+        BlocProvider(
+          create: (_) => ThemeCubit(
+            database: getIt<QueryPodDatabase>(),
+            initialZoomLevel: widget.initialZoomLevel,
+          ),
+        ),
         BlocProvider(create: (_) => getIt<ConnectionCubit>()..load()),
         BlocProvider(create: (_) => ConnectionEditorCubit()),
         BlocProvider(create: (_) => getIt<ConnectionMetadataCubit>()),
@@ -63,7 +72,12 @@ class _AppState extends State<App> {
               return FTheme(
                 data: foruiTheme,
                 child: DesktopResizeFrame(
-                  child: FToaster(child: FTooltipGroup(child: child!)),
+                  child: AppZoomViewport(
+                    scale: state.zoomScale,
+                    child: AppZoomShortcuts(
+                      child: FToaster(child: FTooltipGroup(child: child!)),
+                    ),
+                  ),
                 ),
               );
             },

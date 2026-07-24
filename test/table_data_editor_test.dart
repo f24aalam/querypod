@@ -100,6 +100,46 @@ void main() {
     expect(tester.widget<EditableText>(searchField).controller.text, 'ali');
     await cubit.close();
   });
+
+  testWidgets('row detail shows PostGIS geometry metadata', (tester) async {
+    final cubit = TableDataCubit(repository: _EditorRepository(geo: true));
+    await cubit.openTable(connection, key);
+    cubit.selectSingleRow(key, 0);
+
+    await tester.pumpWidget(_TableEditorHarness(cubit: cubit, tab: tab));
+    await tester.pumpAndSettle();
+
+    expect(find.text('geom'), findsWidgets);
+    expect(find.text('POINT(74.8447843 12.866526)'), findsWidgets);
+    expect(find.text('Kind: geometry'), findsOneWidget);
+    expect(find.text('Type: POINT'), findsOneWidget);
+    expect(find.text('SRID: 4326'), findsOneWidget);
+    expect(find.text('Coordinates: 12.866526, 74.8447843'), findsWidgets);
+    expect(find.byTooltip('Copy WKT'), findsOneWidget);
+    expect(find.byTooltip('Copy coordinates'), findsWidgets);
+    await cubit.close();
+  });
+
+  testWidgets('row detail recognizes generic latitude longitude columns', (
+    tester,
+  ) async {
+    final cubit = TableDataCubit(repository: _EditorRepository(geo: true));
+    await cubit.openTable(connection, key);
+    cubit.selectSingleRow(key, 0);
+
+    await tester.pumpWidget(_TableEditorHarness(cubit: cubit, tab: tab));
+    await tester.pumpAndSettle();
+
+    expect(find.text('lat'), findsWidgets);
+    expect(find.text('lon'), findsWidgets);
+    expect(find.text('Coordinate: latitude'), findsOneWidget);
+    await tester.drag(find.byType(ListView).last, const Offset(0, -260));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Coordinate: longitude'), findsOneWidget);
+    expect(find.text('Coordinates: 12.866526, 74.8447843'), findsWidgets);
+    await cubit.close();
+  });
 }
 
 class _TableEditorHarness extends StatelessWidget {
@@ -123,6 +163,10 @@ class _TableEditorHarness extends StatelessWidget {
 }
 
 class _EditorRepository implements TableDataRepository {
+  final bool geo;
+
+  const _EditorRepository({this.geo = false});
+
   @override
   Future<void> commitChanges(
     Connection connection,
@@ -179,6 +223,20 @@ class _EditorRepository implements TableDataRepository {
         queryDuration: const Duration(milliseconds: 1),
       );
     }
+    if (geo) {
+      return TableRowsPage(
+        rows: [
+          TableDataRow([
+            TableCellValue.text('1'),
+            TableCellValue.text('Mosque'),
+            TableCellValue.text('POINT(74.8447843 12.866526)'),
+            TableCellValue.text('12.866526'),
+            TableCellValue.text('74.8447843'),
+          ]),
+        ],
+        queryDuration: const Duration(milliseconds: 1),
+      );
+    }
     return TableRowsPage(
       rows: [
         TableDataRow([TableCellValue.text('1'), TableCellValue.text('1')]),
@@ -207,6 +265,50 @@ class _EditorRepository implements TableDataRepository {
           TableDataColumn(
             name: 'bio',
             databaseType: 'text',
+            length: 0,
+            isPrimaryKey: false,
+            isNullable: true,
+          ),
+        ],
+        orderColumn: 'id',
+      );
+    }
+    if (geo) {
+      return TableStructure(
+        columns: const [
+          TableDataColumn(
+            name: 'id',
+            databaseType: 'int',
+            length: 11,
+            isPrimaryKey: true,
+            isNullable: false,
+          ),
+          TableDataColumn(
+            name: 'name',
+            databaseType: 'text',
+            length: 0,
+            isPrimaryKey: false,
+            isNullable: true,
+          ),
+          TableDataColumn(
+            name: 'geom',
+            databaseType: 'geometry',
+            length: 0,
+            isPrimaryKey: false,
+            isNullable: true,
+            geoKind: TableColumnGeoKind.geometry,
+            srid: 4326,
+          ),
+          TableDataColumn(
+            name: 'lat',
+            databaseType: 'double precision',
+            length: 0,
+            isPrimaryKey: false,
+            isNullable: true,
+          ),
+          TableDataColumn(
+            name: 'lon',
+            databaseType: 'double precision',
             length: 0,
             isPrimaryKey: false,
             isNullable: true,

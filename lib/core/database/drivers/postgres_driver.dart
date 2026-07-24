@@ -47,6 +47,7 @@ class PostgresDriver implements DatabaseDriver {
       database: dbName.isEmpty ? 'postgres' : dbName,
       username: connection.user.isEmpty ? null : connection.user,
       password: connection.password.isEmpty ? null : connection.password,
+      isUnixSocket: connection.host.startsWith('/'),
     );
 
     return await pg.Connection.open(
@@ -178,7 +179,8 @@ class PostgresDriver implements DatabaseDriver {
       final schemaToUse = _effectiveSchema(schema);
       final qualifiedTable = _qualifiedIdentifier(schemaToUse, table);
       final sql = '''
-          SELECT column_name, data_type, character_maximum_length, is_nullable
+          SELECT column_name, data_type, character_maximum_length, is_nullable,
+                 udt_name
           FROM information_schema.columns
           WHERE table_schema = @schema AND table_name = @table
           ORDER BY ordinal_position;
@@ -187,6 +189,11 @@ class PostgresDriver implements DatabaseDriver {
       final tableSchema = await conn.execute(
         pg.Sql.named(sql),
         parameters: {'schema': schemaToUse, 'table': table},
+      );
+      final postgisColumns = await _loadPostgisColumnMetadata(
+        conn,
+        schemaToUse,
+        table,
       );
       final execMs = DateTime.now().millisecondsSinceEpoch - startMs;
 
@@ -269,7 +276,11 @@ class PostgresDriver implements DatabaseDriver {
 
       for (final row in tableSchema) {
         final name = _asString(row[0]);
-        types[name] = _asString(row[1]);
+        final dataType = _asString(row[1]);
+        final udtName = _asString(row[4]);
+        types[name] = dataType == 'USER-DEFINED' && udtName.isNotEmpty
+            ? udtName
+            : dataType;
         lengths[name] = row[2] != null ? int.tryParse(row[2].toString()) : null;
         if (_asString(row[3]).toUpperCase() == 'YES') {
           nullables.add(name);
@@ -278,6 +289,7 @@ class PostgresDriver implements DatabaseDriver {
 
       final columns = tableSchema.map((row) {
         final name = _asString(row[0]);
+        final postgisColumn = postgisColumns[name];
         return TableDataColumn(
           name: name,
           databaseType: types[name] ?? 'unknown',
@@ -285,6 +297,8 @@ class PostgresDriver implements DatabaseDriver {
           isPrimaryKey: primaryKeys.contains(name),
           isNullable: nullables.contains(name),
           foreignKey: fks[name],
+          geoKind: postgisColumn?.geoKind ?? TableColumnGeoKind.none,
+          srid: postgisColumn?.srid,
         );
       }).toList();
 
@@ -463,8 +477,11 @@ class PostgresDriver implements DatabaseDriver {
     final conn = await _connect(connection, database: database);
     final stopwatch = Stopwatch()..start();
     try {
+      final selectList = structure.columns
+          .map(_selectExpressionForColumn)
+          .join(', ');
       var sql =
-          'SELECT * FROM ${_qualifiedIdentifier(_effectiveSchema(schema), table)}';
+          'SELECT $selectList FROM ${_qualifiedIdentifier(_effectiveSchema(schema), table)}';
 
       final parameters = <String, dynamic>{};
       final whereClauses = <String>[];
@@ -775,6 +792,60 @@ class PostgresDriver implements DatabaseDriver {
   String _qualifiedIdentifier(String schema, String table) =>
       '${_quoteIdentifier(schema)}.${_quoteIdentifier(table)}';
 
+  Future<Map<String, _PostgisColumnMetadata>> _loadPostgisColumnMetadata(
+    pg.Connection conn,
+    String schema,
+    String table,
+  ) async {
+    final extensionResult = await conn.execute(
+      "SELECT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'postgis')",
+    );
+    final hasPostgis =
+        extensionResult.isNotEmpty && extensionResult.first[0] == true;
+    if (!hasPostgis) return const {};
+
+    final rows = await conn.execute(
+      pg.Sql.named('''
+        SELECT a.attname,
+               t.typname,
+               postgis_typmod_srid(a.atttypmod)
+        FROM pg_attribute a
+        JOIN pg_class c ON c.oid = a.attrelid
+        JOIN pg_namespace n ON n.oid = c.relnamespace
+        JOIN pg_type t ON t.oid = a.atttypid
+        WHERE n.nspname = @schema
+          AND c.relname = @table
+          AND a.attnum > 0
+          AND NOT a.attisdropped
+          AND t.typname IN ('geometry', 'geography')
+      '''),
+      parameters: {'schema': schema, 'table': table},
+    );
+
+    return {
+      for (final row in rows)
+        _asString(row[0]): _PostgisColumnMetadata(
+          geoKind: _asString(row[1]) == 'geography'
+              ? TableColumnGeoKind.geography
+              : TableColumnGeoKind.geometry,
+          srid: _sridOrNull(row[2]),
+        ),
+    };
+  }
+
+  int? _sridOrNull(Object? value) {
+    final srid = int.tryParse(_asString(value));
+    return srid == null || srid < 0 ? null : srid;
+  }
+
+  String _selectExpressionForColumn(TableDataColumn column) {
+    final identifier = _quoteIdentifier(column.name);
+    if (_isPostgisColumn(column)) {
+      return 'ST_AsText($identifier) AS $identifier';
+    }
+    return identifier;
+  }
+
   TableCellValue _cell(dynamic value, TableDataColumn column) {
     if (value == null) return const TableCellValue.nullValue();
     if (value is List<int> && _isBinaryColumn(column.databaseType)) {
@@ -801,6 +872,14 @@ class PostgresDriver implements DatabaseDriver {
   bool _isBinaryColumn(String databaseType) {
     final type = databaseType.toLowerCase();
     return type == 'bytea';
+  }
+
+  bool _isPostgisColumn(TableDataColumn column) {
+    final type = column.databaseType.toLowerCase();
+    return column.geoKind == TableColumnGeoKind.geometry ||
+        column.geoKind == TableColumnGeoKind.geography ||
+        type == 'geometry' ||
+        type == 'geography';
   }
 
   @override
@@ -1186,4 +1265,11 @@ class PostgresDriver implements DatabaseDriver {
       await conn.close();
     }
   }
+}
+
+class _PostgisColumnMetadata {
+  final TableColumnGeoKind geoKind;
+  final int? srid;
+
+  const _PostgisColumnMetadata({required this.geoKind, this.srid});
 }

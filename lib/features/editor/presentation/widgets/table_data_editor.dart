@@ -677,12 +677,46 @@ class _RowDetailPanel extends StatelessWidget {
               itemBuilder: (context, index) => _RowDetailField(
                 column: columns[index],
                 value: row.cells[index],
+                coordinatePair: _coordinatePairFor(index),
               ),
             ),
           ),
         ],
       ),
     );
+  }
+
+  String? _coordinatePairFor(int index) {
+    final column = columns[index];
+    final kind = column.effectiveGeoKind;
+    if (kind != TableColumnGeoKind.latitude &&
+        kind != TableColumnGeoKind.longitude) {
+      return null;
+    }
+
+    int? latIndex;
+    int? lonIndex;
+    for (var candidate = 0; candidate < columns.length; candidate++) {
+      switch (columns[candidate].effectiveGeoKind) {
+        case TableColumnGeoKind.latitude:
+          latIndex ??= candidate;
+        case TableColumnGeoKind.longitude:
+          lonIndex ??= candidate;
+        case TableColumnGeoKind.none:
+        case TableColumnGeoKind.geometry:
+        case TableColumnGeoKind.geography:
+          break;
+      }
+    }
+    if (latIndex == null || lonIndex == null) return null;
+    if (latIndex >= row.cells.length || lonIndex >= row.cells.length) {
+      return null;
+    }
+
+    final lat = _numericCellText(row.cells[latIndex]);
+    final lon = _numericCellText(row.cells[lonIndex]);
+    if (lat == null || lon == null) return null;
+    return '$lat, $lon';
   }
 }
 
@@ -819,13 +853,23 @@ class _InspectorMetric extends StatelessWidget {
 class _RowDetailField extends StatelessWidget {
   final TableDataColumn column;
   final TableCellValue value;
+  final String? coordinatePair;
 
-  const _RowDetailField({required this.column, required this.value});
+  const _RowDetailField({
+    required this.column,
+    required this.value,
+    this.coordinatePair,
+  });
 
   @override
   Widget build(BuildContext context) {
     final theme = context.theme;
     final displayedValue = value.fullText ?? value.display;
+    final geoDetail = _GeoDetail.fromColumnValue(
+      column: column,
+      value: value,
+      coordinatePair: coordinatePair,
+    );
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
@@ -884,10 +928,207 @@ class _RowDetailField extends StatelessWidget {
               ),
             ),
           ),
+          if (geoDetail != null) ...[
+            const SizedBox(height: 8),
+            _GeoDetailView(detail: geoDetail),
+          ],
         ],
       ),
     );
   }
+}
+
+class _GeoDetailView extends StatelessWidget {
+  final _GeoDetail detail;
+
+  const _GeoDetailView({required this.detail});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = context.theme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          children: [
+            for (final metric in detail.metrics)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                decoration: BoxDecoration(
+                  color: theme.colors.secondary,
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(color: theme.colors.border, width: 0.5),
+                ),
+                child: Text(
+                  '${metric.label}: ${metric.value}',
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: theme.colors.mutedForeground,
+                  ),
+                ),
+              ),
+          ],
+        ),
+        if (detail.wkt != null || detail.coordinates != null) ...[
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 4,
+            runSpacing: 4,
+            children: [
+              if (detail.wkt != null)
+                _GeoCopyButton(
+                  tooltip: 'Copy WKT',
+                  value: detail.wkt!,
+                  message: 'Copied WKT',
+                  icon: Icons.copy_outlined,
+                ),
+              if (detail.coordinates != null)
+                _GeoCopyButton(
+                  tooltip: 'Copy coordinates',
+                  value: detail.coordinates!,
+                  message: 'Copied coordinates',
+                  icon: Icons.location_on_outlined,
+                ),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _GeoCopyButton extends StatelessWidget {
+  final String tooltip;
+  final String value;
+  final String message;
+  final IconData icon;
+
+  const _GeoCopyButton({
+    required this.tooltip,
+    required this.value,
+    required this.message,
+    required this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = context.theme;
+    return IconButton(
+      tooltip: tooltip,
+      iconSize: 14,
+      constraints: const BoxConstraints.tightFor(width: 28, height: 24),
+      padding: EdgeInsets.zero,
+      color: theme.colors.mutedForeground,
+      onPressed: () async {
+        await Clipboard.setData(ClipboardData(text: value));
+        if (!context.mounted) return;
+        showFToast(
+          context: context,
+          variant: FToastVariant.primary,
+          title: Text(message),
+        );
+      },
+      icon: Icon(icon),
+    );
+  }
+}
+
+class _GeoDetail {
+  final List<_GeoMetric> metrics;
+  final String? wkt;
+  final String? coordinates;
+
+  const _GeoDetail({required this.metrics, this.wkt, this.coordinates});
+
+  static _GeoDetail? fromColumnValue({
+    required TableDataColumn column,
+    required TableCellValue value,
+    String? coordinatePair,
+  }) {
+    if (value.kind == TableCellKind.nullValue) return null;
+
+    final text = (value.fullText ?? value.display).trim();
+    if (text.isEmpty) return null;
+
+    final wktInfo = _parseWktInfo(text);
+    final kind = column.effectiveGeoKind;
+
+    if (kind == TableColumnGeoKind.geometry ||
+        kind == TableColumnGeoKind.geography ||
+        wktInfo != null) {
+      final pointCoordinates = wktInfo?.pointCoordinates;
+      return _GeoDetail(
+        metrics: [
+          _GeoMetric(
+            label: 'Kind',
+            value: kind == TableColumnGeoKind.geography
+                ? 'geography'
+                : kind == TableColumnGeoKind.geometry
+                ? 'geometry'
+                : 'WKT',
+          ),
+          if (wktInfo?.geometryType != null)
+            _GeoMetric(label: 'Type', value: wktInfo!.geometryType),
+          if (column.srid != null || wktInfo?.srid != null)
+            _GeoMetric(
+              label: 'SRID',
+              value: (column.srid ?? wktInfo!.srid).toString(),
+            ),
+          if (pointCoordinates != null || coordinatePair != null)
+            _GeoMetric(
+              label: 'Coordinates',
+              value: pointCoordinates ?? coordinatePair!,
+            ),
+        ],
+        wkt: wktInfo != null ? text : null,
+        coordinates: pointCoordinates ?? coordinatePair,
+      );
+    }
+
+    if (kind == TableColumnGeoKind.latitude ||
+        kind == TableColumnGeoKind.longitude) {
+      final numericText = _numericText(text);
+      if (numericText == null) return null;
+      return _GeoDetail(
+        metrics: [
+          _GeoMetric(
+            label: 'Coordinate',
+            value: kind == TableColumnGeoKind.latitude
+                ? 'latitude'
+                : 'longitude',
+          ),
+          _GeoMetric(
+            label: 'Coordinates',
+            value: coordinatePair ?? numericText,
+          ),
+        ],
+        coordinates: coordinatePair ?? numericText,
+      );
+    }
+
+    return null;
+  }
+}
+
+class _GeoMetric {
+  final String label;
+  final String value;
+
+  const _GeoMetric({required this.label, required this.value});
+}
+
+class _WktInfo {
+  final String geometryType;
+  final int? srid;
+  final String? pointCoordinates;
+
+  const _WktInfo({
+    required this.geometryType,
+    this.srid,
+    this.pointCoordinates,
+  });
 }
 
 class _DataGrid extends StatefulWidget {
@@ -1336,6 +1577,49 @@ Object? _structuredJsonValue(String value) {
     final looseMap = _parseLooseMap(trimmed);
     return looseMap ?? value;
   }
+}
+
+String? _numericCellText(TableCellValue value) {
+  if (value.kind == TableCellKind.nullValue) return null;
+  return _numericText(value.fullText ?? value.display);
+}
+
+String? _numericText(String value) {
+  final text = value.trim();
+  return double.tryParse(text) == null ? null : text;
+}
+
+_WktInfo? _parseWktInfo(String value) {
+  final match = RegExp(
+    r'^\s*(?:SRID=(\d+);)?([A-Z]+)\s*(?:Z|M|ZM)?\s*\(',
+    caseSensitive: false,
+  ).firstMatch(value);
+  if (match == null) return null;
+
+  final geometryType = match.group(2)!.toUpperCase();
+  final srid = int.tryParse(match.group(1) ?? '');
+  return _WktInfo(
+    geometryType: geometryType,
+    srid: srid,
+    pointCoordinates: geometryType == 'POINT'
+        ? _parseWktPointCoordinates(value)
+        : null,
+  );
+}
+
+String? _parseWktPointCoordinates(String value) {
+  final match = RegExp(
+    r'^\s*(?:SRID=\d+;)?POINT\s*(?:Z|M|ZM)?\s*\(\s*'
+    r'([-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?)\s+'
+    r'([-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?)(?:\s+'
+    r'[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?)?\s*\)',
+    caseSensitive: false,
+  ).firstMatch(value);
+  if (match == null) return null;
+
+  final lon = match.group(1)!;
+  final lat = match.group(2)!;
+  return '$lat, $lon';
 }
 
 Map<String, String>? _parseLooseMap(String value) {

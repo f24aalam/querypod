@@ -217,6 +217,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.1.9"
+  dbus:
+    dependency: transitive
+    description:
+      name: dbus
+      sha256: "0ce9b0a839e6dee59a37a623d2fc26a35bbbe6404213e419b0d6411023d62645"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.7.14"
   drift:
     dependency: "direct main"
     description:
@@ -417,12 +425,13 @@ packages:
     source: hosted
     version: "0.3.2"
   flutter_secure_storage_linux:
-    dependency: transitive
+    dependency: "direct overridden"
     description:
-      name: flutter_secure_storage_linux
-      sha256: a5f35ddab43cf5c8215d2feb4ce1957851f28c5c37e6f04335066a0602087bf5
-      url: "https://pub.dev"
-    source: hosted
+      path: flutter_secure_storage_linux
+      ref: "feat/linux-rewrite"
+      resolved-ref: e1c394e705ce3dca6209bc967738a4cc175446e6
+      url: "https://github.com/EchoEllet/flutter_secure_storage.git"
+    source: git
     version: "3.0.1"
   flutter_secure_storage_platform_interface:
     dependency: transitive
@@ -474,6 +483,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.23.0"
+  freedesktop_secret:
+    dependency: transitive
+    description:
+      name: freedesktop_secret
+      sha256: "19ffc3520c7488ec4a21530b13f87b4549a1dc16c9fb823cbaa65163706bf768"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.1.2"
   fuchsia_remote_debug_protocol:
     dependency: transitive
     description: flutter
@@ -563,10 +580,10 @@ packages:
     dependency: transitive
     description:
       name: image
-      sha256: "6300175e00616bbc832e2fc91bfa4d776af5402c81c7151bee6905bb08473c52"
+      sha256: f9881ff4998044947ec38d098bc7c8316ae1186fa786eddffdb867b9bc94dfce
       url: "https://pub.dev"
     source: hosted
-    version: "4.9.1"
+    version: "4.8.0"
   integration_test:
     dependency: "direct dev"
     description: flutter
@@ -652,6 +669,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "6.1.0"
+  linux_application_id:
+    dependency: transitive
+    description:
+      name: linux_application_id
+      sha256: "325827b93fec808cadf7308cd711f064f68569e1f030d1a9623b2afabaf19012"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.0.3"
   logging:
     dependency: transitive
     description:
@@ -1261,10 +1286,10 @@ packages:
     dependency: transitive
     description:
       name: xml
-      sha256: "67f0aff7be013d107995e9b75bf4e7f2c3ef2dfdb2c8e68024bba0a7fd5756a4"
+      sha256: "971043b3a0d3da28727e40ed3e0b5d18b742fa5a68665cca88e74b7876d5e025"
       url: "https://pub.dev"
     source: hosted
-    version: "7.0.1"
+    version: "6.6.1"
   yaml:
     dependency: transitive
     description:

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:forui/forui.dart';
 
+import '../core/presentation/widgets/desktop_resize_frame.dart';
 import '../features/connections/presentation/cubit/connection_cubit.dart';
 import '../features/connections/presentation/cubit/connection_editor_cubit.dart';
 import '../features/editor/presentation/cubit/activity_cubit.dart';
@@ -61,7 +62,9 @@ class _AppState extends State<App> {
               final foruiTheme = state.scheme.getTheme(brightness);
               return FTheme(
                 data: foruiTheme,
-                child: FToaster(child: FTooltipGroup(child: child!)),
+                child: DesktopResizeFrame(
+                  child: FToaster(child: FTooltipGroup(child: child!)),
+                ),
               );
             },
           );

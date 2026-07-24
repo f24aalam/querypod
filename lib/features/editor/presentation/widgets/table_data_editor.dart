@@ -145,7 +145,6 @@ class _TableContent extends StatelessWidget {
       children: [
         FResizableRegion.flex(
           flex: 1,
-          minFlex: 1,
           builder: (context, data, child) => child!,
           child: grid,
         ),

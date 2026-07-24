@@ -6,6 +6,7 @@ import 'app/app.dart';
 import 'app/database.dart';
 import 'app/injection.dart';
 import 'app/launch_bootstrap.dart';
+import 'app/theme_cubit.dart';
 import 'core/platform_utils.dart';
 
 void main() async {
@@ -13,7 +14,11 @@ void main() async {
   sqfliteFfiInit();
   final launchBootstrap = LaunchBootstrapConfig.fromEnvironment();
   await configureDependencies(launchBootstrap: launchBootstrap);
-  final initialZoomLevel = await getIt<QueryPodDatabase>().loadZoomLevel();
+  final database = getIt<QueryPodDatabase>();
+  final initialZoomLevel = await database.loadZoomLevel();
+  final initialScheme = AppColorScheme.fromPersistedName(
+    await database.loadAccentColorScheme(),
+  );
 
   if (isDesktop) {
     await windowManager.ensureInitialized();
@@ -33,6 +38,7 @@ void main() async {
     App(
       initialLocation: launchBootstrap.initialLocation,
       initialZoomLevel: initialZoomLevel,
+      initialScheme: initialScheme,
     ),
   );
 }

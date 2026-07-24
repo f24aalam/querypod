@@ -26,7 +26,7 @@ void main() {
           .customSelect('PRAGMA foreign_keys')
           .getSingle();
       expect(foreignKeys.read<int>('foreign_keys'), 1);
-      expect(database.schemaVersion, 2);
+      expect(database.schemaVersion, 4);
 
       final schemaRows = await database
           .customSelect(
@@ -54,12 +54,22 @@ void main() {
       expect(appState, hasLength(1));
       expect(appState.single.id, 1);
       expect(appState.single.selectedConnectionId, isNull);
+      expect(appState.single.zoomLevel, 0);
+      expect(appState.single.accentColorScheme, 'blue');
       expect(
         () => database.customStatement('INSERT INTO app_state (id) VALUES (2)'),
         throwsA(anything),
       );
     },
   );
+
+  test('app state persists zoom and accent settings', () async {
+    await database.saveZoomLevel(2);
+    await database.saveAccentColorScheme('green');
+
+    expect(await database.loadZoomLevel(), 2);
+    expect(await database.loadAccentColorScheme(), 'green');
+  });
 
   test('foreign-key enforcement rejects orphaned connections', () async {
     expect(

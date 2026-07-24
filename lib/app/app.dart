@@ -22,8 +22,14 @@ import 'theme_cubit.dart';
 class App extends StatefulWidget {
   final String initialLocation;
   final int initialZoomLevel;
+  final AppColorScheme initialScheme;
 
-  const App({super.key, this.initialLocation = '/', this.initialZoomLevel = 0});
+  const App({
+    super.key,
+    this.initialLocation = '/',
+    this.initialZoomLevel = 0,
+    this.initialScheme = AppColorScheme.blue,
+  });
 
   @override
   State<App> createState() => _AppState();
@@ -40,6 +46,7 @@ class _AppState extends State<App> {
           create: (_) => ThemeCubit(
             database: getIt<QueryPodDatabase>(),
             initialZoomLevel: widget.initialZoomLevel,
+            initialScheme: widget.initialScheme,
           ),
         ),
         BlocProvider(create: (_) => getIt<ConnectionCubit>()..load()),

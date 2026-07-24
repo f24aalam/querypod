@@ -2672,8 +2672,26 @@ class $AppStateEntriesTable extends AppStateEntries
     requiredDuringInsert: false,
     defaultValue: const Constant(0),
   );
+  static const VerificationMeta _accentColorSchemeMeta = const VerificationMeta(
+    'accentColorScheme',
+  );
   @override
-  List<GeneratedColumn> get $columns => [id, selectedConnectionId, zoomLevel];
+  late final GeneratedColumn<String> accentColorScheme =
+      GeneratedColumn<String>(
+        'accent_color_scheme',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant('blue'),
+      );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    selectedConnectionId,
+    zoomLevel,
+    accentColorScheme,
+  ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -2704,6 +2722,15 @@ class $AppStateEntriesTable extends AppStateEntries
         zoomLevel.isAcceptableOrUnknown(data['zoom_level']!, _zoomLevelMeta),
       );
     }
+    if (data.containsKey('accent_color_scheme')) {
+      context.handle(
+        _accentColorSchemeMeta,
+        accentColorScheme.isAcceptableOrUnknown(
+          data['accent_color_scheme']!,
+          _accentColorSchemeMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -2725,6 +2752,10 @@ class $AppStateEntriesTable extends AppStateEntries
         DriftSqlType.int,
         data['${effectivePrefix}zoom_level'],
       )!,
+      accentColorScheme: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}accent_color_scheme'],
+      )!,
     );
   }
 
@@ -2738,10 +2769,12 @@ class AppStateRow extends DataClass implements Insertable<AppStateRow> {
   final int id;
   final String? selectedConnectionId;
   final int zoomLevel;
+  final String accentColorScheme;
   const AppStateRow({
     required this.id,
     this.selectedConnectionId,
     required this.zoomLevel,
+    required this.accentColorScheme,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -2751,6 +2784,7 @@ class AppStateRow extends DataClass implements Insertable<AppStateRow> {
       map['selected_connection_id'] = Variable<String>(selectedConnectionId);
     }
     map['zoom_level'] = Variable<int>(zoomLevel);
+    map['accent_color_scheme'] = Variable<String>(accentColorScheme);
     return map;
   }
 
@@ -2761,6 +2795,7 @@ class AppStateRow extends DataClass implements Insertable<AppStateRow> {
           ? const Value.absent()
           : Value(selectedConnectionId),
       zoomLevel: Value(zoomLevel),
+      accentColorScheme: Value(accentColorScheme),
     );
   }
 
@@ -2775,6 +2810,7 @@ class AppStateRow extends DataClass implements Insertable<AppStateRow> {
         json['selectedConnectionId'],
       ),
       zoomLevel: serializer.fromJson<int>(json['zoomLevel']),
+      accentColorScheme: serializer.fromJson<String>(json['accentColorScheme']),
     );
   }
   @override
@@ -2784,6 +2820,7 @@ class AppStateRow extends DataClass implements Insertable<AppStateRow> {
       'id': serializer.toJson<int>(id),
       'selectedConnectionId': serializer.toJson<String?>(selectedConnectionId),
       'zoomLevel': serializer.toJson<int>(zoomLevel),
+      'accentColorScheme': serializer.toJson<String>(accentColorScheme),
     };
   }
 
@@ -2791,12 +2828,14 @@ class AppStateRow extends DataClass implements Insertable<AppStateRow> {
     int? id,
     Value<String?> selectedConnectionId = const Value.absent(),
     int? zoomLevel,
+    String? accentColorScheme,
   }) => AppStateRow(
     id: id ?? this.id,
     selectedConnectionId: selectedConnectionId.present
         ? selectedConnectionId.value
         : this.selectedConnectionId,
     zoomLevel: zoomLevel ?? this.zoomLevel,
+    accentColorScheme: accentColorScheme ?? this.accentColorScheme,
   );
   AppStateRow copyWithCompanion(AppStateEntriesCompanion data) {
     return AppStateRow(
@@ -2805,6 +2844,9 @@ class AppStateRow extends DataClass implements Insertable<AppStateRow> {
           ? data.selectedConnectionId.value
           : this.selectedConnectionId,
       zoomLevel: data.zoomLevel.present ? data.zoomLevel.value : this.zoomLevel,
+      accentColorScheme: data.accentColorScheme.present
+          ? data.accentColorScheme.value
+          : this.accentColorScheme,
     );
   }
 
@@ -2813,46 +2855,54 @@ class AppStateRow extends DataClass implements Insertable<AppStateRow> {
     return (StringBuffer('AppStateRow(')
           ..write('id: $id, ')
           ..write('selectedConnectionId: $selectedConnectionId, ')
-          ..write('zoomLevel: $zoomLevel')
+          ..write('zoomLevel: $zoomLevel, ')
+          ..write('accentColorScheme: $accentColorScheme')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, selectedConnectionId, zoomLevel);
+  int get hashCode =>
+      Object.hash(id, selectedConnectionId, zoomLevel, accentColorScheme);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is AppStateRow &&
           other.id == this.id &&
           other.selectedConnectionId == this.selectedConnectionId &&
-          other.zoomLevel == this.zoomLevel);
+          other.zoomLevel == this.zoomLevel &&
+          other.accentColorScheme == this.accentColorScheme);
 }
 
 class AppStateEntriesCompanion extends UpdateCompanion<AppStateRow> {
   final Value<int> id;
   final Value<String?> selectedConnectionId;
   final Value<int> zoomLevel;
+  final Value<String> accentColorScheme;
   const AppStateEntriesCompanion({
     this.id = const Value.absent(),
     this.selectedConnectionId = const Value.absent(),
     this.zoomLevel = const Value.absent(),
+    this.accentColorScheme = const Value.absent(),
   });
   AppStateEntriesCompanion.insert({
     this.id = const Value.absent(),
     this.selectedConnectionId = const Value.absent(),
     this.zoomLevel = const Value.absent(),
+    this.accentColorScheme = const Value.absent(),
   });
   static Insertable<AppStateRow> custom({
     Expression<int>? id,
     Expression<String>? selectedConnectionId,
     Expression<int>? zoomLevel,
+    Expression<String>? accentColorScheme,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
       if (selectedConnectionId != null)
         'selected_connection_id': selectedConnectionId,
       if (zoomLevel != null) 'zoom_level': zoomLevel,
+      if (accentColorScheme != null) 'accent_color_scheme': accentColorScheme,
     });
   }
 
@@ -2860,11 +2910,13 @@ class AppStateEntriesCompanion extends UpdateCompanion<AppStateRow> {
     Value<int>? id,
     Value<String?>? selectedConnectionId,
     Value<int>? zoomLevel,
+    Value<String>? accentColorScheme,
   }) {
     return AppStateEntriesCompanion(
       id: id ?? this.id,
       selectedConnectionId: selectedConnectionId ?? this.selectedConnectionId,
       zoomLevel: zoomLevel ?? this.zoomLevel,
+      accentColorScheme: accentColorScheme ?? this.accentColorScheme,
     );
   }
 
@@ -2882,6 +2934,9 @@ class AppStateEntriesCompanion extends UpdateCompanion<AppStateRow> {
     if (zoomLevel.present) {
       map['zoom_level'] = Variable<int>(zoomLevel.value);
     }
+    if (accentColorScheme.present) {
+      map['accent_color_scheme'] = Variable<String>(accentColorScheme.value);
+    }
     return map;
   }
 
@@ -2890,7 +2945,8 @@ class AppStateEntriesCompanion extends UpdateCompanion<AppStateRow> {
     return (StringBuffer('AppStateEntriesCompanion(')
           ..write('id: $id, ')
           ..write('selectedConnectionId: $selectedConnectionId, ')
-          ..write('zoomLevel: $zoomLevel')
+          ..write('zoomLevel: $zoomLevel, ')
+          ..write('accentColorScheme: $accentColorScheme')
           ..write(')'))
         .toString();
   }
@@ -5573,12 +5629,14 @@ typedef $$AppStateEntriesTableCreateCompanionBuilder =
       Value<int> id,
       Value<String?> selectedConnectionId,
       Value<int> zoomLevel,
+      Value<String> accentColorScheme,
     });
 typedef $$AppStateEntriesTableUpdateCompanionBuilder =
     AppStateEntriesCompanion Function({
       Value<int> id,
       Value<String?> selectedConnectionId,
       Value<int> zoomLevel,
+      Value<String> accentColorScheme,
     });
 
 final class $$AppStateEntriesTableReferences
@@ -5631,6 +5689,11 @@ class $$AppStateEntriesTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<String> get accentColorScheme => $composableBuilder(
+    column: $table.accentColorScheme,
+    builder: (column) => ColumnFilters(column),
+  );
+
   $$ConnectionsTableFilterComposer get selectedConnectionId {
     final $$ConnectionsTableFilterComposer composer = $composerBuilder(
       composer: this,
@@ -5674,6 +5737,11 @@ class $$AppStateEntriesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get accentColorScheme => $composableBuilder(
+    column: $table.accentColorScheme,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$ConnectionsTableOrderingComposer get selectedConnectionId {
     final $$ConnectionsTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -5712,6 +5780,11 @@ class $$AppStateEntriesTableAnnotationComposer
 
   GeneratedColumn<int> get zoomLevel =>
       $composableBuilder(column: $table.zoomLevel, builder: (column) => column);
+
+  GeneratedColumn<String> get accentColorScheme => $composableBuilder(
+    column: $table.accentColorScheme,
+    builder: (column) => column,
+  );
 
   $$ConnectionsTableAnnotationComposer get selectedConnectionId {
     final $$ConnectionsTableAnnotationComposer composer = $composerBuilder(
@@ -5770,20 +5843,24 @@ class $$AppStateEntriesTableTableManager
                 Value<int> id = const Value.absent(),
                 Value<String?> selectedConnectionId = const Value.absent(),
                 Value<int> zoomLevel = const Value.absent(),
+                Value<String> accentColorScheme = const Value.absent(),
               }) => AppStateEntriesCompanion(
                 id: id,
                 selectedConnectionId: selectedConnectionId,
                 zoomLevel: zoomLevel,
+                accentColorScheme: accentColorScheme,
               ),
           createCompanionCallback:
               ({
                 Value<int> id = const Value.absent(),
                 Value<String?> selectedConnectionId = const Value.absent(),
                 Value<int> zoomLevel = const Value.absent(),
+                Value<String> accentColorScheme = const Value.absent(),
               }) => AppStateEntriesCompanion.insert(
                 id: id,
                 selectedConnectionId: selectedConnectionId,
                 zoomLevel: zoomLevel,
+                accentColorScheme: accentColorScheme,
               ),
           withReferenceMapper: (p0) => p0
               .map(

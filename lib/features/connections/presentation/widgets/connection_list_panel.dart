@@ -140,6 +140,11 @@ class _ConnectionItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final itemContext = context;
+    final selectedColor = Color.lerp(
+      theme.colors.secondary,
+      theme.colors.primary,
+      0.12,
+    )!;
     return FContextMenu(
       menuBuilder: (context, controller, menu) => [
         FItemGroup(
@@ -163,14 +168,24 @@ class _ConnectionItem extends StatelessWidget {
         onDoubleTap: () =>
             context.read<ConnectionCubit>().openSavedConnection(id),
         child: Container(
-          color: isSelected ? theme.colors.secondary : Colors.transparent,
+          decoration: BoxDecoration(
+            color: isSelected ? selectedColor : Colors.transparent,
+            border: Border(
+              left: BorderSide(
+                color: isSelected ? theme.colors.primary : Colors.transparent,
+                width: 2,
+              ),
+            ),
+          ),
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           child: Row(
             children: [
               Icon(
                 Icons.storage_outlined,
                 size: 14,
-                color: theme.colors.mutedForeground,
+                color: isSelected
+                    ? theme.colors.primary
+                    : theme.colors.mutedForeground,
               ),
               const SizedBox(width: 8),
               Expanded(

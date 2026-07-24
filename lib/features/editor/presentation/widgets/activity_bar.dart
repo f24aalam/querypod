@@ -97,23 +97,39 @@ class _ActivityIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = context.theme;
+    final activeColor = Color.lerp(
+      theme.colors.background,
+      theme.colors.primary,
+      0.16,
+    )!;
     return FTooltip(
       tipBuilder: (_, _) => Text(tooltip),
       child: Material(
-        color: isActive ? theme.colors.background : Colors.transparent,
+        color: isActive ? activeColor : Colors.transparent,
         child: InkWell(
           onTap: onTap,
           child: SizedBox(
             width: 48,
             height: 40,
-            child: Center(
-              child: Icon(
-                icon,
-                size: 20,
-                color: isActive
-                    ? theme.colors.foreground
-                    : theme.colors.mutedForeground,
-              ),
+            child: Stack(
+              children: [
+                if (isActive)
+                  Positioned(
+                    left: 0,
+                    top: 8,
+                    bottom: 8,
+                    child: Container(width: 2, color: theme.colors.primary),
+                  ),
+                Center(
+                  child: Icon(
+                    icon,
+                    size: 20,
+                    color: isActive
+                        ? theme.colors.primary
+                        : theme.colors.mutedForeground,
+                  ),
+                ),
+              ],
             ),
           ),
         ),

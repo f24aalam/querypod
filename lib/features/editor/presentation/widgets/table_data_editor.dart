@@ -192,6 +192,11 @@ class _TableStructurePanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = context.theme;
+    final headerColor = Color.lerp(
+      theme.colors.background,
+      theme.colors.primary,
+      0.08,
+    )!;
     final columns = session.structure!.columns;
     final indexes = session.structure!.indexes;
 
@@ -203,17 +208,14 @@ class _TableStructurePanel extends StatelessWidget {
             height: 34,
             padding: const EdgeInsets.only(left: 12, right: 4),
             decoration: BoxDecoration(
+              color: headerColor,
               border: Border(
-                bottom: BorderSide(color: theme.colors.border, width: 1),
+                bottom: BorderSide(color: theme.colors.primary, width: 1),
               ),
             ),
             child: Row(
               children: [
-                Icon(
-                  Icons.info_outline,
-                  size: 14,
-                  color: theme.colors.foreground,
-                ),
+                Icon(Icons.info_outline, size: 14, color: theme.colors.primary),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
@@ -537,6 +539,11 @@ class _ForeignRowPreviewPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = context.theme;
+    final headerColor = Color.lerp(
+      theme.colors.background,
+      theme.colors.primary,
+      0.08,
+    )!;
     final preview = session.foreignRowPreview!;
 
     return Container(
@@ -550,17 +557,14 @@ class _ForeignRowPreviewPanel extends StatelessWidget {
             height: 34,
             padding: const EdgeInsets.only(left: 12, right: 4),
             decoration: BoxDecoration(
+              color: headerColor,
               border: Border(
-                bottom: BorderSide(color: theme.colors.border, width: 1),
+                bottom: BorderSide(color: theme.colors.primary, width: 1),
               ),
             ),
             child: Row(
               children: [
-                Icon(
-                  Icons.open_in_new,
-                  size: 14,
-                  color: theme.colors.foreground,
-                ),
+                Icon(Icons.open_in_new, size: 14, color: theme.colors.primary),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
@@ -620,6 +624,11 @@ class _RowDetailPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = context.theme;
+    final headerColor = Color.lerp(
+      theme.colors.background,
+      theme.colors.primary,
+      0.08,
+    )!;
 
     return Container(
       decoration: BoxDecoration(
@@ -632,8 +641,9 @@ class _RowDetailPanel extends StatelessWidget {
             height: 34,
             padding: const EdgeInsets.only(left: 12, right: 4),
             decoration: BoxDecoration(
+              color: headerColor,
               border: Border(
-                bottom: BorderSide(color: theme.colors.border, width: 1),
+                bottom: BorderSide(color: theme.colors.primary, width: 1),
               ),
             ),
             child: Row(
@@ -641,7 +651,7 @@ class _RowDetailPanel extends StatelessWidget {
                 Icon(
                   Icons.article_outlined,
                   size: 14,
-                  color: theme.colors.foreground,
+                  color: theme.colors.primary,
                 ),
                 const SizedBox(width: 6),
                 Expanded(
@@ -728,6 +738,11 @@ class _BatchInspector extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = context.theme;
+    final headerColor = Color.lerp(
+      theme.colors.background,
+      theme.colors.primary,
+      0.08,
+    )!;
     return Container(
       decoration: BoxDecoration(
         color: theme.colors.background,
@@ -740,8 +755,9 @@ class _BatchInspector extends StatelessWidget {
             height: 34,
             padding: const EdgeInsets.symmetric(horizontal: 12),
             decoration: BoxDecoration(
+              color: headerColor,
               border: Border(
-                bottom: BorderSide(color: theme.colors.border, width: 1),
+                bottom: BorderSide(color: theme.colors.primary, width: 1),
               ),
             ),
             alignment: Alignment.centerLeft,
@@ -2007,6 +2023,11 @@ class _GridRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = context.theme;
+    final selectedColor = Color.lerp(
+      theme.colors.secondary,
+      theme.colors.primary,
+      0.14,
+    )!;
     return FContextMenu(
       menuBuilder: (context, controller, menu) => [
         FItemGroup(
@@ -2088,7 +2109,7 @@ class _GridRow extends StatelessWidget {
             : stagedInsert
             ? Colors.green.withValues(alpha: 0.18)
             : selected
-            ? theme.colors.secondary
+            ? selectedColor
             : Colors.transparent,
         child: Row(
           children: [
@@ -3074,6 +3095,11 @@ class _FilterSheetState extends State<_FilterSheet> {
   @override
   Widget build(BuildContext context) {
     final theme = context.theme;
+    final headerColor = Color.lerp(
+      theme.colors.background,
+      theme.colors.primary,
+      0.08,
+    )!;
     return Container(
       width: 400,
       height: double.infinity,
@@ -3087,8 +3113,9 @@ class _FilterSheetState extends State<_FilterSheet> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
+              color: headerColor,
               border: Border(
-                bottom: BorderSide(color: theme.colors.border, width: 1),
+                bottom: BorderSide(color: theme.colors.primary, width: 1),
               ),
             ),
             child: Row(

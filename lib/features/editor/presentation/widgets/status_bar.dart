@@ -17,7 +17,11 @@ class StatusBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = context.theme;
-    final bgColor = theme.colors.secondary;
+    final bgColor = Color.lerp(
+      theme.colors.secondary,
+      theme.colors.primary,
+      0.06,
+    )!;
     final fgColor = theme.colors.secondaryForeground;
     final mutedColor = theme.colors.mutedForeground;
 

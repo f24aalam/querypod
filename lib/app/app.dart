@@ -15,10 +15,17 @@ import 'router.dart';
 
 import 'theme_cubit.dart';
 
-class App extends StatelessWidget {
+class App extends StatefulWidget {
   final String initialLocation;
 
   const App({super.key, this.initialLocation = '/'});
+
+  @override
+  State<App> createState() => _AppState();
+}
+
+class _AppState extends State<App> {
+  late final _router = buildRouter(initialLocation: widget.initialLocation);
 
   @override
   Widget build(BuildContext context) {
@@ -40,7 +47,7 @@ class App extends StatelessWidget {
           final darkTheme = state.scheme.getTheme(Brightness.dark);
 
           return MaterialApp.router(
-            routerConfig: buildRouter(initialLocation: initialLocation),
+            routerConfig: _router,
             theme: lightTheme.toApproximateMaterialTheme(),
             darkTheme: darkTheme.toApproximateMaterialTheme(),
             themeMode: state.mode,

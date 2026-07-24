@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:forui/forui.dart';
 import 'package:querypod/app/theme.dart' as app_theme;
+import 'package:querypod/core/presentation/widgets/desktop_resize_frame.dart';
 import 'package:querypod/features/editor/presentation/widgets/app_menu_bar.dart';
 import 'package:querypod/features/editor/presentation/widgets/app_title_bar.dart';
 import 'package:window_manager/window_manager.dart';
@@ -13,10 +14,12 @@ void main() {
 
   final calls = <MethodCall>[];
   var isMaximized = false;
+  var isFullScreen = false;
 
   setUp(() {
     calls.clear();
     isMaximized = false;
+    isFullScreen = false;
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(const MethodChannel('window_manager'), (
           call,
@@ -25,6 +28,8 @@ void main() {
           switch (call.method) {
             case 'isMaximized':
               return isMaximized;
+            case 'isFullScreen':
+              return isFullScreen;
             case 'maximize':
               isMaximized = true;
             case 'unmaximize':
@@ -38,6 +43,51 @@ void main() {
     debugDefaultTargetPlatformOverride = null;
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(const MethodChannel('window_manager'), null);
+  });
+
+  testWidgets('desktop resize frame enables edge dragging on Linux', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+
+    await tester.pumpWidget(_resizeFrameApp());
+    await tester.pumpAndSettle();
+
+    final resizeArea = tester.widget<DragToResizeArea>(
+      find.byType(DragToResizeArea),
+    );
+    expect(resizeArea.resizeEdgeSize, 6);
+    expect(resizeArea.enableResizeEdges, isNull);
+    debugDefaultTargetPlatformOverride = null;
+  });
+
+  testWidgets('desktop resize frame disables edge dragging while maximized', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+    isMaximized = true;
+
+    await tester.pumpWidget(_resizeFrameApp());
+    await tester.pumpAndSettle();
+
+    final resizeArea = tester.widget<DragToResizeArea>(
+      find.byType(DragToResizeArea),
+    );
+    expect(resizeArea.enableResizeEdges, isEmpty);
+    debugDefaultTargetPlatformOverride = null;
+  });
+
+  testWidgets('desktop resize frame leaves macOS native resizing alone', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+
+    await tester.pumpWidget(_resizeFrameApp());
+    await tester.pumpAndSettle();
+
+    expect(find.byType(DragToResizeArea), findsNothing);
+    expect(find.byKey(const ValueKey('resize-frame-child')), findsOneWidget);
+    debugDefaultTargetPlatformOverride = null;
   });
 
   testWidgets('Windows uses custom chrome and updates maximize state', (
@@ -233,6 +283,14 @@ void main() {
       debugDefaultTargetPlatformOverride = null;
     });
   }
+}
+
+Widget _resizeFrameApp() {
+  return const MaterialApp(
+    home: DesktopResizeFrame(
+      child: SizedBox(key: ValueKey('resize-frame-child')),
+    ),
+  );
 }
 
 Widget _titleBarApp([FThemeData? theme]) {

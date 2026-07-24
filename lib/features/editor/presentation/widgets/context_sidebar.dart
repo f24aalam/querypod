@@ -124,6 +124,11 @@ class _QueryListItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = context.theme;
+    final activeColor = Color.lerp(
+      theme.colors.secondary,
+      theme.colors.primary,
+      0.12,
+    )!;
 
     return BlocSelector<EditorTabsCubit, EditorTabsState, bool>(
       selector: (state) => state.activeTabKey == QueryTabKey(queryId: query.id),
@@ -154,7 +159,7 @@ class _QueryListItem extends StatelessWidget {
             ),
           ],
           child: Material(
-            color: isActive ? theme.colors.secondary : Colors.transparent,
+            color: isActive ? activeColor : Colors.transparent,
             borderRadius: BorderRadius.circular(6),
             child: InkWell(
               borderRadius: BorderRadius.circular(6),
@@ -173,7 +178,7 @@ class _QueryListItem extends StatelessWidget {
                       Icons.description_outlined,
                       size: 14,
                       color: isActive
-                          ? theme.colors.foreground
+                          ? theme.colors.primary
                           : theme.colors.mutedForeground,
                     ),
                     const SizedBox(width: 8),

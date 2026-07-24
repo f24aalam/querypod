@@ -216,6 +216,11 @@ class _EditorTabBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = context.theme;
+    final activeTabColor = Color.lerp(
+      theme.colors.background,
+      theme.colors.primary,
+      0.10,
+    )!;
     final tabsState = context.watch<EditorTabsCubit>().state;
     final hasWorkTabs = tabsState.tabs.any(_isWorkTab);
     final tabIndex = tabsState.tabs.indexWhere((item) => item.key == tab.key);
@@ -284,7 +289,7 @@ class _EditorTabBody extends StatelessWidget {
       ],
       child: Material(
         key: ValueKey<(String, EditorTabKey)>(('tab-strip', tab.key)),
-        color: isActive ? theme.colors.background : Colors.transparent,
+        color: isActive ? activeTabColor : Colors.transparent,
         child: Container(
           height: 34,
           width: 180,
@@ -321,7 +326,9 @@ class _EditorTabBody extends StatelessWidget {
                                       ? Icons.visibility_outlined
                                       : Icons.table_chart_outlined),
                             size: 14,
-                            color: theme.colors.mutedForeground,
+                            color: isActive
+                                ? theme.colors.primary
+                                : theme.colors.mutedForeground,
                           ),
                           const SizedBox(width: 6),
                           Expanded(

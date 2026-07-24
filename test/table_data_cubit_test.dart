@@ -411,6 +411,45 @@ void main() {
     expect(repository.countCalls, 3);
   });
 
+  test(
+    'search column selection is local while the search box is empty',
+    () async {
+      final repository = _FakeTableDataRepository(total: 80);
+      final cubit = TableDataCubit(repository: repository);
+      await cubit.openTable(connection, key);
+      await cubit.nextPage(key);
+
+      final countCalls = repository.countCalls;
+      final requestCount = repository.requests.length;
+
+      await cubit.setSearch(key, column: 'name');
+
+      var session = cubit.state.session(key)!;
+      expect(session.searchQuery, isNull);
+      expect(session.searchColumn, 'name');
+      expect(session.pageIndex, 1);
+      expect(repository.countCalls, countCalls);
+      expect(repository.requests, hasLength(requestCount));
+
+      await cubit.setSearch(key, column: 'email');
+
+      session = cubit.state.session(key)!;
+      expect(session.searchColumn, 'email');
+      expect(session.pageIndex, 1);
+      expect(repository.countCalls, countCalls);
+      expect(repository.requests, hasLength(requestCount));
+
+      await cubit.setSearch(key, query: 'alice');
+
+      session = cubit.state.session(key)!;
+      expect(session.searchQuery, 'alice');
+      expect(session.searchColumn, 'email');
+      expect(session.pageIndex, 0);
+      expect(repository.countCalls, countCalls + 1);
+      expect(repository.requests, hasLength(requestCount + 1));
+    },
+  );
+
   test('filters reset pagination and avoid unchanged reloads', () async {
     final repository = _FakeTableDataRepository(total: 30);
     final cubit = TableDataCubit(repository: repository);

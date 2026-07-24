@@ -137,6 +137,9 @@ class AppStateEntries extends Table {
     #id,
     onDelete: KeyAction.setNull,
   )();
+  IntColumn get zoomLevel => integer().withDefault(const Constant(0))();
+  TextColumn get accentColorScheme =>
+      text().withDefault(const Constant('blue'))();
 
   @override
   Set<Column<Object>> get primaryKey => {id};
@@ -161,7 +164,7 @@ class QueryPodDatabase extends _$QueryPodDatabase {
     : super(executor ?? _openProfileDatabase(profileNamespace));
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -184,6 +187,15 @@ class QueryPodDatabase extends _$QueryPodDatabase {
         await customStatement('DROP TABLE pinned_tables_old');
         await migrator.createTable(selectedSchemas);
       }
+      if (from < 3) {
+        await migrator.addColumn(appStateEntries, appStateEntries.zoomLevel);
+      }
+      if (from < 4) {
+        await migrator.addColumn(
+          appStateEntries,
+          appStateEntries.accentColorScheme,
+        );
+      }
     },
     beforeOpen: (details) async {
       await customStatement('PRAGMA foreign_keys = ON');
@@ -198,6 +210,26 @@ class QueryPodDatabase extends _$QueryPodDatabase {
         .encode(utf8.encode(normalized))
         .replaceAll('=', '');
     return 'querypod_$encoded.db';
+  }
+
+  Future<int> loadZoomLevel() async {
+    final row = await select(appStateEntries).getSingleOrNull();
+    return row?.zoomLevel ?? 0;
+  }
+
+  Future<void> saveZoomLevel(int zoomLevel) {
+    return (update(appStateEntries)..where((entry) => entry.id.equals(1)))
+        .write(AppStateEntriesCompanion(zoomLevel: Value(zoomLevel)));
+  }
+
+  Future<String> loadAccentColorScheme() async {
+    final row = await select(appStateEntries).getSingleOrNull();
+    return row?.accentColorScheme ?? 'blue';
+  }
+
+  Future<void> saveAccentColorScheme(String scheme) {
+    return (update(appStateEntries)..where((entry) => entry.id.equals(1)))
+        .write(AppStateEntriesCompanion(accentColorScheme: Value(scheme)));
   }
 }
 

@@ -3,11 +3,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:querypod/app/app.dart';
 import 'package:querypod/app/injection.dart';
 import 'package:querypod/app/launch_bootstrap.dart';
+import 'package:querypod/app/theme_cubit.dart';
 import 'package:querypod/features/connections/domain/entities/connection.dart';
 import 'package:querypod/features/connections/domain/repositories/connection_repository.dart';
 import 'package:querypod/features/connections/presentation/cubit/connection_cubit.dart';
 import 'package:querypod/features/editor/presentation/pages/connection_page.dart';
 import 'package:querypod/features/workspaces/domain/repositories/workspace_repository.dart';
+import 'package:querypod/features/workspaces/presentation/pages/workspaces_page.dart';
 
 import 'support/persistence_test_support.dart';
 
@@ -32,6 +34,24 @@ void main() {
     await tester.pumpAndSettle();
 
     final context = tester.element(find.byType(ConnectionPage));
+    expect(
+      context.read<ConnectionCubit>().state.activeWorkspaceId,
+      'router-target',
+    );
+  });
+
+  testWidgets('theme changes keep the active workspace route', (tester) async {
+    await tester.pumpWidget(
+      const App(initialLocation: '/workspace/router-target'),
+    );
+    await tester.pumpAndSettle();
+
+    final context = tester.element(find.byType(ConnectionPage));
+    context.read<ThemeCubit>().setScheme(AppColorScheme.green);
+    await tester.pumpAndSettle();
+
+    expect(find.byType(ConnectionPage), findsOneWidget);
+    expect(find.byType(WorkspacesPage), findsNothing);
     expect(
       context.read<ConnectionCubit>().state.activeWorkspaceId,
       'router-target',

@@ -1,5 +1,7 @@
 enum TableCellKind { nullValue, text, binary }
 
+enum TableColumnGeoKind { none, geometry, geography, latitude, longitude }
+
 class TableCellValue {
   final TableCellKind kind;
   final String display;
@@ -113,6 +115,8 @@ class TableDataColumn {
   final bool isPrimaryKey;
   final bool isNullable;
   final TableForeignKey? foreignKey;
+  final TableColumnGeoKind geoKind;
+  final int? srid;
 
   const TableDataColumn({
     required this.name,
@@ -121,7 +125,25 @@ class TableDataColumn {
     required this.isPrimaryKey,
     required this.isNullable,
     this.foreignKey,
+    this.geoKind = TableColumnGeoKind.none,
+    this.srid,
   });
+
+  TableColumnGeoKind get effectiveGeoKind {
+    if (geoKind != TableColumnGeoKind.none) return geoKind;
+    final normalized = name.toLowerCase();
+    if (normalized == 'lat' || normalized == 'latitude') {
+      return TableColumnGeoKind.latitude;
+    }
+    if (normalized == 'lon' ||
+        normalized == 'lng' ||
+        normalized == 'longitude') {
+      return TableColumnGeoKind.longitude;
+    }
+    return TableColumnGeoKind.none;
+  }
+
+  bool get isGeoColumn => effectiveGeoKind != TableColumnGeoKind.none;
 }
 
 class TableDataRow {

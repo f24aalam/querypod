@@ -66,6 +66,18 @@ class TableDataCubit extends Cubit<TableDataState> {
       return;
     }
 
+    final hadSearchText = session.searchQuery?.trim().isNotEmpty ?? false;
+    final hasSearchText = newQuery?.trim().isNotEmpty ?? false;
+    if (!hadSearchText && !hasSearchText) {
+      _setSession(
+        session.copyWith(
+          searchQuery: () => newQuery,
+          searchColumn: () => newColumn,
+        ),
+      );
+      return;
+    }
+
     _setSession(
       _clearTransientState(
         session.copyWith(

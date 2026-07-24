@@ -78,14 +78,13 @@ fi
 
 runtime_bins=(
   "${PACKAGE_LIB_DIR}/${APP_NAME}"
-  "${PACKAGE_LIB_DIR}/lib/libfile_selector_linux_plugin.so"
-  "${PACKAGE_LIB_DIR}/lib/libflutter_secure_storage_linux_plugin.so"
-  "${PACKAGE_LIB_DIR}/lib/liburl_launcher_linux_plugin.so"
 )
 
-if [[ -f "${PACKAGE_LIB_DIR}/lib/libdartjni.so" ]]; then
-  runtime_bins+=("${PACKAGE_LIB_DIR}/lib/libdartjni.so")
-fi
+for runtime_lib in "${PACKAGE_LIB_DIR}"/lib/lib*_plugin.so "${PACKAGE_LIB_DIR}/lib/libdartjni.so"; do
+  if [[ -f "${runtime_lib}" ]]; then
+    runtime_bins+=("${runtime_lib}")
+  fi
+done
 
 mkdir -p "${PACKAGE_DIR}/debian"
 cat > "${PACKAGE_DIR}/debian/control" <<EOF
